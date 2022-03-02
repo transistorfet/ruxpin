@@ -1,0 +1,1 @@
+qemu-system-aarch64 -machine raspi3b -m 1024 -kernel target/aarch64-unknown-none/debug/ruxpin -no-reboot -gdb tcp::1234 -semihosting -serial stdio # -append "root=/dev/sda2 panic=1 rootfstype=ext4 rw init=/bin/bash" -hda rpi.img
