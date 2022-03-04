@@ -3,9 +3,9 @@ use core::fmt;
 
 const SERIAL_OUT: *mut u8 = 0x3F20_1000 as *mut u8;
 
-pub struct SimpleConsole;
+pub struct Console;
 
-impl fmt::Write for SimpleConsole {
+impl fmt::Write for Console {
     fn write_str(&mut self, s: &str) -> fmt::Result { 
         for ch in s.chars() {
             unsafe {
