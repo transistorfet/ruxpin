@@ -6,14 +6,13 @@
 .global _default_exceptions_table
 
 .macro EXCEPTION_FATAL
-	//ldr	x0, =0x80000
-	//mov	sp, x0
-	//bl	fatal_error
-	//eret
-
 	ldr	x1, =0x3F201000
 	mov	w0, #0x21
 	strb	w0, [x1]
+
+	mrs	x0, ESR_EL1
+	mrs	x1, ELR_EL1
+	b	fatal_error
 
 	b	_loop
 .endm
@@ -21,6 +20,10 @@
 _loop:
 	b	_loop
 
+
+/*
+ * Exceptions Table
+ */
 .balign 2048
 _default_exceptions_table:
 
@@ -76,8 +79,4 @@ _default_exceptions_table:
 .balign 0x80
 	EXCEPTION_FATAL
 
-
-.global _trigger_illegal_instruction
-_trigger_illegal_instruction:
-	.word	0x000000
 

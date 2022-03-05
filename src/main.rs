@@ -41,9 +41,9 @@ fn panic(_info: &PanicInfo) -> ! {
 }
 
 #[no_mangle]
-pub extern "C" fn fatal_error() -> ! {
+pub extern "C" fn fatal_error(esr: i64, elr: i64) -> ! {
     let mut console = Console {};
-    console.write_str("Fatal Error\n").unwrap();
+    console.write_fmt(format_args!("Fatal Error: ESR: 0x{:x}, ELR: 0x{:x}\n", esr, elr)).unwrap();
 
     loop {}
 }
