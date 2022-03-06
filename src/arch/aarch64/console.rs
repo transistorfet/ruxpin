@@ -15,3 +15,8 @@ impl fmt::Write for Console {
         Ok(())
     }
 }
+
+pub fn get_console() -> impl fmt::Write {
+    Console {}
+}
+

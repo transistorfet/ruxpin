@@ -27,8 +27,8 @@ _start:
 
 	bl	_setup_common_system_registers
 
-	wfe
     L_loop_forever:
+	wfe
 	b L_loop_forever
 
 
@@ -50,11 +50,12 @@ _start:
 	mov	x0, #0b00101
 	msr	SPSR_EL3, x0
 
-	adr	x2, L_enter_E2
+	adr	x2, L_enter_E1
 	msr	ELR_EL3, x2
+	isb	sy
 	eret
 
-    L_enter_E2:
+    L_enter_E1:
 	bl	kernel_start
 
 
@@ -94,13 +95,9 @@ _setup_common_system_registers:
 	orr	x0, x0, #(1<<0)
 	msr	SCR_EL3, x0
 
-	ret
+	isb	sy
+	//dsb	sy
 
-
-.global _get_current_el
-_get_current_el:
-	mrs	x0, CurrentEL
-	lsr	x0, x0, 2
 	ret
 
 
