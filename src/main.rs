@@ -2,20 +2,18 @@
 #![no_main]
 
 mod arch;
+mod mm;
 mod printk;
 
 use core::fmt::Write;
 use core::panic::PanicInfo;
 
-use arch::console::Console;
+use crate::mm::kmalloc::{init_kernel_heap, kmalloc, kmfree};
 
-static HELLO: &str = "Hello World!\nAnd this is the thing that involves the stuff and it's really cooled and i like it to bits\n";
 
 #[no_mangle]
 pub extern "C" fn kernel_start() -> ! {
-    let mut console = Console {};
-
-    console.write_str(HELLO).unwrap();
+    printk!("Kernel started\n");
 
     //printk!("CurrentEL: {:x}\n", unsafe { get_current_el() });
 
@@ -23,13 +21,27 @@ pub extern "C" fn kernel_start() -> ! {
     //let mut big_addr: u64 = 8 * 1024 * 1024 * 1024 * 1024;
     //unsafe { core::ptr::read_volatile(big_addr as *mut u64) };
 
-    console.write_str("aaand loop\n").unwrap();
+    init_kernel_heap(0x100000 as *mut i8, 0x100000);
+
+    unsafe {
+        let ptr = kmalloc(1024);
+        printk!("Alloc: {:x}\n", ptr as usize);
+        kmfree(ptr);
+        let ptr = kmalloc(1024);
+        printk!("Alloc2: {:x}\n", ptr as usize);
+    }
+
+    printk!("Looping\n");
     loop {}
 }
 
 #[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
-    printk!("Rust Panic\n");
+fn panic(info: &PanicInfo) -> ! {
+    if let Some(s) = info.payload().downcast_ref::<&str>() {
+        printk!("Rust Panic: {:?}\n", s);
+    } else {
+        printk!("Rust Panic\n");
+    }
 
     loop {}
 }

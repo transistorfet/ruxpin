@@ -101,7 +101,6 @@ _setup_common_system_registers:
 	ret
 
 
-// TODO replace this with something configurable
 _INIT_STACK_POINTER:
-	.word	0x100000
+	.word	__KERNEL_END_ADDR + 0x100000
 
