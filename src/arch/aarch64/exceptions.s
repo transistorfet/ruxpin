@@ -9,7 +9,6 @@
 	ldr	x1, =0x3F201000
 	mov	w0, #0x21
 	strb	w0, [x1]
-
 	mrs	x0, ESR_EL1
 	mrs	x1, ELR_EL1
 	b	fatal_error

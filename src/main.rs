@@ -21,6 +21,7 @@ pub extern "C" fn kernel_start() -> ! {
 
     console.write_str(HELLO).unwrap();
 
+    // TODO this causes an exception because it uses the mrs instruction 
     //console.write_fmt(format_args!("{:x}", unsafe { _get_current_el() }));
     //console.write_str("\n");
 
@@ -28,7 +29,7 @@ pub extern "C" fn kernel_start() -> ! {
     //let mut big_addr: u64 = 8 * 1024 * 1024 * 1024 * 1024;
     //unsafe { core::ptr::read_volatile(big_addr as *mut u64) };
 
-    console.write_str("aaand loop\n");
+    console.write_str("aaand loop\n").unwrap();
     loop {}
 }
 
