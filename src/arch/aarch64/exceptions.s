@@ -30,12 +30,13 @@ _create_context:
 
 	stp	xzr, xzr, [x0, 240]
 
-	mov	x9, #0x3c1
+	mov	x9, #0x3c0		// Default value for PSTATE
 	stp	x1, x9, [x0, 256]
 
 	adr	x1, PROCESS_SAVED_SP
 	str	x0, [x1]
 	ret
+
 
 _save_context:
 	sub	x0, x0, #(8 * 34)
@@ -70,8 +71,7 @@ _save_context:
 _restore_context:
 	ldp	x9, x10, [x0, 256]
 	msr	ELR_EL1, x9
-	// TODO this is causing an illegal instruction
-	//msr	SPSR_EL1, x10
+	msr	SPSR_EL1, x10
 
 	ldp	x9, x10, [x0, 240]
 	stp	x9, x10, [sp, 0]
@@ -99,19 +99,15 @@ _restore_context:
 	add	sp, sp, #16
 	eret
 
-.global _start_multiprocessing
-_start_multiprocessing:
+
+.global _start_multitasking
+_start_multitasking:
 	mov	x9, #16
 	sub	sp, sp, x9
 
 	ldr	x0, PROCESS_SAVED_SP
 	b	_restore_context
 
-
-_exception_fatal2:
-	ldr	x1, =0x3F201000
-	mov	w0, #0x24
-	strb	w0, [x1]
 
 _exception_fatal:
 	ldr	x1, =0x3F201000
@@ -124,9 +120,11 @@ _loop:
 	wfe
 	b	_loop
 
+
 .global PROCESS_SAVED_SP
 PROCESS_SAVED_SP:
 	.word	0
+
 
 .macro HANDLE_CONTEXT_SWITCH
 	sub	sp, sp, #16

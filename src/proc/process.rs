@@ -1,14 +1,11 @@
 
-use core::ptr;
-use core::arch::asm;
-
 use crate::printkln;
-use crate::mm::kmalloc::{kmalloc, kmfree};
+use crate::mm::kmalloc::{kmalloc};
 
 extern {
     fn _create_context(sp: *mut i8, entry: *mut i8) -> *mut i8;
     fn _restore_context();
-    fn _start_multiprocessing();
+    fn _start_multitasking();
 }
 
 //pub static mut PROCESS_SAVED_SP: *mut i8 = ptr::null_mut();
@@ -35,12 +32,12 @@ pub fn create_test_process() {
         //    "msr    SP_EL0, {new_sp}",
         //    new_sp = in(reg) new_sp,
         //);
-        _start_multiprocessing();
+        _start_multitasking();
     }
 }
  
 #[no_mangle]
-pub extern "C" fn handle_exception(sp: i64) {
-    printkln!("Handle an exception for {:x}", sp);
+pub extern "C" fn handle_exception(sp: i64, esr: i64, _far: i64) {
+    printkln!("Handle an exception of {:x} for sp {:x}", esr, sp);
 }
 
