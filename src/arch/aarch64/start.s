@@ -23,6 +23,9 @@ _start:
 	// Setup a default stack
 	adr	x0, #0x20000
 	mul	x0, x0, x1	// The Core ID
+	msr	SP_EL0, x0
+	msr	SP_EL1, x0
+	msr	SP_EL2, x0
 	mov	sp, x0
 
 	bl	_setup_common_system_registers
