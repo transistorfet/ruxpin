@@ -1,14 +1,34 @@
 
+use core::ptr;
+
+use alloc::vec::Vec;
+
+use crate::arch::{create_context, start_multitasking};
 use crate::printkln;
 use crate::mm::kmalloc::{kmalloc};
 
-extern {
-    fn _create_context(sp: *mut i8, entry: *mut i8) -> *mut i8;
-    fn _restore_context();
-    fn _start_multitasking();
+
+pub type Pid = i32;
+
+pub struct Process {
+    pid: Pid,
+    stack: *mut u8,
+    //page_table: PageTable,
 }
 
-//pub static mut PROCESS_SAVED_SP: *mut i8 = ptr::null_mut();
+impl Default for Process {
+    fn default() -> Self {
+        Process {
+            pid: -1,
+            stack: ptr::null_mut()
+        }
+    }
+}
+
+pub static mut process_list: &[Process] = &[];
+
+#[no_mangle]
+pub static mut PROCESS_SAVED_SP: *mut u8 = ptr::null_mut();
 
 pub fn create_test_process() {
     unsafe {
@@ -22,7 +42,7 @@ pub fn create_test_process() {
         (*code.offset(2)) = 0x17ffffff;
 
         let sp = ptr.offset(size as isize);
-        let new_sp = _create_context(sp, ptr);
+        let new_sp = create_context(sp, ptr);
         printkln!("SP: {:#x}", new_sp as u64);
         crate::printk::printk_dump(new_sp, 288);
 
@@ -32,7 +52,7 @@ pub fn create_test_process() {
         //    "msr    SP_EL0, {new_sp}",
         //    new_sp = in(reg) new_sp,
         //);
-        _start_multitasking();
+        start_multitasking();
     }
 }
  

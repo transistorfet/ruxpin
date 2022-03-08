@@ -1,10 +1,13 @@
 #![no_std]
 #![no_main]
+#![feature(alloc_error_handler)]
 
 mod arch;
 mod mm;
 mod proc;
 mod printk;
+
+extern crate alloc;
 
 use core::panic::PanicInfo;
 
@@ -22,7 +25,9 @@ pub extern "C" fn kernel_start() -> ! {
     //let mut big_addr: u64 = 8 * 1024 * 1024 * 1024 * 1024;
     //unsafe { core::ptr::read_volatile(big_addr as *mut u64) };
 
-    init_kernel_heap(0x100000 as *mut i8, 0x100000);
+    unsafe {
+        init_kernel_heap(0x20_0000 as *mut u8, 0x100_0000);
+    }
 
     create_test_process();
 

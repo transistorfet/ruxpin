@@ -1,15 +1,14 @@
 
 
-.section .text
 .extern fatal_error
 .extern handle_exception
-
-.global _default_exceptions_table
-
+.extern PROCESS_SAVED_SP
 
 
-.global _create_context
-_create_context:
+.section .text
+
+.global create_context
+create_context:
 	sub	x0, x0, #(8 * 34)
 
 	stp	xzr, xzr, [x0, 0]
@@ -36,6 +35,15 @@ _create_context:
 	adr	x1, PROCESS_SAVED_SP
 	str	x0, [x1]
 	ret
+
+
+.global start_multitasking
+start_multitasking:
+	mov	x9, #16
+	sub	sp, sp, x9
+
+	ldr	x0, PROCESS_SAVED_SP
+	b	_restore_context
 
 
 _save_context:
@@ -67,7 +75,6 @@ _save_context:
 	ret
 
 
-.global _restore_context
 _restore_context:
 	ldp	x9, x10, [x0, 256]
 	msr	ELR_EL1, x9
@@ -100,15 +107,6 @@ _restore_context:
 	eret
 
 
-.global _start_multitasking
-_start_multitasking:
-	mov	x9, #16
-	sub	sp, sp, x9
-
-	ldr	x0, PROCESS_SAVED_SP
-	b	_restore_context
-
-
 _exception_fatal:
 	ldr	x1, =0x3F201000
 	mov	w0, #0x21
@@ -119,11 +117,6 @@ _exception_fatal:
 _loop:
 	wfe
 	b	_loop
-
-
-.global PROCESS_SAVED_SP
-PROCESS_SAVED_SP:
-	.word	0
 
 
 .macro HANDLE_CONTEXT_SWITCH
@@ -161,59 +154,60 @@ PROCESS_SAVED_SP:
 /*
  * Exceptions Table
  */
+.global _default_exceptions_table
 .balign 2048
 _default_exceptions_table:
 
 // Exceptions where SP_EL0 is the stack
-.balign 0x80
+.balign 0x80	// Synchronous
 	b	_exception_fatal
 
-.balign 0x80
+.balign 0x80	// IRQ
 	b	_exception_fatal
 
-.balign 0x80
+.balign 0x80	// Fast IRQ
 	b	_exception_fatal
 
-.balign 0x80
+.balign 0x80	// SError
 	b	_exception_fatal
 
 // Exceptions where SP_ELx is the stack
-.balign 0x80
-	HANDLE_CONTEXT_SWITCH
-
-.balign 0x80
+.balign 0x80	// Synchronous
 	b	_exception_fatal
 
-.balign 0x80
+.balign 0x80	// IRQ
 	b	_exception_fatal
 
-.balign 0x80
+.balign 0x80	// Fast IRQ
+	b	_exception_fatal
+
+.balign 0x80	// SError
 	b	_exception_fatal
 
 // Exceptions from lower EL in AArch64
-.balign 0x80
+.balign 0x80	// Synchronous
 	HANDLE_CONTEXT_SWITCH
 
-.balign 0x80
+.balign 0x80	// IRQ
 	b	_exception_fatal
 
-.balign 0x80
+.balign 0x80	// Fast IRQ
 	b	_exception_fatal
 
-.balign 0x80
+.balign 0x80	// SError
 	b	_exception_fatal
 
 // Exceptions from lower EL in AArch32
-.balign 0x80
+.balign 0x80	// Synchronous
 	b	_exception_fatal
 
-.balign 0x80
+.balign 0x80	// IRQ
 	b	_exception_fatal
 
-.balign 0x80
+.balign 0x80	// Fast IRQ
 	b	_exception_fatal
 
-.balign 0x80
+.balign 0x80	// SError
 	b	_exception_fatal
 
 
