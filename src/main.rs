@@ -5,6 +5,7 @@
 mod arch;
 mod mm;
 mod proc;
+mod drivers;
 mod printk;
 
 extern crate alloc;
@@ -51,5 +52,9 @@ pub extern "C" fn fatal_error(esr: i64, elr: i64) -> ! {
     printkln!("Fatal Error: ESR: 0x{:x}, ELR: 0x{:x}", esr, elr);
 
     loop {}
+}
+
+mod console {
+    pub use crate::drivers::raspberrypi::console::*;
 }
 

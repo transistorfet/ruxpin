@@ -3,9 +3,10 @@ use core::ptr;
 
 use alloc::vec::Vec;
 
-use crate::arch::{create_context, start_multitasking};
 use crate::printkln;
 use crate::mm::kmalloc::{kmalloc};
+
+use crate::arch::{create_context, start_multitasking};
 
 
 pub type Pid = i32;
@@ -59,5 +60,9 @@ pub fn create_test_process() {
 #[no_mangle]
 pub extern "C" fn handle_exception(sp: i64, esr: i64, _far: i64) {
     printkln!("Handle an exception of {:x} for sp {:x}", esr, sp);
+
+    if esr == 0x56000001 {
+        printkln!("A SYSCALL!");
+    }
 }
 
