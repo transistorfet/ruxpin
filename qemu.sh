@@ -1,5 +1,7 @@
 
-KERNEL=target/aarch64-unknown-none/debug/ruxpin
+#KERNEL=target/aarch64-unknown-none/debug/ruxpin
+#KERNEL=target/aarch64-unknown-none/release/ruxpin
+KERNEL=ruxpin.img
 
 qemu-system-aarch64 \
 	-machine raspi3b -m 1024 \

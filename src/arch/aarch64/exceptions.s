@@ -142,7 +142,8 @@ _loop:
 	str	x0, [x1]
 
 	mrs	x1, ESR_EL1
-	mrs	x2, FAR_EL1
+	mrs	x2, ELR_EL1
+	mrs	x3, FAR_EL1
 	bl	handle_exception
 
 	ldr	x0, PROCESS_SAVED_SP

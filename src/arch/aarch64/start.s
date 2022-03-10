@@ -8,6 +8,7 @@
  */
 .global _start
 _start:
+	// Print the character '1' on boot, for debugging
 	//ldr	x4, =0x3F201000
 	//mov	w5, #0x31
 	//strb	w5, [x4]
@@ -25,7 +26,6 @@ _start:
 	mul	x0, x0, x1	// The Core ID
 	msr	SP_EL0, x0
 	msr	SP_EL1, x0
-	msr	SP_EL2, x0
 	mov	sp, x0
 
 	bl	_setup_common_system_registers
@@ -40,7 +40,6 @@ _start:
 	adr	x1, _INIT_STACK_POINTER
 	msr	SP_EL0, x1
 	msr	SP_EL1, x1
-	msr	SP_EL2, x1
 	mov	sp, x1
 
 	bl	_setup_common_system_registers
@@ -51,10 +50,10 @@ _start:
 	// Switch Exception Level EL1
 	// by setting the flags and return address registers
 	mov	x0, #0b00101
-	msr	SPSR_EL3, x0
+	msr	SPSR_EL2, x0
 
 	adr	x2, L_enter_E1
-	msr	ELR_EL3, x2
+	msr	ELR_EL2, x2
 	isb	sy
 	eret
 
@@ -63,11 +62,43 @@ _start:
 
 
 _setup_common_system_registers:
+	mrs	x0, CurrentEL
+	lsr	x0, x0, 2
+	mov	x1, 3
+	cmp	x0, x1
+	b.eq	L_setup_EL3
+	b	L_setup_EL2
+
+    L_setup_EL3:
+	// Set execution state AArch64, EL1 is Non-secure
+	mrs	x0, SCR_EL3
+	orr	x0, x0, #(1<<10)
+	orr	x0, x0, #(1<<0)
+	msr	SCR_EL3, x0
+
+	// Configure the exceptions table
+	adr	x1, _default_exceptions_table
+	msr	VBAR_EL3, x1
+
+	// Disable various traps in EL1
+	msr	CPTR_EL3, xzr
+
+	// Switch to EL2
+	mov	x0, sp
+	msr	SP_EL2, x0
+	mov	x0, #0b01001
+	msr	SPSR_EL3, x0
+
+	adr	x2, L_setup_EL2
+	msr	ELR_EL3, x2
+	isb	sy
+	eret
+
+    L_setup_EL2:
 	// Configure the exceptions table
 	adr	x1, _default_exceptions_table
 	msr	VBAR_EL1, x1
 	msr	VBAR_EL2, x1
-	msr	VBAR_EL3, x1
 
 	// Configure the Counter
 	mov	x0, #(0b11 << 10)
@@ -81,7 +112,6 @@ _setup_common_system_registers:
 	// Disable various traps in EL1
 	mov	x0, #0x3300
 	msr	CPTR_EL2, x0
-	msr	CPTR_EL3, xzr
 	msr	HSTR_EL2, xzr
 
 	// Enable Aarch64 execution mode
@@ -91,12 +121,6 @@ _setup_common_system_registers:
 	ldr	x1, =0x30C50838
 	msr	SCTLR_EL2, x1
 	msr	SCTLR_EL1, x1
-
-	// Set execution state AArch64, EL1 is Non-secure
-	mrs	x0, SCR_EL3
-	orr	x0, x0, #(1<<10)
-	orr	x0, x0, #(1<<0)
-	msr	SCR_EL3, x0
 
 	isb	sy
 	//dsb	sy
