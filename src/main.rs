@@ -13,6 +13,7 @@ extern crate alloc;
 use core::panic::PanicInfo;
 
 use crate::mm::kmalloc::{init_kernel_heap};
+use crate::mm::vmalloc::{init_virtual_memory};
 use crate::proc::process::{create_test_process};
 
 
@@ -27,7 +28,8 @@ pub extern "C" fn kernel_start() -> ! {
     //unsafe { core::ptr::read_volatile(big_addr as *mut u64) };
 
     unsafe {
-        init_kernel_heap(0x20_0000 as *mut u8, 0x100_0000);
+        init_kernel_heap(0x20_0000 as *mut u8, 0x100_0000 as *mut u8);
+        init_virtual_memory(0x100_0000 as *mut u8, 0x1000_0000 as *mut u8);
     }
 
     create_test_process();

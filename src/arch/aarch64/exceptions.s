@@ -65,23 +65,23 @@ _save_context:
 	stp	x26, x27, [x0, 208]
 	stp	x28, x29, [x0, 224]
 
-	ldp	x0, x1, [sp, 0]
-	stp	x0, x1, [x0, 240]
+	ldp	x8, x9, [sp, 0]
+	stp	x8, x9, [x0, 240]
 
-	mrs	x0, ELR_EL1
-	mrs	x1, SPSR_EL1
-	stp	x0, x1, [x0, 256]
+	mrs	x8, ELR_EL1
+	mrs	x9, SPSR_EL1
+	stp	x8, x9, [x0, 256]
 
 	ret
 
 
 _restore_context:
-	ldp	x9, x10, [x0, 256]
-	msr	ELR_EL1, x9
-	msr	SPSR_EL1, x10
+	ldp	x8, x9, [x0, 256]
+	msr	ELR_EL1, x8
+	msr	SPSR_EL1, x9
 
-	ldp	x9, x10, [x0, 240]
-	stp	x9, x10, [sp, 0]
+	ldp	x8, x9, [x0, 240]
+	stp	x8, x9, [sp, 0]
 
 	ldp	xzr, x1, [x0, 0]
 	ldp	x2, x3, [x0, 16]

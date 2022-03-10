@@ -22,10 +22,10 @@ struct Heap {
 }
 
 impl Heap {
-    pub unsafe fn init(&mut self, addr: *mut u8, size: usize) {
-        let mut space: *mut Block = addr.cast();
+    pub unsafe fn init(&mut self, start: *mut u8, end: *mut u8) {
+        let mut space: *mut Block = start.cast();
 
-        (*space).size = size;
+        (*space).size = end as usize - start as usize;
         (*space).next = ptr::null_mut();
 
         self.free_blocks = space;
@@ -117,8 +117,8 @@ impl Heap {
 }
 
 
-pub unsafe fn init_kernel_heap(addr: *mut u8, size: usize) {
-    MAIN_HEAP.init(addr, size);
+pub unsafe fn init_kernel_heap(start: *mut u8, end: *mut u8) {
+    MAIN_HEAP.init(start, end);
 }
 
 pub unsafe fn kmalloc(size: usize) -> *mut u8 {
