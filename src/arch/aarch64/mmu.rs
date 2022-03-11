@@ -5,36 +5,39 @@ use core::arch::asm;
 use crate::mm::vmalloc::PageRegion;
 
 
+#[allow(dead_code)]
 const TT_DESCRIPTOR_EMPTY: u64 = 0b00;
+#[allow(dead_code)]
 const TT_DESCRIPTOR_TABLE: u64 = 0b11;
+#[allow(dead_code)]
 const TT_DESCRIPTOR_BLOCK: u64 = 0b01;
 
+#[allow(dead_code)]
 const TT_ACCESS_FLAG: u64 = 1 << 10;
 
+#[allow(dead_code)]
 const TT_TYPE_MASK: u64 = 0b11;
+#[allow(dead_code)]
 const TT_TABLE_MASK: u64 = 0x0000_ffff_ffff_ffff_f000;
 
 #[repr(C)]
 pub struct TranslationTable(u64);
 
+impl Default for TranslationTable {
+    fn default() -> Self {
+        Self(0)
+    }
+}
+
+
 pub fn init_mmu(pages: &mut PageRegion) {
     let tl0: *mut u64 = pages.alloc_page_zeroed().cast();
     let tl1: *mut u64 = pages.alloc_page_zeroed().cast();
-    let tl2: *mut u64 = pages.alloc_page_zeroed().cast();
 
     unsafe {
         (*tl0) = (tl1 as u64) | 0b11;
-
+        // Map 1GB space directly to the same addresses
         (*tl1) = 0 | (0b1 << 10) | 0b01;
-        //(*tl1) = (tl2 as u64) | 0b11;
-
-        //for i in 0..512 {
-        //    *code_tl2.offset(i) = (i as u64 * 0x20_0000) | (0b1 << 10) | 0b01
-        //}
-
-        //(*tl2) = 0 | (0b1 << 10) | 0b01;
-        //(*tl2.offset(1)) = 0x20_0000 | (0b1 << 10) | 0b01;
-        //(*tl2.offset(0x1f9)) = 0x3F20_0000 | (0b1 << 10) | 0b01;
 
         enable_mmu(tl0 as *mut u8, tl0 as *mut u8);
     }
@@ -99,10 +102,15 @@ impl TranslationTable {
         let tl2_index = (vaddr as u64) >> 12 & 0x1ff;
         let tl2_entry = unsafe {(self.0 as *mut u64).offset(tl2_index as isize) };
 
-        for page in 0..pages(len) {
-            unsafe {
-                *tl2_entry.offset(page as isize) = (paddr.offset((page * page_size()) as isize) as u64) & TT_TABLE_MASK | TT_ACCESS_FLAG | TT_DESCRIPTOR_BLOCK;
-            }
+        map_granuales(tl2_entry, paddr, page_size(), ceiling_div(len, page_size()));
+    }
+
+}
+
+fn map_granuales(table: *mut u64, paddr: *mut u8, granuale_size: usize, granuales: usize) {
+    for granuale in 0..granuales {
+        unsafe {
+            *table.offset(granuale as isize) = (paddr.offset((granuale * granuale_size) as isize) as u64) & TT_TABLE_MASK | TT_ACCESS_FLAG | TT_DESCRIPTOR_BLOCK;
         }
     }
 }
@@ -113,7 +121,7 @@ fn desc_to_table(entry: *mut u64) -> *mut u64 {
     }
 }
 
-fn pages(size: usize) -> usize {
-    (size / page_size()) + (size % page_size() != 0) as usize
+fn ceiling_div(size: usize, units: usize) -> usize {
+    (size / units) + (size % units != 0) as usize
 }
 

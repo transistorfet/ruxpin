@@ -1,10 +1,8 @@
 
-use core::ptr;
-use core::mem;
+use core::slice;
 
 use crate::printkln;
 use crate::arch::mmu;
-use crate::arch::sync::Mutex;
 
 
 //static mut MEMORY_AREAS: [Option<PagePool>; 20] = unsafe { mem::MaybeUninit::uninit().assume_init() };
@@ -65,7 +63,7 @@ impl PageRegion {
         let table_size = total_pages / 8 / page_size + (total_pages / 8 % page_size != 0) as usize;
 
         let pages = total_pages - table_size;
-        let table: &'static mut [u8] = unsafe { core::slice::from_raw_parts_mut(start, table_size * page_size) };
+        let table: &'static mut [u8] = unsafe { slice::from_raw_parts_mut(start, table_size * page_size) };
         let pages_start = unsafe { start.add(table_size * page_size) };
 
         for i in 0..(pages / 8) {

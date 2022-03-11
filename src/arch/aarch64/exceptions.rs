@@ -6,13 +6,24 @@ use super::mmu::TranslationTable;
 #[repr(C)]
 pub struct Context {
     registers: [u64; 32],
-    ttbr: TranslationTable,
     elr: u64,
     spsr: u64,
+    ttbr: TranslationTable,
+}
+
+impl Default for Context {
+    fn default() -> Self {
+        Self {
+            registers: [0; 32],
+            elr: 0,
+            spsr: 0,
+            ttbr: Default::default(),
+        }
+    }
 }
 
 extern {
-    pub fn create_context(sp: *mut u8, entry: *mut u8) -> *mut u8;
+    pub fn create_context(context: &mut Context, sp: *mut u8, entry: *mut u8);
     pub fn start_multitasking();
 }
 
@@ -27,3 +38,11 @@ extern "C" fn handle_exception(sp: i64, esr: i64, elr: i64, far: i64) {
     }
 }
  
+impl Context {
+    pub fn init(&mut self, sp: *mut u8, entry: *mut u8) {
+        unsafe {
+            create_context(self, sp, entry);
+        }
+    }
+}
+

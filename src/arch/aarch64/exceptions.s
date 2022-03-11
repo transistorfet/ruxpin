@@ -9,8 +9,6 @@
 
 .global create_context
 create_context:
-	sub	x0, x0, #(8 * 34)
-
 	stp	xzr, xzr, [x0, 0]
 	stp	xzr, xzr, [x0, 16]
 	stp	xzr, xzr, [x0, 32]
@@ -27,29 +25,21 @@ create_context:
 	stp	xzr, xzr, [x0, 208]
 	stp	xzr, xzr, [x0, 224]
 
-	stp	xzr, xzr, [x0, 240]
+	stp	xzr, x1, [x0, 240]	// Initial value of SP
 
 	mov	x9, #0x3c0		// Default value for PSTATE
-	stp	x1, x9, [x0, 256]
+	stp	x2, x9, [x0, 256]	// Push the initial PC and PSTATE values
 
-	adr	x1, PROCESS_SAVED_SP
-	str	x0, [x1]
 	ret
 
 
 .global start_multitasking
 start_multitasking:
-	mov	x9, #16
-	sub	sp, sp, x9
-
-	ldr	x0, PROCESS_SAVED_SP
+	ldr	x0, CURRENT_CONTEXT
 	b	_restore_context
 
 
 _save_context:
-	sub	x0, x0, #(8 * 34)
-
-	stp	xzr, x1, [x0, 0]
 	stp	x2, x3, [x0, 16]
 	stp	x4, x5, [x0, 32]
 	stp	x6, x7, [x0, 48]
@@ -66,7 +56,9 @@ _save_context:
 	stp	x28, x29, [x0, 224]
 
 	ldp	x8, x9, [sp, 0]
-	stp	x8, x9, [x0, 240]
+	stp	x8, x1, [x0, 0]
+	mrs	x8, SP_EL0
+	stp	x9, x8, [x0, 240]
 
 	mrs	x8, ELR_EL1
 	mrs	x9, SPSR_EL1
@@ -80,30 +72,25 @@ _restore_context:
 	msr	ELR_EL1, x8
 	msr	SPSR_EL1, x9
 
-	ldp	x8, x9, [x0, 240]
-	stp	x8, x9, [sp, 0]
+	ldp	x30, x8, [x0, 240]
+	msr	SP_EL0, x8
 
-	ldp	xzr, x1, [x0, 0]
-	ldp	x2, x3, [x0, 16]
-	ldp	x4, x5, [x0, 32]
-	ldp	x6, x7, [x0, 48]
-	ldp	x8, x9, [x0, 64]
-	ldp	x10, x11, [x0, 80]
-	ldp	x12, x13, [x0, 96]
-	ldp	x14, x15, [x0, 112]
-	ldp	x16, x17, [x0, 128]
-	ldp	x18, x19, [x0, 144]
-	ldp	x20, x21, [x0, 160]
-	ldp	x22, x23, [x0, 176]
-	ldp	x24, x25, [x0, 192]
-	ldp	x26, x27, [x0, 208]
 	ldp	x28, x29, [x0, 224]
+	ldp	x26, x27, [x0, 208]
+	ldp	x24, x25, [x0, 192]
+	ldp	x22, x23, [x0, 176]
+	ldp	x20, x21, [x0, 160]
+	ldp	x18, x19, [x0, 144]
+	ldp	x16, x17, [x0, 128]
+	ldp	x14, x15, [x0, 112]
+	ldp	x12, x13, [x0, 96]
+	ldp	x10, x11, [x0, 80]
+	ldp	x8, x9, [x0, 64]
+	ldp	x6, x7, [x0, 48]
+	ldp	x4, x5, [x0, 32]
+	ldp	x2, x3, [x0, 16]
+	ldp	x0, x1, [x0, 0]
 
-	add	x0, x0, #(8 * 34)
-	msr	SP_EL0, x0
-
-	ldp	x0, x30, [sp, 0]
-	add	sp, sp, #16
 	eret
 
 
@@ -120,6 +107,7 @@ _loop:
 
 
 .macro HANDLE_CONTEXT_SWITCH
+	// Save two register values before using the registers for temporary values
 	sub	sp, sp, #16
 	stp	x0, x30, [sp, 0]
 
@@ -136,17 +124,16 @@ _loop:
 	cmp	x0, xzr
 	b.ne	_exception_fatal
 
-	mrs	x0, SP_EL0
+	ldr	x0, CURRENT_CONTEXT
 	bl	_save_context
-	adr	x1, PROCESS_SAVED_SP
-	str	x0, [x1]
+	add	sp, sp, #16
 
 	mrs	x1, ESR_EL1
 	mrs	x2, ELR_EL1
 	mrs	x3, FAR_EL1
 	bl	handle_exception
 
-	ldr	x0, PROCESS_SAVED_SP
+	ldr	x0, CURRENT_CONTEXT
 	b	_restore_context
 
 .endm

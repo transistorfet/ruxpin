@@ -14,7 +14,7 @@ use core::panic::PanicInfo;
 
 use crate::mm::kmalloc::{init_kernel_heap};
 use crate::mm::vmalloc::{init_virtual_memory};
-use crate::proc::process::{create_test_process};
+use crate::proc::process::{init_processes, create_test_process};
 
 
 #[no_mangle]
@@ -31,6 +31,8 @@ pub extern "C" fn kernel_start() -> ! {
         init_kernel_heap(0x20_0000 as *mut u8, 0x100_0000 as *mut u8);
         init_virtual_memory(0x100_0000 as *mut u8, 0x1000_0000 as *mut u8);
     }
+
+    init_processes();
 
     create_test_process();
 
