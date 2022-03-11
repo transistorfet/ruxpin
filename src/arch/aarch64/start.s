@@ -1,7 +1,8 @@
 
-.section .text
 .extern kernel_start
 .extern _default_exceptions_table
+
+.section .text._start
 
 /*
  * Kernel Entry Point
