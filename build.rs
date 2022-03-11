@@ -1,3 +1,3 @@
 fn main() {
-    println!("cargo:rustc-link-arg=-Tkernel.ld");
+    println!("cargo:rustc-link-arg=-Tsrc/kernel.ld");
 }
