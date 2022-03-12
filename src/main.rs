@@ -6,6 +6,7 @@ mod arch;
 mod mm;
 mod proc;
 mod drivers;
+mod errors;
 mod printk;
 
 extern crate alloc;

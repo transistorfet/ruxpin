@@ -2,6 +2,7 @@
 use core::arch::asm;
 
 use crate::printkln;
+use crate::errors::KernelError;
 
 // TODO this should be changed to PagePool when you decide how you'd like to do it
 use crate::mm::vmalloc::PageRegion;
@@ -27,46 +28,18 @@ extern {
     static _kernel_translation_table_l0: [u64; page_size()];
 }
 
-
-#[repr(C)]
-pub struct TranslationTable(*mut u64);
-
-
-pub fn init_mmu(pages: &mut PageRegion) {
-    let tl0: *mut u64 = pages.alloc_page_zeroed().cast();
-    let tl1: *mut u64 = pages.alloc_page_zeroed().cast();
-
-    unsafe {
-        (*tl0) = (tl1 as u64) | 0b11;
-        // Map 1GB space directly to the same addresses
-        (*tl1) = 0 | (0b1 << 10) | 0b01;
-
-        //enable_mmu(_DEFAULT_TRANSLATION_TABLE_L0 as *mut u8, tl0 as *mut u8);
-    }
-}
-
-unsafe fn enable_mmu(kernel: *mut u8, user: *mut u8) {
-    let tcr: i64 = 0
+// TODO this isn't actually used by the startup code yet
+#[no_mangle]
+pub static DEFAULT_TCR: i64 = 0
     | (0b101 << 32)     // 48-bit 1TB Physical Address Size
     | (0b10 << 30)      // 4KB Granuale Size for EL1
     | (0b00 << 14)      // 4KB Granuale Size for EL0
     | (64 - 42);        // Number of unmapped address bits (42-bit addressing assumed)
 
-    asm!(
-        //"msr    TTBR1_EL1, {kernel}",
-        //"msr    TTBR0_EL1, {user}",
-        //"msr    TCR_EL1, {tcr}",
-        //"isb",
-        "mrs    {tmp}, SCTLR_EL1",
-        "orr    {tmp}, {tmp}, 1",
-        "msr    SCTLR_EL1, {tmp}",
-        "isb",
-        //tcr = in(reg) tcr,
-        //kernel = in(reg) kernel,
-        //user = in(reg) user,
-        tmp = out(reg) _,
-    );
-}
+
+#[repr(C)]
+pub struct TranslationTable(*mut u64);
+
 
 #[inline(always)]
 pub const fn page_size() -> usize {
@@ -79,39 +52,12 @@ impl TranslationTable {
         Self(tl0)
     }
 
-    pub fn map_addr(&self, vaddr: *mut u8, paddr: *mut u8, len: usize, pages: &mut PageRegion) {
-        // Index Table Level 0
-        let tl0_index = (vaddr as u64) >> (9 + 9 + 9 + 12) & 0x1ff;
-        let tl0_entry = unsafe { self.0.offset(tl0_index as isize) };
+    pub fn map_addr(&self, vaddr: *mut u8, paddr: *mut u8, mut len: usize, pages: &mut PageRegion) -> Result<(), KernelError> {
+        let tl0_addr_bits = 9 + 9 + 9 + 12;
 
-        ensure_table_entry(tl0_entry, pages);
-
-        // Index Table Level 1
-        let tl1_index = (vaddr as u64) >> (9 + 9 + 12) & 0x1ff;
-        let tl1_entry = unsafe {((*tl0_entry & TT_TABLE_MASK) as *mut u64).offset(tl1_index as isize) };
-
-
-        if len >> (9 + 9 + 12) != 0 {
-            // big segment
-        }
-
-        ensure_table_entry(tl1_entry, pages);
-
-        // Index Table Level 2
-        let tl2_index = (vaddr as u64) >> (9 + 12) & 0x1ff;
-        let tl2_entry = unsafe {((*tl1_entry & TT_TABLE_MASK) as *mut u64).offset(tl2_index as isize) };
-
-        if len >> (9 + 12) != 0 {
-            // big segment
-        }
-
-        ensure_table_entry(tl2_entry, pages);
-
-        // Index Table Level 3
-        let tl3_index = (vaddr as u64) >> 12 & 0x1ff;
-        let tl3_entry = unsafe {((*tl2_entry & TT_TABLE_MASK) as *mut u64).offset(tl3_index as isize) };
-
-        map_granuales(tl3_entry, paddr, page_size(), ceiling_div(len, page_size()));
+        let mut paddr = paddr as u64;
+        let mut vaddr = vaddr as u64;
+        map_level(tl0_addr_bits, self.0, &mut len, &mut vaddr, &mut paddr, pages)
     }
 
     pub(crate) fn get_ttbr(&self) -> u64 {
@@ -119,21 +65,106 @@ impl TranslationTable {
     }
 }
 
-fn ensure_table_entry(parent_entry: *mut u64, pages: &mut PageRegion) {
-    let is_empty = unsafe { *parent_entry } & TT_TYPE_MASK == TT_DESCRIPTOR_EMPTY;
-    if is_empty {
-        let next_table: *mut u64 = pages.alloc_page_zeroed().cast();
-        unsafe {
-            *parent_entry = (next_table as u64 & TT_TABLE_MASK) | TT2_DESCRIPTOR_TABLE;
+fn map_level(addr_bits: usize, table: *mut u64, len: &mut usize, vaddr: &mut u64, paddr: &mut u64, pages: &mut PageRegion) -> Result<(), KernelError> {
+    let granuale_size = 1 << addr_bits;
+
+    while *len > 0 {
+        let mut index = table_index_from_vaddr(addr_bits, *vaddr);
+        if (*vaddr & (granuale_size as u64 - 1)) == 0 && *len >= granuale_size {
+            map_granuales(addr_bits, table, &mut index, len, vaddr, paddr)?;
+            break;
         }
+
+        if addr_bits == 12 {
+            break;
+        }
+
+        ensure_table_entry(table, index, pages)?;
+
+        map_level(addr_bits - 9, table_ptr_at_index(table, index), len, vaddr, paddr, pages);
+
+        index += 1;
+    }
+
+    Ok(())
+}
+
+fn map_granuales(addr_bits: usize, table: *mut u64, index: &mut isize, len: &mut usize, vaddr: &mut u64, paddr: &mut u64) -> Result<(), KernelError> {
+    let granuale_size = 1 << addr_bits;
+    let block_flag = if addr_bits == 12 { TT3_DESCRIPTOR_BLOCK } else { TT2_DESCRIPTOR_BLOCK };
+
+    while *len >= granuale_size {
+        if descriptor_type(table, *index) != TT_DESCRIPTOR_EMPTY {
+            return Err(KernelError::AddressAlreadyMapped);
+        }
+
+        unsafe {
+            *table.offset(*index) = (*paddr & TT_BLOCK_MASK) | TT_ACCESS_FLAG | block_flag;
+        }
+
+        *index += 1;
+        *vaddr += granuale_size as u64;
+        *paddr += granuale_size as u64;
+        *len -= granuale_size;
+
+        if *index >= page_size() as isize / 8 {
+            // If we've reached the end of this table, then return to allow a higher level to increment its index
+            break;
+        }
+    }
+
+    Ok(())
+}
+
+fn ensure_table_entry(table: *mut u64, index: isize, pages: &mut PageRegion) -> Result<(), KernelError> {
+    let desc_type = descriptor_type(table, index);
+
+    match desc_type {
+        TT2_DESCRIPTOR_TABLE => {
+            // Do nothing. Sub-table is already present
+            Ok(())
+        },
+
+        TT_DESCRIPTOR_EMPTY => {
+            let next_table: *mut u64 = pages.alloc_page_zeroed().cast();
+            unsafe {
+                *table.offset(index) = (next_table as u64 & TT_TABLE_MASK) | TT2_DESCRIPTOR_TABLE;
+            }
+            Ok(())
+        },
+        TT2_DESCRIPTOR_BLOCK => {
+            //panic!("Error already mapped");
+            Err(KernelError::AddressAlreadyMapped)
+        },
+        _ => {
+            //panic!("Error corrupted page table");
+            Err(KernelError::CorruptTranslationTable)
+        },
     }
 }
 
-fn map_granuales(table: *mut u64, paddr: *mut u8, granuale_size: usize, granuales: usize) {
-    for granuale in 0..granuales {
-        unsafe {
-            *table.offset(granuale as isize) = (paddr.offset((granuale * granuale_size) as isize) as u64) & TT_BLOCK_MASK | TT_ACCESS_FLAG | TT3_DESCRIPTOR_BLOCK;
-        }
+
+fn table_index_from_vaddr(bits: usize, vaddr: u64) -> isize {
+    (((vaddr as u64) >> bits) & 0x1ff) as isize
+}
+
+fn table_ptr_at_index(table: *mut u64, index: isize) -> *mut u64 {
+    unsafe {
+        table_ptr(*table.offset(index))
+    }
+}
+
+fn table_ptr(descriptor: u64) -> *mut u64 {
+    (descriptor & TT_TABLE_MASK) as *mut u64
+}
+
+fn block_ptr(descriptor: u64) -> *mut u64 {
+    (descriptor & TT_BLOCK_MASK) as *mut u64
+}
+
+fn descriptor_type(table: *mut u64, index: isize) -> u64 {
+    unsafe {
+        *table.offset(index) & TT_TYPE_MASK
     }
 }
 

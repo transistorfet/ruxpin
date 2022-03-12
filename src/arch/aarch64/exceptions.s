@@ -70,6 +70,8 @@ _save_context:
 _restore_context:
 	ldr	x8, [x0, 272]
 	msr	TTBR0_EL1, x8
+	// TODO invalidate the TLB cache
+	//tlbi
 
 	ldp	x8, x9, [x0, 256]
 	msr	ELR_EL1, x8

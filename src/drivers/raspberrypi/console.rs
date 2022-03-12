@@ -1,7 +1,9 @@
 
 use core::fmt;
 
-const SERIAL_OUT: *mut u8 = 0x3F20_1000 as *mut u8;
+const __KERNEL_VIRTUAL_BASE_ADDR: u64 = 0xffff_0000_0000_0000;
+
+const SERIAL_OUT: *mut u8 = (__KERNEL_VIRTUAL_BASE_ADDR + 0x3F20_1000) as *mut u8;
 
 pub struct Console;
 

@@ -10,9 +10,7 @@ use crate::arch::mmu;
 static mut PAGES: Option<PageRegion> = None;
 
 pub fn init_virtual_memory(start: *mut u8, end: *mut u8) {
-    let mut pages = PageRegion::new(start, end);
-
-    mmu::init_mmu(&mut pages);
+    let pages = PageRegion::new(start, end);
 
     unsafe {
         PAGES = Some(pages);
