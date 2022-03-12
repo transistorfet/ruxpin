@@ -29,7 +29,6 @@ impl Default for TranslationTable {
     }
 }
 
-
 pub fn init_mmu(pages: &mut PageRegion) {
     let tl0: *mut u64 = pages.alloc_page_zeroed().cast();
     let tl1: *mut u64 = pages.alloc_page_zeroed().cast();
@@ -39,7 +38,7 @@ pub fn init_mmu(pages: &mut PageRegion) {
         // Map 1GB space directly to the same addresses
         (*tl1) = 0 | (0b1 << 10) | 0b01;
 
-        enable_mmu(tl0 as *mut u8, tl0 as *mut u8);
+        //enable_mmu(_DEFAULT_TRANSLATION_TABLE_L0 as *mut u8, tl0 as *mut u8);
     }
 }
 
@@ -51,17 +50,17 @@ unsafe fn enable_mmu(kernel: *mut u8, user: *mut u8) {
     | (64 - 42);        // Number of unmapped address bits (42-bit addressing assumed)
 
     asm!(
-        "msr    TTBR1_EL1, {kernel}",
-        "msr    TTBR0_EL1, {user}",
-        "msr    TCR_EL1, {tcr}",
-        "isb",
+        //"msr    TTBR1_EL1, {kernel}",
+        //"msr    TTBR0_EL1, {user}",
+        //"msr    TCR_EL1, {tcr}",
+        //"isb",
         "mrs    {tmp}, SCTLR_EL1",
         "orr    {tmp}, {tmp}, 1",
         "msr    SCTLR_EL1, {tmp}",
         "isb",
-        tcr = in(reg) tcr,
-        kernel = in(reg) kernel,
-        user = in(reg) user,
+        //tcr = in(reg) tcr,
+        //kernel = in(reg) kernel,
+        //user = in(reg) user,
         tmp = out(reg) _,
     );
 }
