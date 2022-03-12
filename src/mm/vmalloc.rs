@@ -19,6 +19,35 @@ pub fn init_virtual_memory(start: *mut u8, end: *mut u8) {
     }
 }
 
+pub struct VirtualAddressSpace {
+    table: mmu::TranslationTable,
+}
+
+impl VirtualAddressSpace {
+    pub fn new_user_space() -> Self {
+        let pages = unsafe { PAGES.as_mut().unwrap() };
+        let table = mmu::TranslationTable::new_user_table(pages);
+
+        Self {
+            table,
+        }
+    }
+
+    pub fn alloc_page(&mut self) -> *mut u8 {
+        let pages = unsafe { PAGES.as_mut().unwrap() };
+        pages.alloc_page_zeroed()
+    }
+
+    pub fn map_existing_page(&mut self, vaddr: *mut u8, paddr: *mut u8) {
+        let pages = unsafe { PAGES.as_mut().unwrap() };
+        self.table.map_addr(vaddr, paddr, mmu::page_size(), pages); 
+    }
+
+    pub fn get_ttbr(&self) -> u64 {
+        self.table.get_ttbr()
+    }
+}
+
 struct PagePool {
     // TODO a list of all regions
 }

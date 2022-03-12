@@ -8,7 +8,7 @@ pub struct Context {
     registers: [u64; 32],
     elr: u64,
     spsr: u64,
-    ttbr: TranslationTable,
+    ttbr: u64,
 }
 
 impl Default for Context {
@@ -17,7 +17,7 @@ impl Default for Context {
             registers: [0; 32],
             elr: 0,
             spsr: 0,
-            ttbr: Default::default(),
+            ttbr: 0,
         }
     }
 }
@@ -39,7 +39,8 @@ extern "C" fn handle_exception(sp: i64, esr: i64, elr: i64, far: i64) {
 }
  
 impl Context {
-    pub fn init(&mut self, sp: *mut u8, entry: *mut u8) {
+    pub fn init(&mut self, sp: *mut u8, entry: *mut u8, ttbr: u64) {
+        self.ttbr = ttbr;
         unsafe {
             create_context(self, sp, entry);
         }

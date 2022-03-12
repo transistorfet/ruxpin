@@ -5,6 +5,7 @@ use alloc::boxed::Box;
 
 use crate::printkln;
 use crate::mm::kmalloc::{kmalloc};
+use crate::mm::vmalloc::VirtualAddressSpace;
 
 use crate::arch::{Context, start_multitasking};
 
@@ -14,15 +15,7 @@ pub type Pid = i32;
 pub struct Process {
     pid: Pid,
     context: Context,
-}
-
-impl Default for Process {
-    fn default() -> Self {
-        Process {
-            pid: -1,
-            context: Default::default(),
-        }
-    }
+    space: VirtualAddressSpace,
 }
 
 pub static mut PROCESS_LIST: &mut [Option<Process>] = &mut [];
@@ -40,7 +33,7 @@ pub fn init_processes() {
     }
 }
 
-pub fn create_process(sp: *mut u8, entry: *mut u8) {
+pub fn create_process() -> *mut u8 {
     let i = match find_empty_process() {
         Some(i) => i,
         None => panic!("No more processes left"),
@@ -53,12 +46,17 @@ pub fn create_process(sp: *mut u8, entry: *mut u8) {
         PROCESS_LIST[i] = Some(Process {
             pid,
             context: Default::default(),
+            space: VirtualAddressSpace::new_user_space(),
         });
 
-        let context = &mut PROCESS_LIST[i].as_mut().unwrap().context;
-        Context::init(context, sp, entry);
+        let proc = PROCESS_LIST[i].as_mut().unwrap();
+        let entry = proc.space.alloc_page();
+        proc.space.map_existing_page(0x77777000 as *mut u8, entry);
+        Context::init(&mut proc.context, entry.offset(4096), 0x77777000 as *mut u8, proc.space.get_ttbr());
         // TODO this is temporary to bootstrap the context switching
-        CURRENT_CONTEXT = context as *mut Context;
+        CURRENT_CONTEXT = &mut proc.context as *mut Context;
+
+        entry
     }
 }
 
@@ -77,19 +75,21 @@ fn find_empty_process() -> Option<usize> {
 
 pub fn create_test_process() {
     unsafe {
-        let size = 4096;
-        let ptr = kmalloc(size);
-        printkln!("Alloc: {:x}", ptr as usize);
+        //let size = 4096;
+        //let ptr = kmalloc(size);
+        //printkln!("Alloc: {:x}", ptr as usize);
+
+        let ptr = create_process();
 
         let code: *mut u32 = ptr.cast();
         (*code) = 0xd4000021;
         (*code.offset(1)) = 0xd503205f;
         (*code.offset(2)) = 0x17ffffff;
-        let sp = ptr.offset(size as isize);
+        //let sp = ptr.offset(size as isize);
 
-        create_process(sp, ptr);
 
-        printkln!("SP: {:#x}", sp as u64);
+        //printkln!("SP: {:#x}", sp as u64);
+        printkln!("Entry: {:#x}", ptr as u64);
         crate::printk::printk_dump(CURRENT_CONTEXT.cast(), 288);
 
         printkln!("Starting process");

@@ -2,7 +2,6 @@
 .extern kernel_start
 .extern _default_exceptions_table
 .extern _kernel_translation_table_l0
-.extern __KERNEL_VIRTUAL_BASE_ADDR
 
 
 .section .text._start
@@ -22,25 +21,9 @@ _start:
 	and	x1, x1, 0x03
 	mov	x2, #0
 	cmp	x1, x2
-	b.ne	L_suspend_core
-	b	L_start_kernel
+	b.ne	_suspend_core
 
-    L_suspend_core:
-	// Set up a default stack
-	adr	x0, #0x20000
-	mul	x0, x0, x1	// The Core ID
-	msr	SP_EL0, x0
-	msr	SP_EL1, x0
-	mov	sp, x0
-
-	bl	_setup_common_system_registers
-
-    L_loop_forever:
-	wfe
-	b L_loop_forever
-
-
-    L_start_kernel:
+    L_init_core_0:
 	// Set the stack pointer
 	adr	x1, _INIT_STACK_POINTER
 	msr	SP_EL0, x1
@@ -51,6 +34,16 @@ _start:
 
 	// TODO initialize bss
 
+	// Switch to EL1
+	mov	x0, #0b00101
+	msr	SPSR_EL2, x0
+
+	adr	x2, L_enter_E1
+	msr	ELR_EL2, x2
+	isb	sy
+	eret
+
+    L_enter_E1:
 	// Configure the translation tables for the MMU
 	adr	x8, _kernel_translation_table_l0
         msr	TTBR1_EL1, x8
@@ -66,24 +59,16 @@ _start:
         msr	SCTLR_EL1, x8
         isb
 
-	// Switch Exception Level EL1
-	// by setting the flags and return address registers
-	mov	x0, #0b00101
-	msr	SPSR_EL2, x0
-
-	adr	x2, L_enter_E1
-	msr	ELR_EL2, x2
-	isb	sy
-	eret
-
-    L_enter_E1:
-
 	// Patch the current address to use the kernel address space
-	adr	x8, L_continue
+	adr	x8, L_switch_to_kernel_vspace
 	ldr	x9, =__KERNEL_VIRTUAL_BASE_ADDR
 	add	x8, x8, x9
 	br	x8
-    L_continue:
+
+    L_switch_to_kernel_vspace:
+	// Reset the Stack Pointer to use a Kernel Space vaddress
+	adrp	x1, _INIT_STACK_POINTER
+	mov	sp, x1
 
 	// Set up Exceptions Table for EL1
 	adrp	x1, _default_exceptions_table
@@ -159,6 +144,21 @@ _setup_common_system_registers:
 	ret
 
 
+_suspend_core:
+	// Set up a default stack
+	adr	x0, #0x20000
+	mul	x0, x0, x1	// The Core ID
+	msr	SP_EL0, x0
+	msr	SP_EL1, x0
+	mov	sp, x0
+
+	bl	_setup_common_system_registers
+
+    L_loop_forever:
+	wfe
+	b L_loop_forever
+
+
 _INIT_STACK_POINTER:
-	.quad	__KERNEL_END_ADDR + 0x100000
+	.quad	__KERNEL_END_ADDR + 0x100000	// 1MB stack
 

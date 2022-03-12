@@ -1,6 +1,8 @@
 
 use core::arch::asm;
 
+use crate::printkln;
+
 // TODO this should be changed to PagePool when you decide how you'd like to do it
 use crate::mm::vmalloc::PageRegion;
 
@@ -8,26 +10,27 @@ use crate::mm::vmalloc::PageRegion;
 #[allow(dead_code)]
 const TT_DESCRIPTOR_EMPTY: u64 = 0b00;
 #[allow(dead_code)]
-const TT_DESCRIPTOR_TABLE: u64 = 0b11;
+const TT2_DESCRIPTOR_TABLE: u64 = 0b11;
 #[allow(dead_code)]
-const TT_DESCRIPTOR_BLOCK: u64 = 0b01;
+const TT2_DESCRIPTOR_BLOCK: u64 = 0b01;
+const TT3_DESCRIPTOR_BLOCK: u64 = 0b11;
 
 #[allow(dead_code)]
 const TT_ACCESS_FLAG: u64 = 1 << 10;
 
 #[allow(dead_code)]
 const TT_TYPE_MASK: u64 = 0b11;
-#[allow(dead_code)]
 const TT_TABLE_MASK: u64 = 0x0000_ffff_ffff_ffff_f000;
+const TT_BLOCK_MASK: u64 = 0x0000_ffff_ffff_ffff_f000;
+
+extern {
+    static _kernel_translation_table_l0: [u64; page_size()];
+}
+
 
 #[repr(C)]
-pub struct TranslationTable(u64);
+pub struct TranslationTable(*mut u64);
 
-impl Default for TranslationTable {
-    fn default() -> Self {
-        Self(0)
-    }
-}
 
 pub fn init_mmu(pages: &mut PageRegion) {
     let tl0: *mut u64 = pages.alloc_page_zeroed().cast();
@@ -66,50 +69,70 @@ unsafe fn enable_mmu(kernel: *mut u8, user: *mut u8) {
 }
 
 #[inline(always)]
-pub fn page_size() -> usize {
+pub const fn page_size() -> usize {
     4096
 }
 
 impl TranslationTable {
-    pub fn map_addr(&self, vaddr: *mut u8, paddr: *mut u8, len: usize) {
+    pub fn new_user_table(pages: &mut PageRegion) -> Self {
+        let tl0: *mut u64 = pages.alloc_page_zeroed().cast();
+        Self(tl0)
+    }
+
+    pub fn map_addr(&self, vaddr: *mut u8, paddr: *mut u8, len: usize, pages: &mut PageRegion) {
         // Index Table Level 0
-        let tl0_index = (vaddr as u64) >> (9 + 9 + 12) & 0x1ff;
-        let tl0_entry = unsafe { (self.0 as *mut u64).offset(tl0_index as isize) };
+        let tl0_index = (vaddr as u64) >> (9 + 9 + 9 + 12) & 0x1ff;
+        let tl0_entry = unsafe { self.0.offset(tl0_index as isize) };
+
+        ensure_table_entry(tl0_entry, pages);
+
+        // Index Table Level 1
+        let tl1_index = (vaddr as u64) >> (9 + 9 + 12) & 0x1ff;
+        let tl1_entry = unsafe {((*tl0_entry & TT_TABLE_MASK) as *mut u64).offset(tl1_index as isize) };
+
+
         if len >> (9 + 9 + 12) != 0 {
             // big segment
         }
 
-        let is_empty = unsafe { *tl0_entry } & TT_TYPE_MASK == TT_DESCRIPTOR_EMPTY;
-        if is_empty {
-            // TODO allocate table
-        }
+        ensure_table_entry(tl1_entry, pages);
 
-        // Index Table Level 1
-        let tl1_index = (vaddr as u64) >> (9 + 12) & 0x1ff;
-        let tl1_entry = unsafe {(self.0 as *mut u64).offset(tl1_index as isize) };
+        // Index Table Level 2
+        let tl2_index = (vaddr as u64) >> (9 + 12) & 0x1ff;
+        let tl2_entry = unsafe {((*tl1_entry & TT_TABLE_MASK) as *mut u64).offset(tl2_index as isize) };
 
         if len >> (9 + 12) != 0 {
             // big segment
         }
 
-        let is_empty = unsafe { *tl1_entry } & TT_TYPE_MASK == TT_DESCRIPTOR_EMPTY;
-        if is_empty {
-            // TODO allocate table
-        }
+        ensure_table_entry(tl2_entry, pages);
 
-        // Index Table Level 2
-        let tl2_index = (vaddr as u64) >> 12 & 0x1ff;
-        let tl2_entry = unsafe {(self.0 as *mut u64).offset(tl2_index as isize) };
+        // Index Table Level 3
+        let tl3_index = (vaddr as u64) >> 12 & 0x1ff;
+        let tl3_entry = unsafe {((*tl2_entry & TT_TABLE_MASK) as *mut u64).offset(tl3_index as isize) };
 
-        map_granuales(tl2_entry, paddr, page_size(), ceiling_div(len, page_size()));
+        map_granuales(tl3_entry, paddr, page_size(), ceiling_div(len, page_size()));
     }
 
+    pub(crate) fn get_ttbr(&self) -> u64 {
+        self.0 as u64
+    }
+}
+
+fn ensure_table_entry(parent_entry: *mut u64, pages: &mut PageRegion) {
+    let is_empty = unsafe { *parent_entry } & TT_TYPE_MASK == TT_DESCRIPTOR_EMPTY;
+    if is_empty {
+        let next_table: *mut u64 = pages.alloc_page_zeroed().cast();
+        unsafe {
+            *parent_entry = (next_table as u64 & TT_TABLE_MASK) | TT2_DESCRIPTOR_TABLE;
+        }
+    }
 }
 
 fn map_granuales(table: *mut u64, paddr: *mut u8, granuale_size: usize, granuales: usize) {
     for granuale in 0..granuales {
         unsafe {
-            *table.offset(granuale as isize) = (paddr.offset((granuale * granuale_size) as isize) as u64) & TT_TABLE_MASK | TT_ACCESS_FLAG | TT_DESCRIPTOR_BLOCK;
+            *table.offset(granuale as isize) = (paddr.offset((granuale * granuale_size) as isize) as u64) & TT_BLOCK_MASK | TT_ACCESS_FLAG | TT3_DESCRIPTOR_BLOCK;
         }
     }
 }

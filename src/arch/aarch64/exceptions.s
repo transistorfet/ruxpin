@@ -68,6 +68,9 @@ _save_context:
 
 
 _restore_context:
+	ldr	x8, [x0, 272]
+	msr	TTBR0_EL1, x8
+
 	ldp	x8, x9, [x0, 256]
 	msr	ELR_EL1, x8
 	msr	SPSR_EL1, x9
@@ -142,8 +145,8 @@ _loop:
 /*
  * Exceptions Table
  */
+.balign 4096
 .global _default_exceptions_table
-.balign 2048
 _default_exceptions_table:
 
 // Exceptions where SP_EL0 is the stack
