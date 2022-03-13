@@ -27,7 +27,7 @@ create_context:
 
 	stp	xzr, x1, [x0, 240]	// Initial value of SP
 
-	mov	x9, #0x3c0		// Default value for PSTATE
+	mov	x9, #0x0		// Default value for PSTATE
 	stp	x2, x9, [x0, 256]	// Push the initial PC and PSTATE values
 
 	ret

@@ -1,12 +1,14 @@
 
 use core::ptr;
 
+use alloc::vec::Vec;
 use alloc::boxed::Box;
 
 use crate::printkln;
 use crate::mm::kmalloc::{kmalloc};
 use crate::mm::vmalloc::VirtualAddressSpace;
 
+use crate::arch::sync::Mutex;
 use crate::arch::{Context, start_multitasking};
 
 
@@ -18,7 +20,11 @@ pub struct Process {
     space: VirtualAddressSpace,
 }
 
-pub static mut PROCESS_LIST: &mut [Option<Process>] = &mut [];
+unsafe impl Send for Process {}
+unsafe impl Sync for Process {}
+
+pub static PROCESS_LIST: Mutex<Vec<Process>> = Mutex::new(Vec::new());
+//pub static mut PROCESS_LIST: &mut [Option<Process>] = &mut [];
 
 // TODO need to move this
 #[no_mangle]
@@ -26,51 +32,32 @@ pub static mut CURRENT_CONTEXT: *mut Context = ptr::null_mut();
 
 
 pub fn init_processes() {
-    let process_list: Box<[Option<Process>; 20]> = Default::default();
 
-    unsafe {
-        PROCESS_LIST = Box::leak(process_list);
-    }
 }
 
 pub fn create_process() -> *mut u8 {
-    let i = match find_empty_process() {
-        Some(i) => i,
-        None => panic!("No more processes left"),
-    };
-
     // TODO this is wrong temporarily
     let pid = 1;
 
-    unsafe {
-        PROCESS_LIST[i] = Some(Process {
-            pid,
-            context: Default::default(),
-            space: VirtualAddressSpace::new_user_space(),
-        });
+    let mut processes = PROCESS_LIST.lock();
 
-        let proc = PROCESS_LIST[i].as_mut().unwrap();
-        let entry = proc.space.alloc_mapped(0x77777000, 4096);
-        Context::init(&mut proc.context, (0x77777000 + 4096) as *mut u8, 0x77777000 as *mut u8, proc.space.get_ttbr());
+    processes.push(Process {
+        pid,
+        context: Default::default(),
+        space: VirtualAddressSpace::new_user_space(),
+    });
+
+    let index = processes.len() - 1;
+    let proc = &mut processes[index];
+    let entry = proc.space.alloc_mapped(0x77777000, 4096);
+    Context::init(&mut proc.context, (0x77777000 + 4096) as *mut u8, 0x77777000 as *mut u8, proc.space.get_ttbr());
+    unsafe {
         // TODO this is temporary to bootstrap the context switching
         CURRENT_CONTEXT = &mut proc.context as *mut Context;
-
-        entry
-    }
-}
-
-fn find_empty_process() -> Option<usize> {
-    unsafe {
-        for i in 0..PROCESS_LIST.len() {
-            if PROCESS_LIST[i].is_none() {
-                return Some(i);
-            }
-        }
     }
 
-    None
+    entry
 }
-
 
 pub fn create_test_process() {
     unsafe {
