@@ -1,4 +1,6 @@
 
+use core::arch::asm;
+
 use crate::printkln;
 
 use super::mmu::TranslationTable;
@@ -22,8 +24,37 @@ impl Default for Context {
     }
 }
 
+impl Context {
+    pub fn init(&mut self, sp: *mut u8, entry: *mut u8, ttbr: u64) {
+        self.ttbr = ttbr;
+        unsafe {
+            create_context(self, sp, entry);
+        }
+    }
+}
+
+pub type IrqFlags = u32;
+
+pub unsafe fn enable_irq(flags: IrqFlags) {
+    asm!(
+        "msr    DAIF, {}",
+        in(reg) flags
+    );
+}
+
+pub unsafe fn disable_irq() -> IrqFlags {
+    let mut flags;
+    asm!(
+        "mrs    {}, DAIF",
+        "msr    DAIFset, #0xf",
+        out(reg) flags,
+    );
+    flags
+}
+
+
 extern {
-    pub fn create_context(context: &mut Context, sp: *mut u8, entry: *mut u8);
+    fn create_context(context: &mut Context, sp: *mut u8, entry: *mut u8);
     pub fn start_multitasking();
 }
 
@@ -38,12 +69,4 @@ extern "C" fn handle_exception(sp: i64, esr: i64, elr: i64, far: i64) {
     }
 }
  
-impl Context {
-    pub fn init(&mut self, sp: *mut u8, entry: *mut u8, ttbr: u64) {
-        self.ttbr = ttbr;
-        unsafe {
-            create_context(self, sp, entry);
-        }
-    }
-}
 
