@@ -31,14 +31,25 @@ impl VirtualAddressSpace {
         }
     }
 
-    pub fn alloc_page(&mut self) -> *mut u8 {
+    pub fn alloc_mapped(&mut self, mut vaddr: mmu::VirtualAddress, length: usize) -> *mut u8 {
         let pages = unsafe { PAGES.as_mut().unwrap() };
-        pages.alloc_page_zeroed()
+        // TODO this needs to be replaced when then page allocator can do blocks
+        let mut first = 0;
+        for i in 0..(length / mmu::page_size()) {
+            let ptr = pages.alloc_page_zeroed() as mmu::PhysicalAddress;
+            if first == 0 {
+                first = ptr as mmu::PhysicalAddress;
+            }
+            self.map_existing(vaddr, ptr, mmu::page_size());
+            vaddr += mmu::page_size() as mmu::VirtualAddress;
+        }
+
+        first as *mut u8
     }
 
-    pub fn map_existing_page(&mut self, vaddr: *mut u8, paddr: *mut u8) {
+    pub fn map_existing(&mut self, vaddr: mmu::VirtualAddress, paddr: mmu::PhysicalAddress, len: usize) {
         let pages = unsafe { PAGES.as_mut().unwrap() };
-        self.table.map_addr(vaddr, paddr, mmu::page_size(), pages); 
+        self.table.map_addr(vaddr, paddr, len, pages); 
     }
 
     pub fn get_ttbr(&self) -> u64 {
@@ -110,7 +121,7 @@ impl PageRegion {
         let mut i = self.last_index;
 
         loop {
-            if i >= ((self.pages / 8) + (self.pages % 8 != 0) as usize) {
+            if i >= ceiling_div(self.pages, 8) {
                 i = 0;
             }
 
@@ -127,11 +138,9 @@ impl PageRegion {
 
             i += 1;
             if i == self.last_index {
-                break;
+                panic!("Out of memory");
             }
         }
-
-        return 0;
     }
 
     fn bit_free(&mut self, bitnum: usize) {
@@ -139,6 +148,11 @@ impl PageRegion {
         let bit = bitnum & 0x7;
         self.table[i] &= !(0x01 << bit);
         self.pages_free += 1;
+        // NOTE we could set last_index here, but not doing that might mean more contiguous chunks get allocated
     }
+}
+
+fn ceiling_div(size: usize, units: usize) -> usize {
+    (size / units) + (size % units != 0) as usize
 }
 

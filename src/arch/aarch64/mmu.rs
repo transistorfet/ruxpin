@@ -37,7 +37,9 @@ pub static DEFAULT_TCR: i64 = 0
     | (64 - 42);        // Number of unmapped address bits (42-bit addressing assumed)
 
 
-#[repr(C)]
+pub type VirtualAddress = u64;
+pub type PhysicalAddress = u64;
+
 pub struct TranslationTable(*mut u64);
 
 
@@ -52,11 +54,11 @@ impl TranslationTable {
         Self(tl0)
     }
 
-    pub fn map_addr(&self, vaddr: *mut u8, paddr: *mut u8, mut len: usize, pages: &mut PageRegion) -> Result<(), KernelError> {
+    pub fn map_addr(&self, vaddr: VirtualAddress, paddr: PhysicalAddress, mut len: usize, pages: &mut PageRegion) -> Result<(), KernelError> {
         let tl0_addr_bits = 9 + 9 + 9 + 12;
 
-        let mut paddr = paddr as u64;
-        let mut vaddr = vaddr as u64;
+        let mut paddr = paddr;
+        let mut vaddr = vaddr;
         map_level(tl0_addr_bits, self.0, &mut len, &mut vaddr, &mut paddr, pages)
     }
 
@@ -65,7 +67,7 @@ impl TranslationTable {
     }
 }
 
-fn map_level(addr_bits: usize, table: *mut u64, len: &mut usize, vaddr: &mut u64, paddr: &mut u64, pages: &mut PageRegion) -> Result<(), KernelError> {
+fn map_level(addr_bits: usize, table: *mut u64, len: &mut usize, vaddr: &mut VirtualAddress, paddr: &mut PhysicalAddress, pages: &mut PageRegion) -> Result<(), KernelError> {
     let granuale_size = 1 << addr_bits;
 
     while *len > 0 {
@@ -89,7 +91,7 @@ fn map_level(addr_bits: usize, table: *mut u64, len: &mut usize, vaddr: &mut u64
     Ok(())
 }
 
-fn map_granuales(addr_bits: usize, table: *mut u64, index: &mut isize, len: &mut usize, vaddr: &mut u64, paddr: &mut u64) -> Result<(), KernelError> {
+fn map_granuales(addr_bits: usize, table: *mut u64, index: &mut isize, len: &mut usize, vaddr: &mut VirtualAddress, paddr: &mut PhysicalAddress) -> Result<(), KernelError> {
     let granuale_size = 1 << addr_bits;
     let block_flag = if addr_bits == 12 { TT3_DESCRIPTOR_BLOCK } else { TT2_DESCRIPTOR_BLOCK };
 
@@ -144,7 +146,7 @@ fn ensure_table_entry(table: *mut u64, index: isize, pages: &mut PageRegion) -> 
 }
 
 
-fn table_index_from_vaddr(bits: usize, vaddr: u64) -> isize {
+fn table_index_from_vaddr(bits: usize, vaddr: VirtualAddress) -> isize {
     (((vaddr as u64) >> bits) & 0x1ff) as isize
 }
 

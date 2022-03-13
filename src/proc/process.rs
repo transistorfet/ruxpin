@@ -50,8 +50,7 @@ pub fn create_process() -> *mut u8 {
         });
 
         let proc = PROCESS_LIST[i].as_mut().unwrap();
-        let entry = proc.space.alloc_page();
-        proc.space.map_existing_page(0x77777000 as *mut u8, entry);
+        let entry = proc.space.alloc_mapped(0x77777000, 4096);
         Context::init(&mut proc.context, (0x77777000 + 4096) as *mut u8, 0x77777000 as *mut u8, proc.space.get_ttbr());
         // TODO this is temporary to bootstrap the context switching
         CURRENT_CONTEXT = &mut proc.context as *mut Context;
