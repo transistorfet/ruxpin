@@ -68,17 +68,15 @@ _save_context:
 
 
 _restore_context:
-	ldr	x8, [x0, 272]
-	msr	TTBR0_EL1, x8
-	// TODO invalidate the TLB cache
-	//tlbi
+	ldr	x9, [x0, 272]
+	msr	TTBR0_EL1, x9
 
-	ldp	x8, x9, [x0, 256]
-	msr	ELR_EL1, x8
-	msr	SPSR_EL1, x9
+	ldp	x9, x10, [x0, 256]
+	msr	ELR_EL1, x9
+	msr	SPSR_EL1, x10
 
-	ldp	x30, x8, [x0, 240]
-	msr	SP_EL0, x8
+	ldp	x30, x9, [x0, 240]
+	msr	SP_EL0, x9
 
 	ldp	x28, x29, [x0, 224]
 	ldp	x26, x27, [x0, 208]
@@ -96,11 +94,15 @@ _restore_context:
 	ldp	x2, x3, [x0, 16]
 	ldp	x0, x1, [x0, 0]
 
+	// TODO invalidate the TLB cache
+	isb
+	tlbi	VMALLE1IS
+
 	eret
 
 
 _exception_fatal:
-	ldr	x1, =0x3F201000
+	ldr	x1, =0xFFFF00003F201000
 	mov	w0, #0x21
 	strb	w0, [x1]
 	mrs	x0, ESR_EL1
@@ -115,6 +117,9 @@ _loop:
 	// Save two register values before using the registers for temporary values
 	sub	sp, sp, #16
 	stp	x0, x30, [sp, 0]
+
+	mrs	x0, TTBR1_EL1
+	msr	TTBR0_EL1, x0
 
 	// EL2/EL3 will cause a fatal error for now
 	mrs	x0, CurrentEL

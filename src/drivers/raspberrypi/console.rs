@@ -1,9 +1,10 @@
 
 use core::fmt;
 
-const __KERNEL_VIRTUAL_BASE_ADDR: u64 = 0xffff_0000_0000_0000;
+//const __KERNEL_VIRTUAL_BASE_ADDR: u64 = 0xffff_0000_0000_0000;
+use crate::mm::__KERNEL_VIRTUAL_BASE_ADDR;
 
-const SERIAL_OUT: *mut u8 = (__KERNEL_VIRTUAL_BASE_ADDR + 0x3F20_1000) as *mut u8;
+static SERIAL_OUT: u64 = (__KERNEL_VIRTUAL_BASE_ADDR + 0x3F20_1000);
 
 pub struct Console;
 
@@ -11,7 +12,7 @@ impl fmt::Write for Console {
     fn write_str(&mut self, s: &str) -> fmt::Result { 
         for ch in s.chars() {
             unsafe {
-                core::ptr::write_volatile(SERIAL_OUT, ch as u8);
+                core::ptr::write_volatile(SERIAL_OUT as *mut u8, ch as u8);
             }
         }
         Ok(())

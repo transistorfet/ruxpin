@@ -18,6 +18,8 @@ const TT3_DESCRIPTOR_BLOCK: u64 = 0b11;
 
 #[allow(dead_code)]
 const TT_ACCESS_FLAG: u64 = 1 << 10;
+#[allow(dead_code)]
+const TT_READ_WRITE_FLAG: u64 = 0b01 << 6;
 
 #[allow(dead_code)]
 const TT_TYPE_MASK: u64 = 0b11;
@@ -101,7 +103,7 @@ fn map_granuales(addr_bits: usize, table: *mut u64, index: &mut isize, len: &mut
         }
 
         unsafe {
-            *table.offset(*index) = (*paddr & TT_BLOCK_MASK) | TT_ACCESS_FLAG | block_flag;
+            *table.offset(*index) = (*paddr & TT_BLOCK_MASK) | TT_ACCESS_FLAG | TT_READ_WRITE_FLAG | block_flag;
         }
 
         *index += 1;

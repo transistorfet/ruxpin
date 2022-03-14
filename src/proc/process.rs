@@ -59,6 +59,15 @@ pub fn create_process() -> *mut u8 {
     entry
 }
 
+const TEST_PROC1: &[u32] = &[0xd4000021, 0xd503205f, 0x17ffffff];
+const TEST_PROC2: &[u32] = &[0xd10043ff, 0xf90003e0, 0xf90007e1, 0x14000001, 0xd4000021, 0x17ffffff];
+
+pub unsafe fn load_code(code: *mut u32, instructions: &[u32]) {
+    for i in 0..instructions.len() {
+        *code.offset(i as isize) = instructions[i];
+    }
+}
+
 pub fn create_test_process() {
     unsafe {
         //let size = 4096;
@@ -67,10 +76,12 @@ pub fn create_test_process() {
 
         let ptr = create_process();
 
-        let code: *mut u32 = ptr.cast();
-        (*code) = 0xd4000021;
-        (*code.offset(1)) = 0xd503205f;
-        (*code.offset(2)) = 0x17ffffff;
+        load_code(ptr.cast(), TEST_PROC2);
+
+        //let code: *mut u32 = ptr.cast();
+        //(*code) = 0xd4000021;
+        //(*code.offset(1)) = 0xd503205f;
+        //(*code.offset(2)) = 0x17ffffff;
         //let sp = ptr.offset(size as isize);
 
 
