@@ -64,11 +64,31 @@ extern {
 extern "C" fn handle_exception(sp: i64, esr: i64, elr: i64, far: i64) {
     printkln!("Handle an exception of {:x} for sp {:x}", esr, sp);
 
-    if esr == 0x56000001 {
-        printkln!("A SYSCALL!");
-        crate::proc::process::schedule();
-    } else {
-        crate::fatal_error(esr, elr);
+    match esr >> 26 {
+        // SVC from Aarch64
+        0b010101 => {
+            printkln!("A SYSCALL!");
+            crate::proc::process::schedule();
+        },
+
+        // Instruction Abort from lower EL
+        0b100000 => {
+            if esr & 0b111100 == 0b001000 {
+                printkln!("Instruction Abort caused by Access Flag (ie. load the data)");
+            }
+            crate::fatal_error(esr, elr);
+        },
+
+        // Data Abort from lower EL
+        0b100100 => {
+            if esr & 0b111100 == 0b001000 {
+                printkln!("Data Abort caused by Access Flag (ie. load the data)");
+            }
+            crate::fatal_error(esr, elr);
+        },
+        _ => {
+            crate::fatal_error(esr, elr);
+        }
     }
 }
  

@@ -10,7 +10,7 @@ pub struct MutexGuard<'a, T: ?Sized + 'a> {
 }
 
 pub struct Mutex<T: ?Sized> {
-    flags: UnsafeCell<IrqFlags>,
+    locked: AtomicBool,
     data: UnsafeCell<T>
 }
 
@@ -20,7 +20,7 @@ unsafe impl<T: ?Sized + Send> Sync for Mutex<T> {}
 impl<T> Mutex<T> {
     pub const fn new(t: T) -> Mutex<T> {
         Mutex {
-            flags: UnsafeCell::new(0),
+            locked: AtomicBool::new(false),
             data: UnsafeCell::new(t),
         }
     }
@@ -29,7 +29,9 @@ impl<T> Mutex<T> {
 impl<T: ?Sized> Mutex<T> {
     pub fn lock(&self) -> MutexGuard<'_, T> {
         unsafe {
-            *self.flags.get() = disable_irq();
+            while !self.locked.try_change(true) {
+                // TODO delay
+            }
             MutexGuard { lock: self }
         }
     }
@@ -57,8 +59,46 @@ impl<T: ?Sized> Drop for MutexGuard<'_, T> {
     #[inline]
     fn drop(&mut self) {
         unsafe {
-            enable_irq(*self.lock.flags.get());
+            self.lock.locked.change(false);
         }
     }
 }
+
+
+pub struct AtomicBool {
+    inner: UnsafeCell<bool>
+}
+
+impl AtomicBool {
+    pub const fn new(value: bool) -> Self {
+        Self {
+            inner: UnsafeCell::new(value),
+        }
+    }
+
+    pub fn try_change(&self, value: bool) -> bool {
+        unsafe {
+            let flags = disable_irq();
+            let result = if *self.inner.get() == value {
+                false
+            } else {
+                *self.inner.get() = value;
+                true
+            };
+            enable_irq(flags);
+            result
+        }
+    }
+
+    pub fn change(&self, value: bool) {
+        unsafe {
+            let flags = disable_irq();
+            *self.inner.get() = value;
+            enable_irq(flags);
+        }
+    }
+}
+
+unsafe impl Send for AtomicBool {}
+unsafe impl Sync for AtomicBool {}
 
