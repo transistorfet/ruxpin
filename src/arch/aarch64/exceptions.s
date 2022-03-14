@@ -118,6 +118,7 @@ _loop:
 	sub	sp, sp, #16
 	stp	x0, x30, [sp, 0]
 
+	// Restore the kernel translation table so we can directly access lower memory
 	mrs	x0, TTBR1_EL1
 	msr	TTBR0_EL1, x0
 

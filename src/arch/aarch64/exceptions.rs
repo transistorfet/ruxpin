@@ -64,6 +64,7 @@ extern "C" fn handle_exception(sp: i64, esr: i64, elr: i64, far: i64) {
 
     if esr == 0x56000001 {
         printkln!("A SYSCALL!");
+        crate::proc::process::schedule();
     } else {
         crate::fatal_error(esr, elr);
     }
