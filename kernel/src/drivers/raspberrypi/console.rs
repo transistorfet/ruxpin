@@ -1,10 +1,9 @@
 
 use core::fmt;
 
-//const __KERNEL_VIRTUAL_BASE_ADDR: u64 = 0xffff_0000_0000_0000;
 use crate::mm::__KERNEL_VIRTUAL_BASE_ADDR;
 
-static SERIAL_OUT: u64 = (__KERNEL_VIRTUAL_BASE_ADDR + 0x3F20_1000);
+static SERIAL_OUT: u64 = __KERNEL_VIRTUAL_BASE_ADDR + 0x3F20_1000;
 
 pub struct Console;
 

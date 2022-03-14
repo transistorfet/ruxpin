@@ -1,7 +1,4 @@
 
-use core::arch::asm;
-
-use crate::printkln;
 use crate::mm::MemoryAccess;
 use crate::errors::KernelError;
 
@@ -91,9 +88,7 @@ fn map_level(addr_bits: usize, table: *mut u64, len: &mut usize, vaddr: &mut Vir
 
         ensure_table_entry(table, index, pages)?;
 
-        map_level(addr_bits - 9, table_ptr(table, index), len, vaddr, paddr, flags, pages);
-
-        index += 1;
+        map_level(addr_bits - 9, table_ptr(table, index), len, vaddr, paddr, flags, pages)?;
     }
 
     Ok(())
@@ -156,7 +151,7 @@ fn ensure_table_entry(table: *mut u64, index: isize, pages: &mut PageRegion) -> 
 fn lookup_level(addr_bits: usize, table: *mut u64, vaddr: VirtualAddress) -> Result<PhysicalAddress, KernelError> {
     let granuale_size = 1 << addr_bits;
 
-    let mut index = table_index_from_vaddr(addr_bits, vaddr);
+    let index = table_index_from_vaddr(addr_bits, vaddr);
     if is_block(addr_bits, table, index) {
         Ok(block_ptr(table, index) | (vaddr & (granuale_size - 1)))
     } else if addr_bits == 12 {
@@ -179,7 +174,7 @@ fn table_ptr(table: *mut u64, index: isize) -> *mut u64 {
 
 fn block_ptr(table: *mut u64, index: isize) -> PhysicalAddress {
     unsafe {
-        (*table.offset(index) & TT_BLOCK_MASK)
+        *table.offset(index) & TT_BLOCK_MASK
     }
 }
 

@@ -2,10 +2,8 @@
 use core::ptr;
 
 use alloc::vec::Vec;
-use alloc::boxed::Box;
 
 use crate::printkln;
-use crate::mm::kmalloc::{kmalloc};
 use crate::mm::vmalloc::VirtualAddressSpace;
 
 use crate::arch::sync::Mutex;
@@ -93,7 +91,7 @@ const TEST_PROC2: &[u32] = &[0xd10043ff, 0xf90003e0, 0xf90007e1, 0x14000001, 0xd
 
 pub unsafe fn load_code(code: *mut u32, instructions: &[u32]) {
     for i in 0..instructions.len() {
-        *code.offset(i as isize) = instructions[i];
+        *code.add(i) = instructions[i];
     }
 }
 

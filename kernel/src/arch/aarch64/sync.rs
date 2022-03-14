@@ -2,7 +2,7 @@
 use core::cell::UnsafeCell;
 use core::ops::{Deref, DerefMut};
 
-use super::exceptions::{IrqFlags, enable_irq, disable_irq};
+use super::exceptions::{enable_irq, disable_irq};
 
 
 pub struct MutexGuard<'a, T: ?Sized + 'a> {
@@ -28,12 +28,10 @@ impl<T> Mutex<T> {
 
 impl<T: ?Sized> Mutex<T> {
     pub fn lock(&self) -> MutexGuard<'_, T> {
-        unsafe {
-            while !self.locked.try_change(true) {
-                // TODO delay
-            }
-            MutexGuard { lock: self }
+        while !self.locked.try_change(true) {
+            // TODO delay
         }
+        MutexGuard { lock: self }
     }
 }
 
@@ -58,9 +56,7 @@ impl<T: ?Sized> DerefMut for MutexGuard<'_, T> {
 impl<T: ?Sized> Drop for MutexGuard<'_, T> {
     #[inline]
     fn drop(&mut self) {
-        unsafe {
-            self.lock.locked.change(false);
-        }
+        self.lock.locked.change(false);
     }
 }
 

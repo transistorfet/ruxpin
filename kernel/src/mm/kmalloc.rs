@@ -44,7 +44,7 @@ impl Heap {
             if (*cur).size >= block_size {
                 // If the block can be split with enough room for another block struct and more than 8 bytes left over, then split it
                 if (*cur).size >= block_size + mem::size_of::<Block>() + 8 {
-                    nextfree = cur.cast::<u8>().offset(block_size as isize).cast();
+                    nextfree = cur.cast::<u8>().add(block_size).cast();
                     (*nextfree).size = (*cur).size - block_size;
                     (*cur).size = block_size;
 
@@ -76,17 +76,17 @@ impl Heap {
         let mut block: *mut Block = ptr.cast::<Block>().offset(-1);
         let mut cur: *mut Block = self.free_blocks;
 
-        while cur != ptr::null_mut() {
+        while !cur.is_null() {
             if (*cur).next == block {
                 panic!("Double free detected at {:x}! Halting...\n", cur as usize);
             }
 
-            if cur.cast::<u8>().offset((*cur).size as isize).cast() == block {
+            if cur.cast::<u8>().add((*cur).size).cast() == block {
                 // Merge the free'd block with the previous block
                 (*cur).size += (*block).size;
 
                 // If this block is adjacent to the next free block, then merge them
-                if cur.cast::<u8>().offset((*cur).size as isize).cast() == (*cur).next {
+                if cur.cast::<u8>().add((*cur).size).cast() == (*cur).next {
                     (*cur).size += (*(*cur).next).size;
                     (*cur).next = (*(*cur).next).next;
                 }
@@ -103,7 +103,7 @@ impl Heap {
                 (*block).next = cur;
 
                 // If this block is adjacent to the next free block, then merge them
-                if block.cast::<u8>().offset((*block).size as isize).cast() == cur {
+                if block.cast::<u8>().add((*block).size).cast() == cur {
                     (*block).size += (*cur).size;
                     (*block).next = (*cur).next;
                 }

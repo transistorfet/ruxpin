@@ -3,12 +3,10 @@ use core::arch::asm;
 
 use crate::printkln;
 
-use super::mmu::TranslationTable;
-
 #[repr(C)]
 pub struct Context {
     x_registers: [u64; 32],
-    v_registers: [u128; 32],
+    v_registers: [u64; 64],     // TODO this should be u128, but they don't have a stable ABI, so I'm avoiding them for safety
     elr: u64,
     spsr: u64,
     ttbr: u64,
@@ -18,7 +16,7 @@ impl Default for Context {
     fn default() -> Self {
         Self {
             x_registers: [0; 32],
-            v_registers: [0; 32],
+            v_registers: [0; 64],
             elr: 0,
             spsr: 0,
             ttbr: 0,
@@ -35,11 +33,11 @@ impl Context {
     }
 }
 
-pub type IrqFlags = u32;
+pub type IrqFlags = u64;
 
 pub unsafe fn enable_irq(flags: IrqFlags) {
     asm!(
-        "msr    DAIF, {}",
+        "msr    DAIF, {:x}",
         in(reg) flags
     );
 }
@@ -47,7 +45,7 @@ pub unsafe fn enable_irq(flags: IrqFlags) {
 pub unsafe fn disable_irq() -> IrqFlags {
     let mut flags;
     asm!(
-        "mrs    {}, DAIF",
+        "mrs    {:x}, DAIF",
         "msr    DAIFset, #0xf",
         out(reg) flags,
     );
@@ -74,7 +72,7 @@ extern "C" fn handle_exception(sp: i64, esr: i64, elr: i64, far: i64) {
         // Instruction Abort from lower EL
         0b100000 => {
             if esr & 0b111100 == 0b001000 {
-                printkln!("Instruction Abort caused by Access Flag (ie. load the data)");
+                printkln!("Instruction Abort caused by Access Flag (ie. load the data) at {:x}", far);
             }
             crate::fatal_error(esr, elr);
         },
@@ -82,7 +80,7 @@ extern "C" fn handle_exception(sp: i64, esr: i64, elr: i64, far: i64) {
         // Data Abort from lower EL
         0b100100 => {
             if esr & 0b111100 == 0b001000 {
-                printkln!("Data Abort caused by Access Flag (ie. load the data)");
+                printkln!("Data Abort caused by Access Flag (ie. load the data) at {:x}", far);
             }
             crate::fatal_error(esr, elr);
         },

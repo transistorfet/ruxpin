@@ -1,7 +1,6 @@
 
 use core::slice;
 
-use crate::printkln;
 use crate::mm::MemoryAccess;
 use crate::arch::mmu::{self, TranslationTable, VirtualAddress, PhysicalAddress};
 
@@ -43,7 +42,7 @@ impl VirtualAddressSpace {
         let pages = unsafe { PAGES.as_mut().unwrap() };
         // TODO this needs to be replaced when then page allocator can do blocks
         let mut first = 0;
-        for i in 0..(length / mmu::page_size()) {
+        for _ in 0..(length / mmu::page_size()) {
             let ptr = pages.alloc_page_zeroed() as PhysicalAddress;
             if first == 0 {
                 first = ptr as PhysicalAddress;
@@ -58,7 +57,7 @@ impl VirtualAddressSpace {
     pub fn map_existing(&mut self, vaddr: VirtualAddress, paddr: PhysicalAddress, len: usize) {
         let pages = unsafe { PAGES.as_mut().unwrap() };
         // TODO this readwritexecute is temporary until you get segment data recorded
-        self.table.map_addr(MemoryAccess::ReadWriteExecute, vaddr, paddr, len, pages);
+        self.table.map_addr(MemoryAccess::ReadWriteExecute, vaddr, paddr, len, pages).unwrap();
     }
 
     pub fn get_ttbr(&self) -> u64 {
@@ -83,7 +82,7 @@ impl PageRegion {
     pub fn alloc_page(&mut self) -> *mut u8 {
         let bit = self.bit_alloc();
         unsafe {
-            self.pages_start.offset((bit * mmu::page_size()) as isize)
+            self.pages_start.add(bit * mmu::page_size())
         }
     }
 
@@ -92,7 +91,7 @@ impl PageRegion {
 
         unsafe {
             for i in 0..mmu::page_size() {
-                *ptr.offset(i as isize) = 0;
+                *ptr.add(i) = 0;
             }
         }
 
