@@ -9,6 +9,7 @@
 
 .global create_context
 create_context:
+	// Integer Registers
 	stp	xzr, xzr, [x0, 0]
 	stp	xzr, xzr, [x0, 16]
 	stp	xzr, xzr, [x0, 32]
@@ -24,11 +25,35 @@ create_context:
 	stp	xzr, xzr, [x0, 192]
 	stp	xzr, xzr, [x0, 208]
 	stp	xzr, xzr, [x0, 224]
-
 	stp	xzr, x1, [x0, 240]	// Initial value of SP
 
+	add	x0, x0, #256
+
+	// Floating Point Registers
+	stp	xzr, xzr, [x0, 0]
+	stp	xzr, xzr, [x0, 32]
+	stp	xzr, xzr, [x0, 64]
+	stp	xzr, xzr, [x0, 96]
+	stp	xzr, xzr, [x0, 128]
+	stp	xzr, xzr, [x0, 160]
+	stp	xzr, xzr, [x0, 192]
+	stp	xzr, xzr, [x0, 224]
+	stp	xzr, xzr, [x0, 256]
+	stp	xzr, xzr, [x0, 288]
+	stp	xzr, xzr, [x0, 320]
+	stp	xzr, xzr, [x0, 352]
+	stp	xzr, xzr, [x0, 384]
+	stp	xzr, xzr, [x0, 416]
+	stp	xzr, xzr, [x0, 448]
+	stp	xzr, xzr, [x0, 480]
+
+	add	x0, x0, #512
+
+	// Additional Control Registers
 	mov	x9, #0x0		// Default value for PSTATE
-	stp	x2, x9, [x0, 256]	// Push the initial PC and PSTATE values
+	stp	x2, x9, [x0, 0]	// Push the initial PC and PSTATE values
+
+	sub	x0, x0, #(512 + 256)
 
 	ret
 
@@ -40,6 +65,7 @@ start_multitasking:
 
 
 _save_context:
+	// Integer Registers
 	stp	x2, x3, [x0, 16]
 	stp	x4, x5, [x0, 32]
 	stp	x6, x7, [x0, 48]
@@ -55,26 +81,78 @@ _save_context:
 	stp	x26, x27, [x0, 208]
 	stp	x28, x29, [x0, 224]
 
+	// Save the two values on the stack now that we have temp regs
 	ldp	x8, x9, [sp, 0]
 	stp	x8, x1, [x0, 0]
 	mrs	x8, SP_EL0
 	stp	x9, x8, [x0, 240]
 
+	// Reposition offset
+	add	x0, x0, #256
+
+	// Floating Point Registers
+	stp	q0, q1, [x0, 0]
+	stp	q2, q3, [x0, 32]
+	stp	q4, q5, [x0, 64]
+	stp	q6, q7, [x0, 96]
+	stp	q8, q9, [x0, 128]
+	stp	q10, q11, [x0, 160]
+	stp	q12, q13, [x0, 192]
+	stp	q14, q15, [x0, 224]
+	stp	q16, q17, [x0, 256]
+	stp	q18, q19, [x0, 288]
+	stp	q20, q21, [x0, 320]
+	stp	q22, q23, [x0, 352]
+	stp	q24, q25, [x0, 384]
+	stp	q26, q27, [x0, 416]
+	stp	q28, q29, [x0, 448]
+	stp	q30, q31, [x0, 480]
+
+	add	x0, x0, #512
+
 	mrs	x8, ELR_EL1
 	mrs	x9, SPSR_EL1
-	stp	x8, x9, [x0, 256]
+	stp	x8, x9, [x0, 0]
+
+	sub	x0, x0, #(512 + 256)
 
 	ret
 
 
 _restore_context:
-	ldr	x9, [x0, 272]
+	// Indexing can only have an offset 512, so advance the pointer to reach the rest
+	add	x0, x0, #(512 + 256)
+
+	ldr	x9, [x0, 16]
 	msr	TTBR0_EL1, x9
 
-	ldp	x9, x10, [x0, 256]
+	ldp	x9, x10, [x0, 0]
 	msr	ELR_EL1, x9
 	msr	SPSR_EL1, x10
 
+	sub	x0, x0, #512
+
+	// Floating Point Registers
+	ldp	q30, q31, [x0, 480]
+	ldp	q28, q29, [x0, 448]
+	ldp	q26, q27, [x0, 416]
+	ldp	q24, q25, [x0, 384]
+	ldp	q22, q23, [x0, 352]
+	ldp	q20, q21, [x0, 320]
+	ldp	q18, q19, [x0, 288]
+	ldp	q16, q17, [x0, 256]
+	ldp	q14, q15, [x0, 224]
+	ldp	q12, q13, [x0, 192]
+	ldp	q10, q11, [x0, 160]
+	ldp	q8, q9, [x0, 128]
+	ldp	q6, q7, [x0, 96]
+	ldp	q4, q5, [x0, 64]
+	ldp	q2, q3, [x0, 32]
+	ldp	q0, q1, [x0, 0]
+
+	sub	x0, x0, #256
+
+	// Integer Registers
 	ldp	x30, x9, [x0, 240]
 	msr	SP_EL0, x9
 

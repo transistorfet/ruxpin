@@ -7,7 +7,8 @@ use super::mmu::TranslationTable;
 
 #[repr(C)]
 pub struct Context {
-    registers: [u64; 32],
+    x_registers: [u64; 32],
+    v_registers: [u128; 32],
     elr: u64,
     spsr: u64,
     ttbr: u64,
@@ -16,7 +17,8 @@ pub struct Context {
 impl Default for Context {
     fn default() -> Self {
         Self {
-            registers: [0; 32],
+            x_registers: [0; 32],
+            v_registers: [0; 32],
             elr: 0,
             spsr: 0,
             ttbr: 0,
