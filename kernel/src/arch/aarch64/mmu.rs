@@ -2,6 +2,7 @@
 use core::arch::asm;
 
 use crate::printkln;
+use crate::mm::MemoryAccess;
 use crate::errors::KernelError;
 
 // TODO this should be changed to PagePool when you decide how you'd like to do it
@@ -16,15 +17,17 @@ const TT2_DESCRIPTOR_TABLE: u64 = 0b11;
 const TT2_DESCRIPTOR_BLOCK: u64 = 0b01;
 const TT3_DESCRIPTOR_BLOCK: u64 = 0b11;
 
-#[allow(dead_code)]
 const TT_ACCESS_FLAG: u64 = 1 << 10;
-#[allow(dead_code)]
+const TT_READ_ONLY_FLAG: u64 = 0b11 << 6;
 const TT_READ_WRITE_FLAG: u64 = 0b01 << 6;
+const TT_NO_EXECUTE_FLAG: u64 = 0b11 << 53;
 
 #[allow(dead_code)]
 const TT_TYPE_MASK: u64 = 0b11;
 const TT_TABLE_MASK: u64 = 0x0000_ffff_ffff_ffff_f000;
 const TT_BLOCK_MASK: u64 = 0x0000_ffff_ffff_ffff_f000;
+
+const TL0_ADDR_BITS: usize = 9 + 9 + 9 + 12;
 
 extern {
     static _kernel_translation_table_l0: [u64; page_size()];
@@ -56,12 +59,15 @@ impl TranslationTable {
         Self(tl0)
     }
 
-    pub fn map_addr(&self, vaddr: VirtualAddress, paddr: PhysicalAddress, mut len: usize, pages: &mut PageRegion) -> Result<(), KernelError> {
-        let tl0_addr_bits = 9 + 9 + 9 + 12;
-
+    pub fn map_addr(&self, access: MemoryAccess, vaddr: VirtualAddress, paddr: PhysicalAddress, mut len: usize, pages: &mut PageRegion) -> Result<(), KernelError> {
+        let flags = memory_access_flags(access);
         let mut paddr = paddr;
         let mut vaddr = vaddr;
-        map_level(tl0_addr_bits, self.0, &mut len, &mut vaddr, &mut paddr, pages)
+        map_level(TL0_ADDR_BITS, self.0, &mut len, &mut vaddr, &mut paddr, flags, pages)
+    }
+
+    pub fn translate_addr(&self, vaddr: VirtualAddress) -> Result<PhysicalAddress, KernelError> {
+        lookup_level(TL0_ADDR_BITS, self.0, vaddr)
     }
 
     pub(crate) fn get_ttbr(&self) -> u64 {
@@ -69,13 +75,13 @@ impl TranslationTable {
     }
 }
 
-fn map_level(addr_bits: usize, table: *mut u64, len: &mut usize, vaddr: &mut VirtualAddress, paddr: &mut PhysicalAddress, pages: &mut PageRegion) -> Result<(), KernelError> {
+fn map_level(addr_bits: usize, table: *mut u64, len: &mut usize, vaddr: &mut VirtualAddress, paddr: &mut PhysicalAddress, flags: u64, pages: &mut PageRegion) -> Result<(), KernelError> {
     let granuale_size = 1 << addr_bits;
 
     while *len > 0 {
         let mut index = table_index_from_vaddr(addr_bits, *vaddr);
         if (*vaddr & (granuale_size as u64 - 1)) == 0 && *len >= granuale_size {
-            map_granuales(addr_bits, table, &mut index, len, vaddr, paddr)?;
+            map_granuales(addr_bits, table, &mut index, len, vaddr, paddr, flags)?;
             break;
         }
 
@@ -85,7 +91,7 @@ fn map_level(addr_bits: usize, table: *mut u64, len: &mut usize, vaddr: &mut Vir
 
         ensure_table_entry(table, index, pages)?;
 
-        map_level(addr_bits - 9, table_ptr_at_index(table, index), len, vaddr, paddr, pages);
+        map_level(addr_bits - 9, table_ptr(table, index), len, vaddr, paddr, flags, pages);
 
         index += 1;
     }
@@ -93,7 +99,7 @@ fn map_level(addr_bits: usize, table: *mut u64, len: &mut usize, vaddr: &mut Vir
     Ok(())
 }
 
-fn map_granuales(addr_bits: usize, table: *mut u64, index: &mut isize, len: &mut usize, vaddr: &mut VirtualAddress, paddr: &mut PhysicalAddress) -> Result<(), KernelError> {
+fn map_granuales(addr_bits: usize, table: *mut u64, index: &mut isize, len: &mut usize, vaddr: &mut VirtualAddress, paddr: &mut PhysicalAddress, flags: u64) -> Result<(), KernelError> {
     let granuale_size = 1 << addr_bits;
     let block_flag = if addr_bits == 12 { TT3_DESCRIPTOR_BLOCK } else { TT2_DESCRIPTOR_BLOCK };
 
@@ -103,7 +109,7 @@ fn map_granuales(addr_bits: usize, table: *mut u64, index: &mut isize, len: &mut
         }
 
         unsafe {
-            *table.offset(*index) = (*paddr & TT_BLOCK_MASK) | TT_ACCESS_FLAG | TT_READ_WRITE_FLAG | block_flag;
+            *table.offset(*index) = (*paddr & TT_BLOCK_MASK) | TT_ACCESS_FLAG | flags | block_flag;
         }
 
         *index += 1;
@@ -147,23 +153,34 @@ fn ensure_table_entry(table: *mut u64, index: isize, pages: &mut PageRegion) -> 
     }
 }
 
+fn lookup_level(addr_bits: usize, table: *mut u64, vaddr: VirtualAddress) -> Result<PhysicalAddress, KernelError> {
+    let granuale_size = 1 << addr_bits;
+
+    let mut index = table_index_from_vaddr(addr_bits, vaddr);
+    if is_block(addr_bits, table, index) {
+        Ok(block_ptr(table, index) | (vaddr & (granuale_size - 1)))
+    } else if addr_bits == 12 {
+        Err(KernelError::AddressUnmapped)
+    } else {
+        lookup_level(addr_bits - 9, table_ptr(table, index), vaddr)
+    }
+}
+
 
 fn table_index_from_vaddr(bits: usize, vaddr: VirtualAddress) -> isize {
     (((vaddr as u64) >> bits) & 0x1ff) as isize
 }
 
-fn table_ptr_at_index(table: *mut u64, index: isize) -> *mut u64 {
+fn table_ptr(table: *mut u64, index: isize) -> *mut u64 {
     unsafe {
-        table_ptr(*table.offset(index))
+        (*table.offset(index) & TT_TABLE_MASK) as *mut u64
     }
 }
 
-fn table_ptr(descriptor: u64) -> *mut u64 {
-    (descriptor & TT_TABLE_MASK) as *mut u64
-}
-
-fn block_ptr(descriptor: u64) -> *mut u64 {
-    (descriptor & TT_BLOCK_MASK) as *mut u64
+fn block_ptr(table: *mut u64, index: isize) -> PhysicalAddress {
+    unsafe {
+        (*table.offset(index) & TT_BLOCK_MASK)
+    }
 }
 
 fn descriptor_type(table: *mut u64, index: isize) -> u64 {
@@ -172,13 +189,21 @@ fn descriptor_type(table: *mut u64, index: isize) -> u64 {
     }
 }
 
-fn desc_to_table(entry: *mut u64) -> *mut u64 {
-    unsafe {
-        (*entry & TT_TABLE_MASK) as *mut u64
+fn is_block(addr_bits: usize, table: *mut u64, index: isize) -> bool {
+    let dtype = descriptor_type(table, index);
+    if addr_bits == 12 {
+        dtype == TT3_DESCRIPTOR_BLOCK
+    } else {
+        dtype == TT2_DESCRIPTOR_BLOCK
     }
 }
 
-fn ceiling_div(size: usize, units: usize) -> usize {
-    (size / units) + (size % units != 0) as usize
+fn memory_access_flags(access: MemoryAccess) -> u64 {
+    match access {
+        MemoryAccess::ReadOnly => TT_READ_ONLY_FLAG | TT_NO_EXECUTE_FLAG,
+        MemoryAccess::ReadExecute => TT_READ_ONLY_FLAG,
+        MemoryAccess::ReadWrite => TT_READ_WRITE_FLAG | TT_NO_EXECUTE_FLAG,
+        MemoryAccess::ReadWriteExecute => TT_READ_WRITE_FLAG,
+    }
 }
 

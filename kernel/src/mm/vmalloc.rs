@@ -2,7 +2,8 @@
 use core::slice;
 
 use crate::printkln;
-use crate::arch::mmu;
+use crate::mm::MemoryAccess;
+use crate::arch::mmu::{self, TranslationTable, VirtualAddress, PhysicalAddress};
 
 
 //static mut MEMORY_AREAS: [Option<PagePool>; 20] = unsafe { mem::MaybeUninit::uninit().assume_init() };
@@ -17,39 +18,47 @@ pub fn init_virtual_memory(start: *mut u8, end: *mut u8) {
     }
 }
 
+pub struct Segment {
+    //memtype: MemType
+    //start: VirtualAddress,
+    //len: usize,
+    //ops for getting pages
+}
+
 pub struct VirtualAddressSpace {
-    table: mmu::TranslationTable,
+    table: TranslationTable,
 }
 
 impl VirtualAddressSpace {
     pub fn new_user_space() -> Self {
         let pages = unsafe { PAGES.as_mut().unwrap() };
-        let table = mmu::TranslationTable::new_user_table(pages);
+        let table = TranslationTable::new_user_table(pages);
 
         Self {
             table,
         }
     }
 
-    pub fn alloc_mapped(&mut self, mut vaddr: mmu::VirtualAddress, length: usize) -> *mut u8 {
+    pub fn alloc_mapped(&mut self, mut vaddr: VirtualAddress, length: usize) -> *mut u8 {
         let pages = unsafe { PAGES.as_mut().unwrap() };
         // TODO this needs to be replaced when then page allocator can do blocks
         let mut first = 0;
         for i in 0..(length / mmu::page_size()) {
-            let ptr = pages.alloc_page_zeroed() as mmu::PhysicalAddress;
+            let ptr = pages.alloc_page_zeroed() as PhysicalAddress;
             if first == 0 {
-                first = ptr as mmu::PhysicalAddress;
+                first = ptr as PhysicalAddress;
             }
             self.map_existing(vaddr, ptr, mmu::page_size());
-            vaddr += mmu::page_size() as mmu::VirtualAddress;
+            vaddr += mmu::page_size() as VirtualAddress;
         }
 
         first as *mut u8
     }
 
-    pub fn map_existing(&mut self, vaddr: mmu::VirtualAddress, paddr: mmu::PhysicalAddress, len: usize) {
+    pub fn map_existing(&mut self, vaddr: VirtualAddress, paddr: PhysicalAddress, len: usize) {
         let pages = unsafe { PAGES.as_mut().unwrap() };
-        self.table.map_addr(vaddr, paddr, len, pages); 
+        // TODO this readwritexecute is temporary until you get segment data recorded
+        self.table.map_addr(MemoryAccess::ReadWriteExecute, vaddr, paddr, len, pages);
     }
 
     pub fn get_ttbr(&self) -> u64 {
