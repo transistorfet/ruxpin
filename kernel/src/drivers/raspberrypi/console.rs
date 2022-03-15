@@ -1,5 +1,6 @@
 
 use core::fmt;
+use core::ptr;
 
 use crate::mm::__KERNEL_VIRTUAL_BASE_ADDR;
 
@@ -11,7 +12,7 @@ impl fmt::Write for Console {
     fn write_str(&mut self, s: &str) -> fmt::Result { 
         for ch in s.chars() {
             unsafe {
-                core::ptr::write_volatile(SERIAL_OUT as *mut u8, ch as u8);
+                ptr::write_volatile(SERIAL_OUT as *mut u8, ch as u8);
             }
         }
         Ok(())

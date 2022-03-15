@@ -38,7 +38,7 @@ impl VirtualAddressSpace {
         }
     }
 
-    pub fn alloc_mapped(&mut self, mut vaddr: VirtualAddress, length: usize) -> *mut u8 {
+    pub fn alloc_mapped(&mut self, access: MemoryAccess, mut vaddr: VirtualAddress, length: usize) -> *mut u8 {
         let pages = unsafe { PAGES.as_mut().unwrap() };
         // TODO this needs to be replaced when then page allocator can do blocks
         let mut first = 0;
@@ -47,17 +47,17 @@ impl VirtualAddressSpace {
             if first == 0 {
                 first = ptr as PhysicalAddress;
             }
-            self.map_existing(vaddr, ptr, mmu::page_size());
+            self.map_existing(access, vaddr, ptr, mmu::page_size());
             vaddr += mmu::page_size() as VirtualAddress;
         }
 
         first as *mut u8
     }
 
-    pub fn map_existing(&mut self, vaddr: VirtualAddress, paddr: PhysicalAddress, len: usize) {
+    pub fn map_existing(&mut self, access: MemoryAccess, vaddr: VirtualAddress, paddr: PhysicalAddress, len: usize) {
         let pages = unsafe { PAGES.as_mut().unwrap() };
         // TODO this readwritexecute is temporary until you get segment data recorded
-        self.table.map_addr(MemoryAccess::ReadWriteExecute, vaddr, paddr, len, pages).unwrap();
+        self.table.map_addr(access, vaddr, paddr, len, pages).unwrap();
     }
 
     pub fn get_ttbr(&self) -> u64 {

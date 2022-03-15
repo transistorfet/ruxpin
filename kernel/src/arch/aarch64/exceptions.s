@@ -1,6 +1,7 @@
 
 
 .extern fatal_error
+.extern handle_irq
 .extern handle_exception
 .extern PROCESS_SAVED_SP
 
@@ -191,7 +192,7 @@ _loop:
 	b	_loop
 
 
-.macro HANDLE_CONTEXT_SWITCH
+.macro HANDLE_CONTEXT_SWITCH handler
 	// Save two register values before using the registers for temporary values
 	sub	sp, sp, #16
 	stp	x0, x30, [sp, 0]
@@ -220,7 +221,7 @@ _loop:
 	mrs	x1, ESR_EL1
 	mrs	x2, ELR_EL1
 	mrs	x3, FAR_EL1
-	bl	handle_exception
+	bl	\handler
 
 	ldr	x0, CURRENT_CONTEXT
 	b	_restore_context
@@ -263,10 +264,10 @@ _default_exceptions_table:
 
 // Exceptions from lower EL in AArch64
 .balign 0x80	// Synchronous
-	HANDLE_CONTEXT_SWITCH
+	HANDLE_CONTEXT_SWITCH handle_exception
 
 .balign 0x80	// IRQ
-	b	_exception_fatal
+	HANDLE_CONTEXT_SWITCH handle_irq
 
 .balign 0x80	// Fast IRQ
 	b	_exception_fatal

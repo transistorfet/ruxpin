@@ -7,7 +7,7 @@ qemu-system-aarch64 \
 	-machine raspi3b -m 1024 \
 	-kernel "$KERNEL" \
 	-no-reboot -gdb tcp::1234 \
-	-d int \
+	-d "int" \
 	-serial stdio
 	#-serial stdio -monitor tcp:localhost:1235 -S
 	#-chardev stdio,mux=on,id=char0 -monitor chardev:char0 -S

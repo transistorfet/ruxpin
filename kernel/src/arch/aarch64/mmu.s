@@ -7,7 +7,8 @@
 
 // Translation Table Level 1
 _kernel_translation_table_l1:
-.quad 0b10000000001
+.quad 0x00000401
+.quad 0x40000401
 .balign 4096
 
 // Translation Table Level 0

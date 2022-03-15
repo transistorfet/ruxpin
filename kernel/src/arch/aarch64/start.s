@@ -120,6 +120,8 @@ _setup_common_system_registers:
 	mov	x0, #(0b11 << 10)
 	msr	CNTHCTL_EL2, x0
 	msr	CNTVOFF_EL2, xzr
+	mov	x0, #3
+	msr	CNTHCTL_EL2, x0
 
 	// Enable Floating Point in EL1/0
 	mov	x0, #(0b11 << 20)

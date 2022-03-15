@@ -52,6 +52,14 @@ pub unsafe fn disable_irq() -> IrqFlags {
     flags
 }
 
+pub unsafe fn enable_all_irq() {
+    asm!("msr    DAIFclr, #0xf");
+}
+
+pub unsafe fn disable_all_irq() {
+    asm!("msr    DAIFset, #0xf");
+}
+
 
 extern {
     fn create_context(context: &mut Context, sp: *mut u8, entry: *mut u8);
@@ -89,5 +97,13 @@ extern "C" fn handle_exception(sp: i64, esr: i64, elr: i64, far: i64) {
         }
     }
 }
- 
+
+#[no_mangle]
+extern "C" fn handle_irq(sp: i64, esr: i64, elr: i64, far: i64) {
+    printkln!("Handle an irq of {:x} for sp {:x}", esr, sp);
+
+    crate::drivers::arm::gic::timer_reset();
+
+    crate::proc::process::schedule();
+}
 

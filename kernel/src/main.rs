@@ -33,6 +33,7 @@ pub extern "C" fn kernel_start() -> ! {
         init_virtual_memory(0x100_0000 as *mut u8, 0x1000_0000 as *mut u8);
     }
 
+    crate::drivers::arm::gic::init_gic();
     init_processes();
 
     create_test_process();
