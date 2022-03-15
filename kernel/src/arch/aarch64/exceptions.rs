@@ -3,36 +3,6 @@ use core::arch::asm;
 
 use crate::printkln;
 
-#[repr(C)]
-pub struct Context {
-    x_registers: [u64; 32],
-    v_registers: [u64; 64],     // TODO this should be u128, but they don't have a stable ABI, so I'm avoiding them for safety
-    elr: u64,
-    spsr: u64,
-    ttbr: u64,
-}
-
-impl Default for Context {
-    fn default() -> Self {
-        Self {
-            x_registers: [0; 32],
-            v_registers: [0; 64],
-            elr: 0,
-            spsr: 0,
-            ttbr: 0,
-        }
-    }
-}
-
-impl Context {
-    pub fn init(&mut self, sp: *mut u8, entry: *mut u8, ttbr: u64) {
-        self.ttbr = ttbr;
-        unsafe {
-            create_context(self, sp, entry);
-        }
-    }
-}
-
 pub type IrqFlags = u64;
 
 pub unsafe fn enable_irq(flags: IrqFlags) {
@@ -60,11 +30,18 @@ pub unsafe fn disable_all_irq() {
     asm!("msr    DAIFset, #0xf");
 }
 
+static mut IRQ_HANDLER: fn() = default_handler;
 
-extern {
-    fn create_context(context: &mut Context, sp: *mut u8, entry: *mut u8);
-    pub fn start_multitasking();
+pub fn register_irq(func: fn()) {
+    unsafe {
+        IRQ_HANDLER = func;
+    }
 }
+
+const fn default_handler() {
+    /* Do Nothing */
+}
+
 
 #[no_mangle]
 extern "C" fn handle_exception(sp: i64, esr: i64, elr: i64, far: i64) {
@@ -102,7 +79,9 @@ extern "C" fn handle_exception(sp: i64, esr: i64, elr: i64, far: i64) {
 extern "C" fn handle_irq(sp: i64, esr: i64, elr: i64, far: i64) {
     printkln!("Handle an irq of {:x} for sp {:x}", esr, sp);
 
-    crate::drivers::arm::gic::timer_reset();
+    unsafe {
+        IRQ_HANDLER();
+    }
 
     crate::proc::process::schedule();
 }

@@ -17,6 +17,9 @@ use crate::mm::kmalloc::{init_kernel_heap};
 use crate::mm::vmalloc::{init_virtual_memory};
 use crate::proc::process::{init_processes, create_test_process};
 
+use crate::drivers::arm::SystemTimer;
+use crate::drivers::arm::GenericInterruptController;
+
 
 #[no_mangle]
 pub extern "C" fn kernel_start() -> ! {
@@ -33,7 +36,8 @@ pub extern "C" fn kernel_start() -> ! {
         init_virtual_memory(0x100_0000 as *mut u8, 0x1000_0000 as *mut u8);
     }
 
-    crate::drivers::arm::gic::init_gic();
+    SystemTimer::init();
+    GenericInterruptController::init();
     init_processes();
 
     create_test_process();
