@@ -51,24 +51,17 @@ extern "C" fn handle_exception(sp: i64, esr: i64, elr: i64, far: i64) {
         // SVC from Aarch64
         0b010101 => {
             printkln!("A SYSCALL!");
-            crate::proc::process::schedule();
+            //crate::proc::process::schedule();
         },
 
-        // Instruction Abort from lower EL
-        0b100000 => {
+        // Instruction or Data Abort from lower EL
+        0b100000 | 0b100100 => {
             if esr & 0b111100 == 0b001000 {
                 printkln!("Instruction Abort caused by Access Flag (ie. load the data) at {:x}", far);
             }
             crate::fatal_error(esr, elr);
         },
 
-        // Data Abort from lower EL
-        0b100100 => {
-            if esr & 0b111100 == 0b001000 {
-                printkln!("Data Abort caused by Access Flag (ie. load the data) at {:x}", far);
-            }
-            crate::fatal_error(esr, elr);
-        },
         _ => {
             crate::fatal_error(esr, elr);
         }
@@ -83,6 +76,6 @@ extern "C" fn handle_irq(sp: i64, esr: i64, elr: i64, far: i64) {
         IRQ_HANDLER();
     }
 
-    crate::proc::process::schedule();
+    //crate::proc::process::schedule();
 }
 

@@ -181,9 +181,16 @@ _restore_context:
 
 
 _exception_fatal:
-	ldr	x1, =0xFFFF00003F201000
+	// Restore the kernel translation table so we can directly access lower memory
+	mrs	x0, TTBR1_EL1
+	msr	TTBR0_EL1, x0
+
+	// Print a ! character (for debugging when printing from rust causes exceptions)
+	ldr	x1, =0x3F201000
 	mov	w0, #0x21
 	strb	w0, [x1]
+
+	// Jump to the fatal error code
 	mrs	x0, ESR_EL1
 	mrs	x1, ELR_EL1
 	b	fatal_error
@@ -192,6 +199,7 @@ _loop:
 	b	_loop
 
 
+// Handle an exception from EL0 to EL1 (save the user process context)
 .macro HANDLE_CONTEXT_SWITCH handler
 	// Save two register values before using the registers for temporary values
 	sub	sp, sp, #16
@@ -207,25 +215,55 @@ _loop:
 	cmp	x0, x30
 	b.ne	_exception_fatal
 
-	// If we didn't come from EL0, then cause a fatal error for now
-	mrs	x0, SPSR_EL1
-	and	x0, x0, #0x0F
-	lsr	x0, x0, 2
-	cmp	x0, xzr
-	b.ne	_exception_fatal
-
+	// Save the user process's context (and subtract the values stored at the start from the stack)
 	ldr	x0, CURRENT_CONTEXT
 	bl	_save_context
 	add	sp, sp, #16
+
+	// Call the handler with exception-identifying information
+	mrs	x1, ESR_EL1
+	mrs	x2, ELR_EL1
+	mrs	x3, FAR_EL1
+	bl	\handler
+
+	// Restore the context and return the user process
+	ldr	x0, CURRENT_CONTEXT
+	b	_restore_context
+.endm
+
+// Handle an exception from EL1 to EL1 (ie. the kernel is already running,
+// save kernel registers on the stack instead of the process context).
+.macro HANDLE_KERNEL_EXCEPTION handler
+	add	sp, sp, #160
+	stp	x0, x1, [sp, 0]
+	stp	x2, x3, [sp, 16]
+	stp	x4, x5, [sp, 32]
+	stp	x6, x7, [sp, 48]
+	stp	x8, x9, [sp, 64]
+	stp	x10, x11, [sp, 80]
+	stp	x12, x13, [sp, 96]
+	stp	x14, x15, [sp, 112]
+	stp	x16, x17, [sp, 128]
+	stp	x18, x30, [sp, 144]
 
 	mrs	x1, ESR_EL1
 	mrs	x2, ELR_EL1
 	mrs	x3, FAR_EL1
 	bl	\handler
 
-	ldr	x0, CURRENT_CONTEXT
-	b	_restore_context
+	stp	x18, x30, [sp, 144]
+	stp	x16, x17, [sp, 128]
+	stp	x14, x15, [sp, 112]
+	stp	x12, x13, [sp, 96]
+	stp	x10, x11, [sp, 80]
+	stp	x8, x9, [sp, 64]
+	stp	x6, x7, [sp, 48]
+	stp	x4, x5, [sp, 32]
+	stp	x2, x3, [sp, 16]
+	stp	x0, x1, [sp, 0]
+	sub	sp, sp, #160
 
+	eret
 .endm
 
 
@@ -254,7 +292,7 @@ _default_exceptions_table:
 	b	_exception_fatal
 
 .balign 0x80	// IRQ
-	b	_exception_fatal
+	HANDLE_KERNEL_EXCEPTION handle_irq
 
 .balign 0x80	// Fast IRQ
 	b	_exception_fatal
