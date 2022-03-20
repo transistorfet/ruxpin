@@ -173,7 +173,7 @@ _restore_context:
 	ldp	x2, x3, [x0, 16]
 	ldp	x0, x1, [x0, 0]
 
-	// TODO invalidate the TLB cache
+	// Invalidate the TLB cache in case TTBR0_EL1 points to a different table
 	tlbi	VMALLE1IS
 	dsb	ish
 	isb

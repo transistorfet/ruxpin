@@ -22,7 +22,7 @@ macro_rules! printkln {
     })
 }
 
-pub unsafe fn printk_dump(mut ptr: *mut u8, mut size: usize) {
+pub unsafe fn printk_dump(mut ptr: *const u8, mut size: usize) {
     while size > 0 {
         printk!("{:#010x}: ", ptr as u64);
         for i in 0..16 {

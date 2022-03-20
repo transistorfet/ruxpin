@@ -62,7 +62,7 @@ impl ProcessManager {
         let entry = proc.space.alloc_mapped(MemoryAccess::ReadExecute, 0x77777000, 4096);
         // Allocate stack segment
         proc.space.alloc_mapped(MemoryAccess::ReadWrite, 0xFFFFF000, 4096);
-        Context::init(&mut proc.context, 0xFFFFFFFF as *mut u8, 0x77777000 as *mut u8, proc.space.get_ttbr());
+        Context::init(&mut proc.context, 0x1_0000_0000 as *mut u8, 0x77777000 as *mut u8, proc.space.get_ttbr());
 
         unsafe {
             // TODO this is temporary to bootstrap the context switching

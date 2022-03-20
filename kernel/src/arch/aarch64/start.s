@@ -49,8 +49,10 @@ _start:
         msr	TTBR1_EL1, x8
         msr	TTBR0_EL1, x8
         //mov	x8, #((0b101 << 32) | (0b10 << 30) | (0b00 << 14) | (64 - 42))
-        ldr	x8, =0x580000016   //((0b101 << 32) | (0b10 << 30) | (0b00 << 14) | (64 - 42))
+        ldr	x8, =0x580100010   //(0b101 << 32) | (0b10 << 30) | ((64 - 48) << 16) | (0b00 << 14) | (64 - 48)
         msr	TCR_EL1, x8
+	mov	x8, #0
+	msr	MAIR_EL1, x8
         isb
 
 	// Enable the MMU
@@ -59,7 +61,7 @@ _start:
         msr	SCTLR_EL1, x8
         isb
 
-	// Patch the current address to use the kernel address space
+	// Patch the program counter to use the kernel address space
 	adr	x8, L_switch_to_kernel_vspace
 	ldr	x9, =__KERNEL_VIRTUAL_BASE_ADDR
 	add	x8, x8, x9
