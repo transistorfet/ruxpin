@@ -20,9 +20,10 @@ use crate::proc::process::{init_processes, create_test_process};
 use crate::drivers::arm::SystemTimer;
 use crate::drivers::arm::GenericInterruptController;
 
-
 #[no_mangle]
 pub extern "C" fn kernel_start() -> ! {
+    console::Console::init();
+
     printkln!("Kernel started");
 
     //printk!("CurrentEL: {:x}\n", unsafe { get_current_el() });
@@ -43,6 +44,7 @@ pub extern "C" fn kernel_start() -> ! {
     create_test_process();
 
     printkln!("Looping");
+
     loop {}
 }
 
@@ -58,8 +60,8 @@ fn panic(info: &PanicInfo) -> ! {
 }
 
 #[no_mangle]
-pub extern "C" fn fatal_error(esr: i64, elr: i64) -> ! {
-    printkln!("Fatal Error: ESR: 0x{:x}, ELR: 0x{:x}", esr, elr);
+pub extern "C" fn fatal_error(elr: i64, esr: i64, far: i64) -> ! {
+    printkln!("Fatal Error: ESR: {:#x}, FAR: {:#x}, ELR: {:#x}", esr, far, elr);
 
     loop {}
 }

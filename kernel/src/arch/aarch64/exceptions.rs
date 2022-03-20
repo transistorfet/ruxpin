@@ -44,14 +44,14 @@ const fn default_handler() {
 
 
 #[no_mangle]
-extern "C" fn handle_exception(sp: i64, esr: i64, elr: i64, far: i64) {
+extern "C" fn handle_exception(context: i64, elr: i64, esr: i64, far: i64, sp: i64) {
     printkln!("Handle an exception of {:x} for sp {:x}", esr, sp);
 
     match esr >> 26 {
         // SVC from Aarch64
         0b010101 => {
             printkln!("A SYSCALL!");
-            //crate::proc::process::schedule();
+            crate::proc::process::schedule();
         },
 
         // Instruction or Data Abort from lower EL
@@ -59,17 +59,17 @@ extern "C" fn handle_exception(sp: i64, esr: i64, elr: i64, far: i64) {
             if esr & 0b111100 == 0b001000 {
                 printkln!("Instruction Abort caused by Access Flag (ie. load the data) at {:x}", far);
             }
-            crate::fatal_error(esr, elr);
+            crate::fatal_error(elr, esr, far);
         },
 
         _ => {
-            crate::fatal_error(esr, elr);
+            crate::fatal_error(elr, esr, far);
         }
     }
 }
 
 #[no_mangle]
-extern "C" fn handle_irq(sp: i64, esr: i64, elr: i64, far: i64) {
+extern "C" fn handle_irq(context: i64, elr: i64, esr: i64, far: i64, sp: i64) {
     printkln!("Handle an irq of {:x} for sp {:x}", esr, sp);
 
     unsafe {

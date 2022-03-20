@@ -174,8 +174,9 @@ _restore_context:
 	ldp	x0, x1, [x0, 0]
 
 	// TODO invalidate the TLB cache
-	isb
 	tlbi	VMALLE1IS
+	dsb	ish
+	isb
 
 	eret
 
@@ -191,8 +192,9 @@ _exception_fatal:
 	strb	w0, [x1]
 
 	// Jump to the fatal error code
-	mrs	x0, ESR_EL1
-	mrs	x1, ELR_EL1
+	mrs	x0, ELR_EL1
+	mrs	x1, ESR_EL1
+	mrs	x2, FAR_EL1
 	b	fatal_error
 _loop:
 	wfe
@@ -221,9 +223,10 @@ _loop:
 	add	sp, sp, #16
 
 	// Call the handler with exception-identifying information
-	mrs	x1, ESR_EL1
-	mrs	x2, ELR_EL1
+	mrs	x1, ELR_EL1
+	mrs	x2, ESR_EL1
 	mrs	x3, FAR_EL1
+	mrs	x4, SP_EL0
 	bl	\handler
 
 	// Restore the context and return the user process
@@ -234,6 +237,11 @@ _loop:
 // Handle an exception from EL1 to EL1 (ie. the kernel is already running,
 // save kernel registers on the stack instead of the process context).
 .macro HANDLE_KERNEL_EXCEPTION handler
+	// Print a $ character (for debugging when printing from rust causes exceptions)
+	ldr	x1, =0x3F201000
+	mov	w0, #0x24
+	strb	w0, [x1]
+
 	add	sp, sp, #160
 	stp	x0, x1, [sp, 0]
 	stp	x2, x3, [sp, 16]
