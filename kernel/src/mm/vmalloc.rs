@@ -1,8 +1,13 @@
 
 use core::slice;
+use alloc::vec::Vec;
 
+use crate::printkln;
 use crate::mm::MemoryAccess;
 use crate::arch::mmu::{self, TranslationTable, VirtualAddress, PhysicalAddress};
+
+
+const MAX_SEGMENTS: usize = 6;
 
 
 //static mut MEMORY_AREAS: [Option<PagePool>; 20] = unsafe { mem::MaybeUninit::uninit().assume_init() };
@@ -18,14 +23,14 @@ pub fn init_virtual_memory(start: *mut u8, end: *mut u8) {
 }
 
 pub struct Segment {
-    //memtype: MemType
-    //start: VirtualAddress,
-    //len: usize,
+    start: VirtualAddress,
+    end: VirtualAddress,
     //ops for getting pages
 }
 
 pub struct VirtualAddressSpace {
     table: TranslationTable,
+    segments: Vec<Segment>,
 }
 
 impl VirtualAddressSpace {
@@ -35,6 +40,7 @@ impl VirtualAddressSpace {
 
         Self {
             table,
+            segments: Vec::with_capacity(MAX_SEGMENTS),
         }
     }
 
@@ -104,8 +110,11 @@ impl PageRegion {
     }
 
     fn new(start: *mut u8, end: *mut u8) -> Self {
+        let total_size = end as usize - start as usize;
+        printkln!("virtual memory: using region at {:#x}, size {}MiB", start as u64, total_size / 1024 / 1024);
+
         let page_size = mmu::page_size();
-        let total_pages = (end as usize - start as usize) / page_size;
+        let total_pages = total_size / page_size;
         let table_size = total_pages / 8 / page_size + (total_pages / 8 % page_size != 0) as usize;
 
         let pages = total_pages - table_size;

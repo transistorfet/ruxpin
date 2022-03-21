@@ -3,6 +3,8 @@ use core::ptr;
 use core::mem;
 use core::alloc::{GlobalAlloc, Layout};
 
+use crate::printkln;
+
 
 #[global_allocator]
 static mut MAIN_HEAP: Heap = Heap { free_blocks: ptr::null_mut() };
@@ -25,7 +27,10 @@ impl Heap {
     pub unsafe fn init(&mut self, start: *mut u8, end: *mut u8) {
         let mut space: *mut Block = start.cast();
 
-        (*space).size = end as usize - start as usize;
+        let size = end as usize - start as usize;
+        printkln!("kernel heap: using {:#x}, size {}MiB", start as u64, size / 1024 / 1024);
+
+        (*space).size = size;
         (*space).next = ptr::null_mut();
 
         self.free_blocks = space;

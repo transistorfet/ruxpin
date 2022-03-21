@@ -19,12 +19,13 @@ use crate::proc::process::{init_processes, create_test_process};
 
 use crate::drivers::arm::SystemTimer;
 use crate::drivers::arm::GenericInterruptController;
+use crate::drivers::raspberrypi::emmc::EmmcDevice;
 
 #[no_mangle]
 pub extern "C" fn kernel_start() -> ! {
     console::Console::init();
 
-    printkln!("Kernel started");
+    printkln!("starting kernel...");
 
     //printk!("CurrentEL: {:x}\n", unsafe { get_current_el() });
 
@@ -37,25 +38,31 @@ pub extern "C" fn kernel_start() -> ! {
         init_virtual_memory(0x100_0000 as *mut u8, 0x1000_0000 as *mut u8);
     }
 
+    printkln!("emmc: initializing");
+    EmmcDevice::init();
+    let mut data = [0; 512];
+    EmmcDevice::read_sector(0, &mut data).unwrap();
+    unsafe {
+        crate::printk::printk_dump(&data as *const u8, 512);
+    }
+    EmmcDevice::read_sector(1, &mut data).unwrap();
+    unsafe {
+        crate::printk::printk_dump(&data as *const u8, 512);
+    }
+
     SystemTimer::init();
     GenericInterruptController::init();
     init_processes();
 
     create_test_process();
 
-    printkln!("Looping");
-
+    printkln!("Error starting processes... halting...");
     loop {}
 }
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    if let Some(s) = info.payload().downcast_ref::<&str>() {
-        printkln!("Rust Panic: {:?}", s);
-    } else {
-        printkln!("Rust Panic");
-    }
-
+    printkln!("Rust Panic: {}", info);
     loop {}
 }
 
