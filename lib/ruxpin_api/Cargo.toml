@@ -1,0 +1,7 @@
+[package]
+name = "ruxpin_api"
+version = "0.1.0"
+authors = ["transistor <trans@jabberwocky.ca>"]
+edition = "2021"
+
+[dependencies]
