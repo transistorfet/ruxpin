@@ -3,6 +3,7 @@ use core::ptr;
 use core::hint::spin_loop;
 
 use crate::printkln;
+use crate::types::BlockDriver;
 use crate::errors::KernelError;
 
 //use super::gpio;
@@ -27,26 +28,28 @@ enum Command {
 pub struct EmmcDevice;
 
 impl EmmcDevice {
-    pub fn init() {
-        EmmcHost::init().unwrap();
+    pub fn init() -> Result<(), KernelError> {
+        EmmcHost::init()?;
 
-        EmmcHost::send_command(Command::GoIdle, 0).unwrap();
+        EmmcHost::send_command(Command::GoIdle, 0)?;
 
-        EmmcHost::send_command(Command::SendIfCond, 0x000001AA).unwrap();
+        EmmcHost::send_command(Command::SendIfCond, 0x000001AA)?;
         loop {
-            EmmcHost::send_command(Command::AppCommand, 0).unwrap();
-            let response = EmmcHost::send_command(Command::SendOpCond, 0x51ff8000).unwrap();
+            EmmcHost::send_command(Command::AppCommand, 0)?;
+            let response = EmmcHost::send_command(Command::SendOpCond, 0x51ff8000)?;
             if response & MMC_RESP_COMMAND_COMPLETE != 0 {
                 break;
             }
         }
 
-        EmmcHost::send_command(Command::SendCID, 0).unwrap();
-        let card = EmmcHost::send_command(Command::SendRelAddr, 0).unwrap();
-        EmmcHost::send_command(Command::CardSelect, card).unwrap();
+        EmmcHost::send_command(Command::SendCID, 0)?;
+        let card = EmmcHost::send_command(Command::SendRelAddr, 0)?;
+        EmmcHost::send_command(Command::CardSelect, card)?;
+
+        Ok(())
     }
 
-    pub fn read_data(mut offset: usize, buffer: &mut [u8]) -> Result<(), KernelError> {
+    pub fn read_data(buffer: &mut [u8], mut offset: usize) -> Result<(), KernelError> {
         let blocksize = 256;
         let mut i = 0;
         let mut len = buffer.len();
@@ -69,6 +72,20 @@ impl EmmcDevice {
         EmmcHost::send_command(Command::StopTransmission, 0)?;
 
         Ok(())
+    }
+}
+
+impl BlockDriver for EmmcDevice {
+    fn init(&self) -> Result<(), KernelError> {
+        EmmcDevice::init()
+    }
+
+    fn read(&self, buffer: &mut [u8], offset: usize) -> Result<(), KernelError> {
+        EmmcDevice::read_data(buffer, offset)
+    }
+
+    fn write(&self, buffer: &[u8], offset: usize) -> Result<(), KernelError> {
+        Err(KernelError::PermissionNotAllowed)
     }
 }
 

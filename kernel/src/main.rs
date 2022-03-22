@@ -6,6 +6,7 @@ mod arch;
 mod mm;
 mod proc;
 mod drivers;
+mod types;
 mod errors;
 mod printk;
 
@@ -17,6 +18,7 @@ use crate::mm::kmalloc::{init_kernel_heap};
 use crate::mm::vmalloc::{init_virtual_memory};
 use crate::proc::process::{init_processes, create_test_process};
 
+use crate::types::BlockDriver;
 use crate::drivers::arm::SystemTimer;
 use crate::drivers::arm::GenericInterruptController;
 use crate::drivers::raspberrypi::emmc::EmmcDevice;
@@ -38,10 +40,11 @@ pub extern "C" fn kernel_start() -> ! {
         init_virtual_memory(0x100_0000 as *mut u8, 0x1000_0000 as *mut u8);
     }
 
+    let block_device: &mut dyn BlockDriver = &mut EmmcDevice{};
     printkln!("emmc: initializing");
-    EmmcDevice::init();
+    block_device.init();
     let mut data = [0; 1024];
-    EmmcDevice::read_data(0, &mut data).unwrap();
+    block_device.read(&mut data, 0).unwrap();
     unsafe {
         crate::printk::printk_dump(&data as *const u8, 1024);
     }

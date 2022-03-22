@@ -6,5 +6,6 @@ pub enum KernelError {
     CorruptTranslationTable,
 
     DeviceTimeout,
+    PermissionNotAllowed,
 }
 
