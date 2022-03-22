@@ -40,15 +40,15 @@ pub extern "C" fn kernel_start() -> ! {
 
     printkln!("emmc: initializing");
     EmmcDevice::init();
-    let mut data = [0; 512];
-    EmmcDevice::read_sector(0, &mut data).unwrap();
+    let mut data = [0; 1024];
+    EmmcDevice::read_data(0, &mut data).unwrap();
     unsafe {
-        crate::printk::printk_dump(&data as *const u8, 512);
+        crate::printk::printk_dump(&data as *const u8, 1024);
     }
-    EmmcDevice::read_sector(1, &mut data).unwrap();
-    unsafe {
-        crate::printk::printk_dump(&data as *const u8, 512);
-    }
+    //EmmcDevice::read_sector(512, &mut data).unwrap();
+    //unsafe {
+    //    crate::printk::printk_dump(&data as *const u8, 512);
+    //}
 
     SystemTimer::init();
     GenericInterruptController::init();
