@@ -1,7 +1,6 @@
 
 use core::fmt;
 use core::ptr;
-use core::arch::asm;
 
 
 const PL011_BASE: u64 = 0x3F20_1000;
@@ -19,7 +18,7 @@ const PL011_FLAGS_TX_FIFO_EMPTY: u32    = 1 << 7;
 
 const PL011_CTL_UART_ENABLE: u32        = 1 << 0;
 const PL011_CTL_TX_ENABLE: u32          = 1 << 8;
-const PL011_CTL_RX_ENABLE: u32          = 1 << 9;
+//const PL011_CTL_RX_ENABLE: u32          = 1 << 9;
 
 const PL011_LC_FIFO_ENABLE: u32         = 1 << 4;
 
@@ -51,6 +50,7 @@ impl Console {
         }
     }
 
+    #[allow(dead_code)]
     pub fn flush(&self) {
         unsafe {
             while (ptr::read_volatile(PL011_FLAGS) & PL011_FLAGS_TX_FIFO_EMPTY) == 0 { }

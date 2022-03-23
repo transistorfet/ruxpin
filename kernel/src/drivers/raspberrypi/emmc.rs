@@ -1,6 +1,5 @@
 
 use core::ptr;
-use core::hint::spin_loop;
 
 use crate::printkln;
 use crate::types::BlockDriver;
@@ -49,7 +48,7 @@ impl EmmcDevice {
         Ok(())
     }
 
-    pub fn read_data(buffer: &mut [u8], mut offset: usize) -> Result<(), KernelError> {
+    pub fn read_data(buffer: &mut [u8], offset: usize) -> Result<(), KernelError> {
         let blocksize = 256;
         let mut i = 0;
         let mut len = buffer.len();
@@ -84,7 +83,7 @@ impl BlockDriver for EmmcDevice {
         EmmcDevice::read_data(buffer, offset)
     }
 
-    fn write(&self, buffer: &[u8], offset: usize) -> Result<(), KernelError> {
+    fn write(&self, _buffer: &[u8], _offset: usize) -> Result<(), KernelError> {
         Err(KernelError::PermissionNotAllowed)
     }
 }
@@ -93,7 +92,7 @@ impl BlockDriver for EmmcDevice {
 
 const EMMC1_BASE_ADDR: u64 = 0x3F30_0000;
 
-const EMMC1_ARG2: *mut u32              = (EMMC1_BASE_ADDR + 0x00) as *mut u32;
+//const EMMC1_ARG2: *mut u32              = (EMMC1_BASE_ADDR + 0x00) as *mut u32;
 const EMMC1_BLOCK_COUNT_SIZE: *mut u32  = (EMMC1_BASE_ADDR + 0x04) as *mut u32;
 const EMMC1_ARG1: *mut u32              = (EMMC1_BASE_ADDR + 0x08) as *mut u32;
 const EMMC1_COMMAND: *mut u32           = (EMMC1_BASE_ADDR + 0x0C) as *mut u32;
@@ -108,7 +107,7 @@ const EMMC1_HOST_CONTROL1: *mut u32     = (EMMC1_BASE_ADDR + 0x2C) as *mut u32;
 const EMMC1_INTERRUPT_FLAGS: *mut u32   = (EMMC1_BASE_ADDR + 0x30) as *mut u32;
 const EMMC1_INTERRUPT_MASK: *mut u32    = (EMMC1_BASE_ADDR + 0x34) as *mut u32;
 const EMMC1_INTERRUPT_ENABLE: *mut u32  = (EMMC1_BASE_ADDR + 0x38) as *mut u32;
-const EMMC1_HOST_CONTROL2: *mut u32     = (EMMC1_BASE_ADDR + 0x3C) as *mut u32;
+//const EMMC1_HOST_CONTROL2: *mut u32     = (EMMC1_BASE_ADDR + 0x3C) as *mut u32;
 
 const EMMC1_HC1_CLOCK_STABLE: u32       = 1 << 1;
 const EMMC1_HC1_RESET_HOST: u32         = 1 << 24;
@@ -216,7 +215,7 @@ const fn command_code(cmd: Command) -> u32 {
 }
 
 fn wait_until_set(reg: *const u32, mask: u32) -> Result<(), KernelError> {
-    for i in 0..1000 {
+    for _ in 0..1000 {
         unsafe {
             if (ptr::read_volatile(reg) & mask) != 0 {
                 return Ok(());
@@ -227,7 +226,7 @@ fn wait_until_set(reg: *const u32, mask: u32) -> Result<(), KernelError> {
 }
 
 fn wait_until_clear(reg: *const u32, mask: u32) -> Result<(), KernelError> {
-    for i in 0..1000 {
+    for _ in 0..1000 {
         unsafe {
             if (ptr::read_volatile(reg) & mask) == 0 {
                 return Ok(());

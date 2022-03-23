@@ -22,10 +22,12 @@ pub unsafe fn disable_irq() -> IrqFlags {
     flags
 }
 
+#[allow(dead_code)]
 pub unsafe fn enable_all_irq() {
     asm!("msr    DAIFclr, #0xf");
 }
 
+#[allow(dead_code)]
 pub unsafe fn disable_all_irq() {
     asm!("msr    DAIFset, #0xf");
 }
@@ -44,7 +46,7 @@ const fn default_handler() {
 
 
 #[no_mangle]
-extern "C" fn handle_exception(context: i64, elr: i64, esr: i64, far: i64, sp: i64) {
+extern "C" fn handle_exception(_context: i64, elr: i64, esr: i64, far: i64, sp: i64) {
     printkln!("Handle an exception of {:x} for sp {:x}", esr, sp);
 
     match esr >> 26 {
@@ -69,7 +71,7 @@ extern "C" fn handle_exception(context: i64, elr: i64, esr: i64, far: i64, sp: i
 }
 
 #[no_mangle]
-extern "C" fn handle_irq(context: i64, elr: i64, esr: i64, far: i64, sp: i64) {
+extern "C" fn handle_irq(_context: i64, _elr: i64, esr: i64, _far: i64, sp: i64) {
     printkln!("Handle an irq of {:x} for sp {:x}", esr, sp);
 
     unsafe {

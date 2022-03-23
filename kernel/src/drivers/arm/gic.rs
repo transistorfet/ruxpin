@@ -2,24 +2,19 @@
 
 use core::ptr;
 
-use crate::printkln;
-use crate::mm::__KERNEL_VIRTUAL_BASE_ADDR;
-
-//const GIC_BASE: u64 = 0xffff_0000_0000_0000 + 0x7E00_B000;
-//const GIC_BASE: u64 = 0x3F00_B000;
 const GIC_BASE: u64 = 0x3F00_B200;
 
-const GIC_IRQ_PENDING_BASIC: *mut u32 = (GIC_BASE + 0x00) as *mut u32;
+//const GIC_IRQ_PENDING_BASIC: *mut u32 = (GIC_BASE + 0x00) as *mut u32;
 const GIC_IRQ_ENABLE1: *mut u32 = (GIC_BASE + 0x10) as *mut u32;
-const GIC_IRQ_DISABLE1: *mut u32 = (GIC_BASE + 0x1C) as *mut u32;
+//const GIC_IRQ_DISABLE1: *mut u32 = (GIC_BASE + 0x1C) as *mut u32;
 
 
 pub struct GenericInterruptController;
 
 impl GenericInterruptController {
     pub fn init() {
-        unsafe {
     /*
+        unsafe {
             asm!(
                 "mrs    {tmp}, CNTFRQ_EL0",
                 "msr    CNTP_TVAL_EL0, {tmp}",
@@ -27,9 +22,9 @@ impl GenericInterruptController {
                 "msr    CNTP_CTL_EL0, {tmp}",
                 tmp = out(reg) _
             );
+        }
     */
 
-        }
 
         GenericInterruptController::enable_interrupt();
     }

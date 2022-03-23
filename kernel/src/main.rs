@@ -42,7 +42,7 @@ pub extern "C" fn kernel_start() -> ! {
 
     let block_device: &mut dyn BlockDriver = &mut EmmcDevice{};
     printkln!("emmc: initializing");
-    block_device.init();
+    block_device.init().unwrap();
     let mut data = [0; 1024];
     block_device.read(&mut data, 0).unwrap();
     unsafe {
