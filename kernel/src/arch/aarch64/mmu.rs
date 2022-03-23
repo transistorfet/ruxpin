@@ -3,7 +3,7 @@ use crate::mm::MemoryAccess;
 use crate::errors::KernelError;
 
 // TODO this should be changed to PagePool when you decide how you'd like to do it
-use crate::mm::vmalloc::PageRegion;
+use crate::mm::pages::PageRegion;
 
 
 #[allow(dead_code)]
@@ -21,8 +21,8 @@ const TT_NO_EXECUTE_FLAG: u64 = 0b11 << 53;
 
 #[allow(dead_code)]
 const TT_TYPE_MASK: u64 = 0b11;
-const TT_TABLE_MASK: u64 = 0x0000_ffff_ffff_ffff_f000;
-const TT_BLOCK_MASK: u64 = 0x0000_ffff_ffff_ffff_f000;
+const TT_TABLE_MASK: u64 = 0x0000_ffff_ffff_f000;
+const TT_BLOCK_MASK: u64 = 0x0000_ffff_ffff_f000;
 
 const TL0_ADDR_BITS: usize = 9 + 9 + 9 + 12;
 
@@ -63,6 +63,12 @@ impl TranslationTable {
         map_level(TL0_ADDR_BITS, self.0, &mut len, &mut vaddr, &mut paddr, flags, pages)
     }
 
+    pub fn unmap_addr<F>(&self, mut vaddr: VirtualAddress, mut len: usize, pages: &mut PageRegion, unmap_block: &F) -> Result<(), KernelError>
+        where F: Fn(&mut PageRegion, VirtualAddress, PhysicalAddress)
+    {
+        unmap_level(TL0_ADDR_BITS, self.0, &mut len, &mut vaddr, pages, unmap_block)
+    }
+
     pub fn translate_addr(&self, vaddr: VirtualAddress) -> Result<PhysicalAddress, KernelError> {
         lookup_level(TL0_ADDR_BITS, self.0, vaddr)
     }
@@ -94,7 +100,7 @@ fn map_level(addr_bits: usize, table: *mut u64, len: &mut usize, vaddr: &mut Vir
     Ok(())
 }
 
-fn map_granuales(addr_bits: usize, table: *mut u64, index: &mut isize, len: &mut usize, vaddr: &mut VirtualAddress, paddr: &mut PhysicalAddress, flags: u64) -> Result<(), KernelError> {
+fn map_granuales(addr_bits: usize, table: *mut u64, index: &mut usize, len: &mut usize, vaddr: &mut VirtualAddress, paddr: &mut PhysicalAddress, flags: u64) -> Result<(), KernelError> {
     let granuale_size = 1 << addr_bits;
     let block_flag = if addr_bits == 12 { TT3_DESCRIPTOR_BLOCK } else { TT2_DESCRIPTOR_BLOCK };
 
@@ -104,7 +110,7 @@ fn map_granuales(addr_bits: usize, table: *mut u64, index: &mut isize, len: &mut
         }
 
         unsafe {
-            *table.offset(*index) = (*paddr & TT_BLOCK_MASK) | TT_ACCESS_FLAG | flags | block_flag;
+            *table.add(*index) = (*paddr & TT_BLOCK_MASK) | TT_ACCESS_FLAG | flags | block_flag;
         }
 
         *index += 1;
@@ -112,7 +118,7 @@ fn map_granuales(addr_bits: usize, table: *mut u64, index: &mut isize, len: &mut
         *paddr += granuale_size as u64;
         *len -= granuale_size;
 
-        if *index >= page_size() as isize / 8 {
+        if *index >= page_size() / 8 {
             // If we've reached the end of this table, then return to allow a higher level to increment its index
             break;
         }
@@ -121,7 +127,7 @@ fn map_granuales(addr_bits: usize, table: *mut u64, index: &mut isize, len: &mut
     Ok(())
 }
 
-fn ensure_table_entry(table: *mut u64, index: isize, pages: &mut PageRegion) -> Result<(), KernelError> {
+fn ensure_table_entry(table: *mut u64, index: usize, pages: &mut PageRegion) -> Result<(), KernelError> {
     let desc_type = descriptor_type(table, index);
 
     match desc_type {
@@ -133,7 +139,7 @@ fn ensure_table_entry(table: *mut u64, index: isize, pages: &mut PageRegion) -> 
         TT_DESCRIPTOR_EMPTY => {
             let next_table: *mut u64 = pages.alloc_page_zeroed().cast();
             unsafe {
-                *table.offset(index) = (next_table as u64 & TT_TABLE_MASK) | TT2_DESCRIPTOR_TABLE;
+                *table.add(index) = (next_table as u64 & TT_TABLE_MASK) | TT2_DESCRIPTOR_TABLE;
             }
             Ok(())
         },
@@ -146,6 +152,63 @@ fn ensure_table_entry(table: *mut u64, index: isize, pages: &mut PageRegion) -> 
             Err(KernelError::CorruptTranslationTable)
         },
     }
+}
+
+fn unmap_level<F>(addr_bits: usize, table: *mut u64, len: &mut usize, vaddr: &mut VirtualAddress, pages: &mut PageRegion, unmap_block: &F) -> Result<(), KernelError>
+    where F: Fn(&mut PageRegion, VirtualAddress, PhysicalAddress)
+{
+    let granuale_size = 1 << addr_bits;
+
+    let mut index = table_index_from_vaddr(addr_bits, *vaddr);
+    while *len > 0 && index <= page_size() / 8 {
+        if is_block(addr_bits, table, index) {
+            unmap_granuales(addr_bits, table, &mut index, len, vaddr, pages, unmap_block)?;
+        }
+
+        if addr_bits != 12 && descriptor_type(table, index) == TT2_DESCRIPTOR_TABLE {
+            let subtable = table_ptr(table, index);
+            unmap_level(addr_bits - 9, subtable, len, vaddr, pages, unmap_block)?;
+
+            if table_is_empty(subtable) {
+                pages.free_page(subtable as *mut u8);
+                unsafe {
+                    *table.add(index) = 0;
+                }
+            }
+        } else {
+            *vaddr += granuale_size as u64;
+            *len -= granuale_size;
+            index += 1;
+        }
+    }
+
+    Ok(())
+}
+
+fn unmap_granuales<F>(addr_bits: usize, table: *mut u64, index: &mut usize, len: &mut usize, vaddr: &mut VirtualAddress, pages: &mut PageRegion, unmap_block: &F) -> Result<(), KernelError>
+    where F: Fn(&mut PageRegion, VirtualAddress, PhysicalAddress)
+{
+    let granuale_size = 1 << addr_bits;
+
+    while *len >= granuale_size {
+        if descriptor_type(table, *index) != TT_DESCRIPTOR_EMPTY {
+            unmap_block(pages, *vaddr, block_ptr(table, *index));
+            unsafe {
+                *table.add(*index) = 0;
+            }
+        }
+
+        *index += 1;
+        *vaddr += granuale_size as u64;
+        *len -= granuale_size;
+
+        if *index >= page_size() / 8 {
+            // If we've reached the end of this table, then return to allow a higher level to increment its index
+            break;
+        }
+    }
+
+    Ok(())
 }
 
 fn lookup_level(addr_bits: usize, table: *mut u64, vaddr: VirtualAddress) -> Result<PhysicalAddress, KernelError> {
@@ -162,35 +225,44 @@ fn lookup_level(addr_bits: usize, table: *mut u64, vaddr: VirtualAddress) -> Res
 }
 
 
-fn table_index_from_vaddr(bits: usize, vaddr: VirtualAddress) -> isize {
-    (((vaddr as u64) >> bits) & 0x1ff) as isize
+fn table_index_from_vaddr(bits: usize, vaddr: VirtualAddress) -> usize {
+    (((vaddr as u64) >> bits) & 0x1ff) as usize
 }
 
-fn table_ptr(table: *mut u64, index: isize) -> *mut u64 {
+fn table_ptr(table: *mut u64, index: usize) -> *mut u64 {
     unsafe {
-        (*table.offset(index) & TT_TABLE_MASK) as *mut u64
+        (*table.add(index) & TT_TABLE_MASK) as *mut u64
     }
 }
 
-fn block_ptr(table: *mut u64, index: isize) -> PhysicalAddress {
+fn block_ptr(table: *mut u64, index: usize) -> PhysicalAddress {
     unsafe {
-        *table.offset(index) & TT_BLOCK_MASK
+        *table.add(index) & TT_BLOCK_MASK
     }
 }
 
-fn descriptor_type(table: *mut u64, index: isize) -> u64 {
+fn descriptor_type(table: *mut u64, index: usize) -> u64 {
     unsafe {
-        *table.offset(index) & TT_TYPE_MASK
+        *table.add(index) & TT_TYPE_MASK
     }
 }
 
-fn is_block(addr_bits: usize, table: *mut u64, index: isize) -> bool {
+fn is_block(addr_bits: usize, table: *mut u64, index: usize) -> bool {
     let dtype = descriptor_type(table, index);
     if addr_bits == 12 {
         dtype == TT3_DESCRIPTOR_BLOCK
     } else {
         dtype == TT2_DESCRIPTOR_BLOCK
     }
+}
+
+fn table_is_empty(table: *mut u64) -> bool {
+    for index in 0..(page_size() / 8) {
+        if descriptor_type(table, index) != TT_DESCRIPTOR_EMPTY {
+            return false;
+        }
+    }
+    true
 }
 
 fn memory_access_flags(access: MemoryAccess) -> u64 {
