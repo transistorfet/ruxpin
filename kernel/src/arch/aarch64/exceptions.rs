@@ -46,7 +46,7 @@ const fn default_handler() {
 
 
 #[no_mangle]
-extern "C" fn handle_exception(_context: i64, elr: i64, esr: i64, far: i64, sp: i64) {
+extern "C" fn handle_exception(_context: u64, elr: u64, esr: u64, far: u64, sp: u64) {
     printkln!("Handle an exception of {:x} for sp {:x}", esr, sp);
 
     match esr >> 26 {
@@ -60,8 +60,11 @@ extern "C" fn handle_exception(_context: i64, elr: i64, esr: i64, far: i64, sp: 
         0b100000 | 0b100100 => {
             if esr & 0b111100 == 0b001000 {
                 printkln!("Instruction Abort caused by Access Flag (ie. load the data) at {:x}", far);
+                use crate::proc::process::page_fault_handler;
+                page_fault_handler(far);
+            } else {
+                crate::fatal_error(elr, esr, far);
             }
-            crate::fatal_error(elr, esr, far);
         },
 
         _ => {
@@ -71,7 +74,7 @@ extern "C" fn handle_exception(_context: i64, elr: i64, esr: i64, far: i64, sp: 
 }
 
 #[no_mangle]
-extern "C" fn handle_irq(_context: i64, _elr: i64, esr: i64, _far: i64, sp: i64) {
+extern "C" fn handle_irq(_context: u64, _elr: u64, esr: u64, _far: u64, sp: u64) {
     printkln!("Handle an irq of {:x} for sp {:x}", esr, sp);
 
     unsafe {

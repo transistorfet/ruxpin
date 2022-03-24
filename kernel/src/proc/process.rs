@@ -7,9 +7,9 @@ use crate::printkln;
 use crate::mm::MemoryAccess;
 use crate::mm::vmalloc::VirtualAddressSpace;
 
+use crate::arch::Context;
 use crate::arch::sync::Mutex;
 use crate::arch::types::VirtualAddress;
-use crate::arch::{Context, start_multitasking};
 
 
 pub type Pid = i32;
@@ -36,7 +36,12 @@ pub static mut CURRENT_CONTEXT: *mut Context = ptr::null_mut();
 
 
 pub fn init_processes() {
+    //let idle = PROCESS_MANAGER.lock().create_process();
+    //load_code(idle.cast(), TEST_PROC1);
 
+    create_test_process();
+
+    PROCESS_MANAGER.lock().schedule();
 }
 
 impl ProcessManager {
@@ -65,11 +70,6 @@ impl ProcessManager {
         proc.space.alloc_mapped(MemoryAccess::ReadWrite, VirtualAddress::from(0xFFFFF000), 4096);
         Context::init(&mut proc.context, VirtualAddress::from(0x1_0000_0000), VirtualAddress::from(0x77777000), proc.space.get_ttbr());
 
-        unsafe {
-            // TODO this is temporary to bootstrap the context switching
-            CURRENT_CONTEXT = &mut proc.context as *mut Context;
-        }
-
         entry
     }
 
@@ -87,14 +87,13 @@ impl ProcessManager {
 
         let proc = &mut self.processes[self.current];
         unsafe {
-            // TODO this is temporary to bootstrap the context switching
             CURRENT_CONTEXT = &mut proc.context as *mut Context;
         }
     }
-}
 
-pub fn schedule() {
-    PROCESS_MANAGER.lock().schedule();
+    fn page_fault(&mut self, far: u64) {
+        self.processes[self.current].space.load_page(VirtualAddress::from(far));
+    }
 }
 
 const TEST_PROC1: &[u32] = &[0xd40000e1, 0xd503205f, 0x17ffffff];
@@ -114,13 +113,16 @@ pub fn create_test_process() {
         let ptr = PROCESS_MANAGER.lock().create_process();
         load_code(ptr.cast(), TEST_PROC2);
 
-
         printkln!("Entry: {:#x}", ptr as u64);
         crate::printk::printk_dump(CURRENT_CONTEXT.cast(), 768 + 32);
-
-        printkln!("Starting process");
-
-        start_multitasking();
     }
+}
+
+pub fn schedule() {
+    PROCESS_MANAGER.lock().schedule();
+}
+
+pub fn page_fault_handler(far: u64) {
+    PROCESS_MANAGER.lock().page_fault(far);
 }
 

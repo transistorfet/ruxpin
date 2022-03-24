@@ -15,15 +15,21 @@ extern crate alloc;
 use core::panic::PanicInfo;
 
 use crate::arch::types::PhysicalAddress;
+use crate::arch::context::start_multitasking;
 
-use crate::mm::kmalloc::{init_kernel_heap};
-use crate::mm::vmalloc::{init_virtual_memory};
-use crate::proc::process::{init_processes, create_test_process};
+use crate::proc::process::init_processes;
+use crate::mm::kmalloc::init_kernel_heap;
+use crate::mm::vmalloc::init_virtual_memory;
 
 use crate::types::BlockDriver;
 use crate::drivers::arm::SystemTimer;
 use crate::drivers::arm::GenericInterruptController;
 use crate::drivers::raspberrypi::emmc::EmmcDevice;
+
+mod console {
+    pub use crate::drivers::raspberrypi::console::*;
+}
+
 
 #[no_mangle]
 pub extern "C" fn kernel_start() -> ! {
@@ -31,16 +37,9 @@ pub extern "C" fn kernel_start() -> ! {
 
     printkln!("starting kernel...");
 
-    //printk!("CurrentEL: {:x}\n", unsafe { get_current_el() });
-
-    //unsafe { _trigger_illegal_instruction(); }
-    //let mut big_addr: u64 = 8 * 1024 * 1024 * 1024 * 1024;
-    //unsafe { core::ptr::read_volatile(big_addr as *mut u64) };
-
-    unsafe {
-        init_kernel_heap(0x20_0000 as *mut u8, 0x100_0000 as *mut u8);
-        init_virtual_memory(PhysicalAddress::from(0x100_0000), PhysicalAddress::from(0x1000_0000));
-    }
+    unsafe { init_kernel_heap(0x20_0000 as *mut u8, 0x100_0000 as *mut u8) };
+    init_virtual_memory(PhysicalAddress::from(0x100_0000), PhysicalAddress::from(0x1000_0000));
+    init_processes();
 
 
     let block_device: &mut dyn BlockDriver = &mut EmmcDevice{};
@@ -52,15 +51,12 @@ pub extern "C" fn kernel_start() -> ! {
         crate::printk::printk_dump(&data as *const u8, 1024);
     }
 
-
     SystemTimer::init();
     GenericInterruptController::init();
-    init_processes();
 
-    create_test_process();
 
-    printkln!("Error starting processes... halting...");
-    loop {}
+    printkln!("scheduler: starting multitasking");
+    start_multitasking();
 }
 
 #[panic_handler]
@@ -70,13 +66,8 @@ fn panic(info: &PanicInfo) -> ! {
 }
 
 #[no_mangle]
-pub extern "C" fn fatal_error(elr: i64, esr: i64, far: i64) -> ! {
+pub extern "C" fn fatal_error(elr: u64, esr: u64, far: u64) -> ! {
     printkln!("Fatal Error: ESR: {:#x}, FAR: {:#x}, ELR: {:#x}", esr, far, elr);
-
     loop {}
-}
-
-mod console {
-    pub use crate::drivers::raspberrypi::console::*;
 }
 

@@ -3,13 +3,12 @@
 .extern fatal_error
 .extern handle_irq
 .extern handle_exception
-.extern PROCESS_SAVED_SP
 
 
 .section .text
 
-.global create_context
-create_context:
+.global _create_context
+_create_context:
 	// Integer Registers
 	stp	xzr, xzr, [x0, 0]
 	stp	xzr, xzr, [x0, 16]
@@ -59,8 +58,8 @@ create_context:
 	ret
 
 
-.global start_multitasking
-start_multitasking:
+.global _start_multitasking
+_start_multitasking:
 	ldr	x0, CURRENT_CONTEXT
 	b	_restore_context
 

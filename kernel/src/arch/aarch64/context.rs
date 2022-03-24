@@ -3,8 +3,8 @@ use super::types::VirtualAddress;
 
 extern "C" {
     // These definitions are in aarch64/exceptions.s
-    fn create_context(context: &mut Context, sp: u64, entry: u64);
-    pub fn start_multitasking();
+    fn _create_context(context: &mut Context, sp: u64, entry: u64);
+    pub fn _start_multitasking() -> !;
 }
 
 #[repr(C)]
@@ -32,8 +32,14 @@ impl Context {
     pub fn init(&mut self, sp: VirtualAddress, entry: VirtualAddress, ttbr: u64) {
         self.ttbr = ttbr;
         unsafe {
-            create_context(self, u64::from(sp), u64::from(entry));
+            _create_context(self, u64::from(sp), u64::from(entry));
         }
+    }
+}
+
+pub fn start_multitasking() -> ! {
+    unsafe {
+        _start_multitasking();
     }
 }
 

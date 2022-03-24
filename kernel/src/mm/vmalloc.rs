@@ -71,8 +71,17 @@ impl VirtualAddressSpace {
         }).unwrap();
     }
 
-    pub fn get_ttbr(&self) -> u64 {
+    pub(crate) fn get_ttbr(&self) -> u64 {
         self.table.get_ttbr()
+    }
+
+    pub(crate) fn load_page(&self, far: VirtualAddress) {
+        for segment in &self.segments {
+            if far >= segment.start && far <= segment.end {
+                // TODO load the page
+                break;
+            }
+        }
     }
 }
 
