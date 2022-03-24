@@ -3,7 +3,7 @@ use core::slice;
 
 use crate::printkln;
 use crate::arch::mmu;
-
+use crate::arch::types::PhysicalAddress;
 
 //struct PagePool {
 //    // TODO a list of all regions
@@ -14,15 +14,13 @@ pub struct PageRegion {
     pages_free: usize,
     table: &'static mut [u8],
     last_index: usize,
-    pages_start: *mut u8,
+    pages_start: PhysicalAddress,
 }
-
-//static mut MEMORY_AREAS: [Option<PagePool>; 20] = unsafe { mem::MaybeUninit::uninit().assume_init() };
 
 static mut PAGES: Option<PageRegion> = None;
 
 
-pub fn init_pages_area(start: *mut u8, end: *mut u8) {
+pub fn init_pages_area(start: PhysicalAddress, end: PhysicalAddress) {
     let pages = PageRegion::new(start, end);
 
     unsafe {
@@ -37,44 +35,44 @@ pub fn get_page_area<'a>() -> &'a mut PageRegion {
 }
 
 impl PageRegion {
-    pub fn alloc_page(&mut self) -> *mut u8 {
+    pub fn alloc_page(&mut self) -> PhysicalAddress {
         let bit = self.bit_alloc();
-        unsafe {
-            self.pages_start.add(bit * mmu::page_size())
-        }
+        let page_addr = self.pages_start.add(bit * mmu::page_size());
+        page_addr
     }
 
-    pub fn alloc_page_zeroed(&mut self) -> *mut u8 {
-        let ptr = self.alloc_page();
+    pub fn alloc_page_zeroed(&mut self) -> PhysicalAddress {
+        let paddr = self.alloc_page();
 
         unsafe {
-            for i in 0..mmu::page_size() {
-                *ptr.add(i) = 0;
+            let page = slice::from_raw_parts_mut(paddr.as_ptr(), mmu::page_size());
+            for ptr in page.iter_mut() {
+                *ptr = 0;
             }
         }
 
-        ptr
+        paddr
     }
 
-    pub fn free_page(&mut self, ptr: *mut u8) {
-        let bit = (ptr as usize - self.pages_start as usize) / mmu::page_size();
+    pub fn free_page(&mut self, ptr: PhysicalAddress) {
+        let bit = (usize::from(ptr) - usize::from(self.pages_start)) / mmu::page_size();
         self.bit_free(bit);
     }
 
-    fn new(start: *mut u8, end: *mut u8) -> Self {
+    fn new(start: PhysicalAddress, end: PhysicalAddress) -> Self {
         let page_size = mmu::page_size();
-        let total_size = end as usize - start as usize;
+        let total_size = usize::from(end) - usize::from(start);
         let total_pages = total_size / page_size;
         let table_size = total_pages / 8 / page_size + (total_pages / 8 % page_size != 0) as usize;
 
-        printkln!("virtual memory: using region at {:#x}, size {} MiB, pages {}", start as u64, total_size / 1024 / 1024, total_pages - table_size);
+        printkln!("virtual memory: using region at {:?}, size {} MiB, pages {}", start, total_size / 1024 / 1024, total_pages - table_size);
 
         let pages = total_pages - table_size;
-        let table: &'static mut [u8] = unsafe { slice::from_raw_parts_mut(start, table_size * page_size) };
-        let pages_start = unsafe { start.add(table_size * page_size) };
+        let table: &'static mut [u8] = unsafe { slice::from_raw_parts_mut(start.as_ptr(), table_size * page_size / 8) };
+        let pages_start = PhysicalAddress::from(start).add(table_size * page_size);
 
-        for i in 0..(pages / 8) {
-            table[i] = 0;
+        for byte in table.iter_mut() {
+            *byte = 0;
         }
 
         Self {

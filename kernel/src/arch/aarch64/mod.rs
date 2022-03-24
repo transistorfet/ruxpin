@@ -1,6 +1,7 @@
 
 pub mod mmu;
 pub mod sync;
+pub mod types;
 pub mod context;
 pub mod registers;
 pub mod exceptions;

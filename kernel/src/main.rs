@@ -14,6 +14,8 @@ extern crate alloc;
 
 use core::panic::PanicInfo;
 
+use crate::arch::types::PhysicalAddress;
+
 use crate::mm::kmalloc::{init_kernel_heap};
 use crate::mm::vmalloc::{init_virtual_memory};
 use crate::proc::process::{init_processes, create_test_process};
@@ -37,8 +39,9 @@ pub extern "C" fn kernel_start() -> ! {
 
     unsafe {
         init_kernel_heap(0x20_0000 as *mut u8, 0x100_0000 as *mut u8);
-        init_virtual_memory(0x100_0000 as *mut u8, 0x1000_0000 as *mut u8);
+        init_virtual_memory(PhysicalAddress::from(0x100_0000), PhysicalAddress::from(0x1000_0000));
     }
+
 
     let block_device: &mut dyn BlockDriver = &mut EmmcDevice{};
     printkln!("emmc: initializing");
@@ -48,10 +51,7 @@ pub extern "C" fn kernel_start() -> ! {
     unsafe {
         crate::printk::printk_dump(&data as *const u8, 1024);
     }
-    //EmmcDevice::read_sector(512, &mut data).unwrap();
-    //unsafe {
-    //    crate::printk::printk_dump(&data as *const u8, 512);
-    //}
+
 
     SystemTimer::init();
     GenericInterruptController::init();

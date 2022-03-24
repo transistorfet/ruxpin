@@ -3,13 +3,14 @@ use alloc::vec::Vec;
 
 use crate::mm::pages;
 use crate::mm::MemoryAccess;
-use crate::arch::mmu::{self, TranslationTable, VirtualAddress, PhysicalAddress};
+use crate::arch::mmu::{self, TranslationTable};
+use crate::arch::types::{VirtualAddress, PhysicalAddress};
 
 
 const MAX_SEGMENTS: usize = 6;
 
 
-pub fn init_virtual_memory(start: *mut u8, end: *mut u8) {
+pub fn init_virtual_memory(start: PhysicalAddress, end: PhysicalAddress) {
     pages::init_pages_area(start, end);
 }
 
@@ -38,17 +39,19 @@ impl VirtualAddressSpace {
     pub fn alloc_mapped(&mut self, access: MemoryAccess, mut vaddr: VirtualAddress, length: usize) -> *mut u8 {
         let pages = pages::get_page_area();
         // TODO this needs to be replaced when then page allocator can do blocks
-        let mut first = 0;
+        let mut first = None;
         for _ in 0..(length / mmu::page_size()) {
-            let ptr = pages.alloc_page_zeroed() as PhysicalAddress;
-            if first == 0 {
-                first = ptr as PhysicalAddress;
+            let ptr = PhysicalAddress::from(pages.alloc_page_zeroed());
+            if first.is_none() {
+                first = Some(ptr);
             }
             self.map_existing(access, vaddr, ptr, mmu::page_size());
-            vaddr += mmu::page_size() as VirtualAddress;
+            vaddr = vaddr.add(mmu::page_size());
         }
 
-        first as *mut u8
+        unsafe {
+            first.unwrap().as_ptr()
+        }
     }
 
     pub fn map_existing(&mut self, access: MemoryAccess, vaddr: VirtualAddress, paddr: PhysicalAddress, len: usize) {
@@ -63,7 +66,7 @@ impl VirtualAddressSpace {
             for segment in &self.segments {
                 if vaddr >= segment.start && vaddr <= segment.end {
                 }
-                pages.free_page(paddr as *mut u8);
+                pages.free_page(paddr);
             }
         }).unwrap();
     }

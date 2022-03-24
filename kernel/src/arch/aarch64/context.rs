@@ -1,7 +1,9 @@
 
-extern {
+use super::types::VirtualAddress;
+
+extern "C" {
     // These definitions are in aarch64/exceptions.s
-    fn create_context(context: &mut Context, sp: *mut u8, entry: *mut u8);
+    fn create_context(context: &mut Context, sp: u64, entry: u64);
     pub fn start_multitasking();
 }
 
@@ -27,10 +29,10 @@ impl Default for Context {
 }
 
 impl Context {
-    pub fn init(&mut self, sp: *mut u8, entry: *mut u8, ttbr: u64) {
+    pub fn init(&mut self, sp: VirtualAddress, entry: VirtualAddress, ttbr: u64) {
         self.ttbr = ttbr;
         unsafe {
-            create_context(self, sp, entry);
+            create_context(self, u64::from(sp), u64::from(entry));
         }
     }
 }

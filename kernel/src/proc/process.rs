@@ -8,6 +8,7 @@ use crate::mm::MemoryAccess;
 use crate::mm::vmalloc::VirtualAddressSpace;
 
 use crate::arch::sync::Mutex;
+use crate::arch::types::VirtualAddress;
 use crate::arch::{Context, start_multitasking};
 
 
@@ -59,10 +60,10 @@ impl ProcessManager {
         self.current = self.processes.len() - 1;
         let proc = &mut self.processes[self.current];
         // Allocate text segment
-        let entry = proc.space.alloc_mapped(MemoryAccess::ReadExecute, 0x77777000, 4096);
+        let entry = proc.space.alloc_mapped(MemoryAccess::ReadExecute, VirtualAddress::from(0x77777000), 4096);
         // Allocate stack segment
-        proc.space.alloc_mapped(MemoryAccess::ReadWrite, 0xFFFFF000, 4096);
-        Context::init(&mut proc.context, 0x1_0000_0000 as *mut u8, 0x77777000 as *mut u8, proc.space.get_ttbr());
+        proc.space.alloc_mapped(MemoryAccess::ReadWrite, VirtualAddress::from(0xFFFFF000), 4096);
+        Context::init(&mut proc.context, VirtualAddress::from(0x1_0000_0000), VirtualAddress::from(0x77777000), proc.space.get_ttbr());
 
         unsafe {
             // TODO this is temporary to bootstrap the context switching
@@ -75,7 +76,7 @@ impl ProcessManager {
     // TODO this is temporary to suppress unused warnings
     #[allow(dead_code)]
     fn destroy_process(&mut self, proc: &mut Process) {
-        proc.space.unmap_range(0, usize::MAX);
+        proc.space.unmap_range(VirtualAddress::from(0), usize::MAX);
     }
 
     fn schedule(&mut self) {
