@@ -5,7 +5,7 @@ use crate::mm::MemoryAccess;
 use crate::errors::KernelError;
 
 // TODO this should be changed to PagePool when you decide how you'd like to do it
-use crate::mm::pages::PageRegion;
+use crate::mm::pages::PagePool;
 
 use super::types::{PhysicalAddress, VirtualAddress};
 
@@ -58,19 +58,19 @@ pub const fn table_entries() -> usize {
 }
 
 impl TranslationTable {
-    pub fn new_user_table(pages: &mut PageRegion) -> Self {
+    pub fn new_user_table(pages: &mut PagePool) -> Self {
         let tl0 = allocacte_table(pages);
         Self(tl0.as_mut_ptr())
     }
 
-    pub fn map_addr(&mut self, access: MemoryAccess, mut vaddr: VirtualAddress, mut paddr: PhysicalAddress, mut len: usize, pages: &mut PageRegion) -> Result<(), KernelError> {
+    pub fn map_addr(&mut self, access: MemoryAccess, mut vaddr: VirtualAddress, mut paddr: PhysicalAddress, mut len: usize, pages: &mut PagePool) -> Result<(), KernelError> {
         let flags = memory_access_flags(access);
         map_level(TL0_ADDR_BITS, self.as_slice(), &mut len, &mut vaddr, &mut paddr, flags, pages)
     }
 
-    pub fn unmap_addr<F>(&mut self, mut vaddr: VirtualAddress, mut len: usize, pages: &mut PageRegion, unmap_block: &F) -> Result<(), KernelError>
+    pub fn unmap_addr<F>(&mut self, mut vaddr: VirtualAddress, mut len: usize, pages: &mut PagePool, unmap_block: &F) -> Result<(), KernelError>
     where
-        F: Fn(&mut PageRegion, VirtualAddress, PhysicalAddress)
+        F: Fn(&mut PagePool, VirtualAddress, PhysicalAddress)
     {
         unmap_level(TL0_ADDR_BITS, self.as_slice(), &mut len, &mut vaddr, pages, unmap_block)
     }
@@ -90,7 +90,7 @@ impl TranslationTable {
     }
 }
 
-fn map_level(addr_bits: usize, table: &mut [u64], len: &mut usize, vaddr: &mut VirtualAddress, paddr: &mut PhysicalAddress, flags: u64, pages: &mut PageRegion) -> Result<(), KernelError> {
+fn map_level(addr_bits: usize, table: &mut [u64], len: &mut usize, vaddr: &mut VirtualAddress, paddr: &mut PhysicalAddress, flags: u64, pages: &mut PagePool) -> Result<(), KernelError> {
     let granuale_size = 1 << addr_bits;
 
     while *len > 0 {
@@ -137,7 +137,7 @@ fn map_granuales(addr_bits: usize, table: &mut [u64], index: &mut usize, len: &m
     Ok(())
 }
 
-fn ensure_table_entry(table: &mut [u64], index: usize, pages: &mut PageRegion) -> Result<(), KernelError> {
+fn ensure_table_entry(table: &mut [u64], index: usize, pages: &mut PagePool) -> Result<(), KernelError> {
     let desc_type = descriptor_type(table, index);
 
     match desc_type {
@@ -160,9 +160,9 @@ fn ensure_table_entry(table: &mut [u64], index: usize, pages: &mut PageRegion) -
     }
 }
 
-fn unmap_level<F>(addr_bits: usize, table: &mut [u64], len: &mut usize, vaddr: &mut VirtualAddress, pages: &mut PageRegion, unmap_block: &F) -> Result<(), KernelError>
+fn unmap_level<F>(addr_bits: usize, table: &mut [u64], len: &mut usize, vaddr: &mut VirtualAddress, pages: &mut PagePool, unmap_block: &F) -> Result<(), KernelError>
 where
-    F: Fn(&mut PageRegion, VirtualAddress, PhysicalAddress)
+    F: Fn(&mut PagePool, VirtualAddress, PhysicalAddress)
 {
     let granuale_size = 1 << addr_bits;
 
@@ -190,9 +190,9 @@ where
     Ok(())
 }
 
-fn unmap_granuales<F>(addr_bits: usize, table: &mut [u64], index: &mut usize, len: &mut usize, vaddr: &mut VirtualAddress, pages: &mut PageRegion, unmap_block: &F) -> Result<(), KernelError>
+fn unmap_granuales<F>(addr_bits: usize, table: &mut [u64], index: &mut usize, len: &mut usize, vaddr: &mut VirtualAddress, pages: &mut PagePool, unmap_block: &F) -> Result<(), KernelError>
 where
-    F: Fn(&mut PageRegion, VirtualAddress, PhysicalAddress)
+    F: Fn(&mut PagePool, VirtualAddress, PhysicalAddress)
 {
     let granuale_size = 1 << addr_bits;
 
@@ -228,7 +228,7 @@ fn lookup_level(addr_bits: usize, table: &mut [u64], vaddr: VirtualAddress) -> R
     }
 }
 
-fn allocacte_table(pages: &mut PageRegion) -> &'static mut [u64] {
+fn allocacte_table(pages: &mut PagePool) -> &'static mut [u64] {
     unsafe {
         let addr: *mut u64 = pages.alloc_page_zeroed().as_ptr() as *mut u64;
         slice::from_raw_parts_mut(addr, table_entries())

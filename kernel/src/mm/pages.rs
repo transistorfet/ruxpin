@@ -1,13 +1,15 @@
 
 use core::slice;
 
+use alloc::vec::Vec;
+
 use crate::printkln;
 use crate::arch::mmu;
 use crate::arch::types::PhysicalAddress;
 
-//struct PagePool {
-//    // TODO a list of all regions
-//}
+pub struct PagePool {
+    regions: Vec<PageRegion>,
+}
 
 pub struct PageRegion {
     pages: usize,
@@ -17,41 +19,61 @@ pub struct PageRegion {
     pages_start: PhysicalAddress,
 }
 
-static mut PAGES: Option<PageRegion> = None;
+static mut PAGES: PagePool = PagePool::new();
 
 
 pub fn init_pages_area(start: PhysicalAddress, end: PhysicalAddress) {
     let pages = PageRegion::new(start, end);
 
     unsafe {
-        PAGES = Some(pages);
+        PAGES.regions.push(pages);
     }
 }
 
-pub fn get_page_area<'a>() -> &'a mut PageRegion {
+pub fn get_page_area<'a>() -> &'a mut PagePool {
     unsafe {
-        PAGES.as_mut().unwrap()
+        &mut PAGES
     }
 }
 
-impl PageRegion {
+impl PagePool {
+    pub const fn new() -> Self {
+        Self {
+            regions: Vec::new(),
+        }
+    }
+
     pub fn alloc_page(&mut self) -> PhysicalAddress {
-        let bit = self.bit_alloc();
-        let page_addr = self.pages_start.add(bit * mmu::page_size());
-        page_addr
+        for region in &mut self.regions {
+            if let Some(addr) = region.alloc_page() {
+                return addr;
+            }
+        }
+        panic!("Out of memory");
     }
 
     pub fn alloc_page_zeroed(&mut self) -> PhysicalAddress {
         let paddr = self.alloc_page();
-
         unsafe {
-            let page = slice::from_raw_parts_mut(paddr.as_ptr(), mmu::page_size());
-            for ptr in page.iter_mut() {
-                *ptr = 0;
+            zero_page(paddr);
+        }
+        paddr
+    }
+
+    pub fn free_page(&mut self, ptr: PhysicalAddress) {
+        for region in &mut self.regions {
+            if ptr >= region.pages_start && ptr <= region.pages_start.add(region.pages) {
+                return region.free_page(ptr);
             }
         }
+    }
+}
 
-        paddr
+impl PageRegion {
+    pub fn alloc_page(&mut self) -> Option<PhysicalAddress> {
+        let bit = self.bit_alloc()?;
+        let page_addr = self.pages_start.add(bit * mmu::page_size());
+        Some(page_addr)
     }
 
     pub fn free_page(&mut self, ptr: PhysicalAddress) {
@@ -84,7 +106,7 @@ impl PageRegion {
         }
     }
 
-    fn bit_alloc(&mut self) -> usize {
+    fn bit_alloc(&mut self) -> Option<usize> {
         let mut i = self.last_index;
 
         loop {
@@ -100,12 +122,12 @@ impl PageRegion {
                 self.table[i] |= 0x01 << bit;
                 self.last_index = i;
                 self.pages_free -= 1;
-                return (i * 8) + bit;
+                return Some((i * 8) + bit);
             }
 
             i += 1;
             if i == self.last_index {
-                panic!("Out of memory");
+                return None;
             }
         }
     }
@@ -116,6 +138,13 @@ impl PageRegion {
         self.table[i] &= !(0x01 << bit);
         self.pages_free += 1;
         // NOTE we could set last_index here, but not doing that might mean more contiguous chunks get allocated
+    }
+}
+
+unsafe fn zero_page(paddr: PhysicalAddress) {
+    let page = slice::from_raw_parts_mut(paddr.as_ptr(), mmu::page_size());
+    for ptr in page.iter_mut() {
+        *ptr = 0;
     }
 }
 

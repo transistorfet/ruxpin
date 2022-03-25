@@ -112,9 +112,6 @@ pub fn create_test_process() {
 
         let ptr = PROCESS_MANAGER.lock().create_process();
         load_code(ptr.cast(), TEST_PROC2);
-
-        printkln!("Entry: {:#x}", ptr as u64);
-        crate::printk::printk_dump(CURRENT_CONTEXT.cast(), 768 + 32);
     }
 }
 

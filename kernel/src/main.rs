@@ -37,7 +37,9 @@ pub extern "C" fn kernel_start() -> ! {
 
     printkln!("starting kernel...");
 
-    unsafe { init_kernel_heap(0x20_0000 as *mut u8, 0x100_0000 as *mut u8) };
+    // Since data in the heap could be accessed at any time, we use the kernel address space so that TTBR1 is always used for lookups
+    unsafe { init_kernel_heap(0xffff_0000_0020_0000 as *mut u8, 0xffff_0000_0100_0000 as *mut u8) };
+
     init_virtual_memory(PhysicalAddress::from(0x100_0000), PhysicalAddress::from(0x1000_0000));
     init_processes();
 
