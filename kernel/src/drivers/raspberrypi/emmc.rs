@@ -49,7 +49,7 @@ impl EmmcDevice {
     }
 
     pub fn read_data(buffer: &mut [u8], offset: usize) -> Result<(), KernelError> {
-        let blocksize = 256;
+        let blocksize = 512;
         let mut i = 0;
         let mut len = buffer.len();
 
@@ -59,6 +59,8 @@ impl EmmcDevice {
             i += blocksize;
         }
 
+        EmmcHost::send_command(Command::StopTransmission, 0)?;
+
         Ok(())
     }
 
@@ -67,8 +69,6 @@ impl EmmcDevice {
         EmmcHost::send_command(Command::ReadSingle, offset as u32)?;
 
         EmmcHost::read_data(buffer)?;
-
-        EmmcHost::send_command(Command::StopTransmission, 0)?;
 
         Ok(())
     }
@@ -118,7 +118,7 @@ const EMMC1_STA_DATA_INHIBIT: u32       = 1 << 1;
 const EMMC1_INT_COMMAND_DONE: u32       = 1 << 0;
 const EMMC1_INT_DATA_DONE: u32          = 1 << 1;
 const EMMC1_INT_READ_READY: u32         = 1 << 5;
-const EMMC1_INT_ANY_ERROR: u32          = 0x17F << 16;
+const EMMC1_INT_ANY_ERROR: u32          = 0x17F8000;
 
 
 pub struct EmmcHost;
@@ -154,8 +154,8 @@ impl EmmcHost {
             ptr::write_volatile(EMMC1_ARG1, arg1);
             ptr::write_volatile(EMMC1_COMMAND, command_code(cmd));
 
-            // TODO this causes it to hang, but I'm not sure why.  It was done by the bare metal raspi C project
-            //ptr::write_volatile(EMMC1_INTERRUPT_FLAGS, ptr::read_volatile(EMMC1_INTERRUPT_FLAGS));
+            // TODO the initialization times out if this isn't present, but I'm not sure what it does
+            ptr::write_volatile(EMMC1_INTERRUPT_FLAGS, ptr::read_volatile(EMMC1_INTERRUPT_FLAGS));
 
             wait_until_set(EMMC1_INTERRUPT_FLAGS, EMMC1_INT_COMMAND_DONE | EMMC1_INT_ANY_ERROR)?;
 
@@ -215,7 +215,7 @@ const fn command_code(cmd: Command) -> u32 {
 }
 
 fn wait_until_set(reg: *const u32, mask: u32) -> Result<(), KernelError> {
-    for _ in 0..1000 {
+    for _ in 0..100000 {
         unsafe {
             if (ptr::read_volatile(reg) & mask) != 0 {
                 return Ok(());
@@ -226,7 +226,7 @@ fn wait_until_set(reg: *const u32, mask: u32) -> Result<(), KernelError> {
 }
 
 fn wait_until_clear(reg: *const u32, mask: u32) -> Result<(), KernelError> {
-    for _ in 0..1000 {
+    for _ in 0..100000 {
         unsafe {
             if (ptr::read_volatile(reg) & mask) == 0 {
                 return Ok(());
