@@ -150,12 +150,12 @@ impl EmmcHost {
         unsafe {
             wait_until_clear(EMMC1_STATUS, EMMC1_STA_COMMAND_INHIBIT)?;
 
+            // TODO the initialization times out if this isn't present, but I'm not sure what it does
+            ptr::write_volatile(EMMC1_INTERRUPT_FLAGS, ptr::read_volatile(EMMC1_INTERRUPT_FLAGS));
+
             printkln!("mmc: sending command {:?} {:x}", cmd, arg1);
             ptr::write_volatile(EMMC1_ARG1, arg1);
             ptr::write_volatile(EMMC1_COMMAND, command_code(cmd));
-
-            // TODO the initialization times out if this isn't present, but I'm not sure what it does
-            ptr::write_volatile(EMMC1_INTERRUPT_FLAGS, ptr::read_volatile(EMMC1_INTERRUPT_FLAGS));
 
             wait_until_set(EMMC1_INTERRUPT_FLAGS, EMMC1_INT_COMMAND_DONE | EMMC1_INT_ANY_ERROR)?;
 
