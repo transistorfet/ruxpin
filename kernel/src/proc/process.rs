@@ -3,12 +3,11 @@ use core::ptr;
 
 use alloc::vec::Vec;
 
-use crate::printkln;
 use crate::mm::MemoryAccess;
 use crate::mm::vmalloc::VirtualAddressSpace;
 
 use crate::arch::Context;
-use crate::arch::sync::Mutex;
+use crate::arch::sync::Spinlock;
 use crate::arch::types::VirtualAddress;
 
 
@@ -28,7 +27,8 @@ struct ProcessManager {
 unsafe impl Send for Process {}
 unsafe impl Sync for Process {}
 
-static PROCESS_MANAGER: Mutex<ProcessManager> = Mutex::new(ProcessManager::new());
+static NEXT_PID: Spinlock<Pid> = Spinlock::new(1);
+static PROCESS_MANAGER: Spinlock<ProcessManager> = Spinlock::new(ProcessManager::new());
 
 // TODO need to move this
 #[no_mangle]
@@ -53,8 +53,7 @@ impl ProcessManager {
     }
 
     fn create_process(&mut self) -> *mut u8 {
-        // TODO this is wrong temporarily
-        let pid = 1;
+        let pid = next_pid();
 
         self.processes.push(Process {
             pid,
@@ -96,6 +95,13 @@ impl ProcessManager {
     }
 }
 
+fn next_pid() -> Pid {
+    let mut mutex = NEXT_PID.lock();
+    let pid = *mutex;
+    *mutex += 1;
+    pid
+}
+
 const TEST_PROC1: &[u32] = &[0xd40000e1, 0xd503205f, 0x17ffffff];
 const TEST_PROC2: &[u32] = &[0xd10043ff, 0xf90003e0, 0xf90007e1, 0x14000001, 0xd4000021, 0x17ffffff];
 
@@ -115,11 +121,11 @@ pub fn create_test_process() {
     }
 }
 
-pub fn schedule() {
+pub(crate) fn schedule() {
     PROCESS_MANAGER.lock().schedule();
 }
 
-pub fn page_fault_handler(far: u64) {
+pub(crate) fn page_fault_handler(far: u64) {
     PROCESS_MANAGER.lock().page_fault(far);
 }
 
