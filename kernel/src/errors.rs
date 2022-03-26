@@ -4,6 +4,7 @@
 pub enum KernelError {
     AddressAlreadyMapped,
     AddressUnmapped,
+    UnexpectedGranualeSize,
     CorruptTranslationTable,
 
     DeviceTimeout,

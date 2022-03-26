@@ -39,7 +39,7 @@ impl VirtualAddressSpace {
     pub fn alloc_mapped(&mut self, access: MemoryPermissions, vaddr: VirtualAddress, len: usize) -> *mut u8 {
         let pages = pages::get_page_area();
 
-        self.table.map_addr(MemoryType::Existing, access, vaddr, len, pages, &|pages, current_vaddr, len| {
+        self.table.map_addr(MemoryType::Existing, access, vaddr, len, pages, &|pages, _, len| {
             if len == mmu::page_size() {
                 Some(pages.alloc_page_zeroed())
             } else {
@@ -51,6 +51,17 @@ impl VirtualAddressSpace {
         unsafe {
             first.as_ptr()
         }
+    }
+
+    pub fn map_on_demand(&mut self, access: MemoryPermissions, vaddr: VirtualAddress, len: usize) {
+        let pages = pages::get_page_area();
+        self.table.map_addr(MemoryType::Unallocated, access, vaddr, len, pages, &|_, _, len| {
+            if len == mmu::page_size() {
+                Some(PhysicalAddress::from(0))
+            } else {
+                None
+            }
+        }).unwrap();
     }
 
     pub fn map_existing(&mut self, access: MemoryPermissions, vaddr: VirtualAddress, paddr: PhysicalAddress, len: usize) {
@@ -77,13 +88,15 @@ impl VirtualAddressSpace {
         self.table.get_ttbr()
     }
 
-    pub(crate) fn load_page(&self, far: VirtualAddress) {
-        for segment in &self.segments {
-            if far >= segment.start && far <= segment.end {
-                // TODO load the page
-                break;
-            }
-        }
+    pub(crate) fn load_page(&mut self, far: VirtualAddress) {
+        //for segment in &self.segments {
+        //    if far >= segment.start && far <= segment.end {
+                let pages = pages::get_page_area();
+                let page = pages.alloc_page_zeroed();
+                self.table.update_mapping(far, page, mmu::page_size()).unwrap();
+        //        break;
+        //    }
+        //}
     }
 }
 

@@ -53,7 +53,7 @@ extern "C" fn handle_exception(_context: u64, elr: u64, esr: u64, far: u64, sp: 
         // SVC from Aarch64
         0b010101 => {
             printkln!("A SYSCALL!");
-            crate::proc::process::schedule();
+            //crate::proc::process::schedule();
         },
 
         // Instruction or Data Abort from lower EL
@@ -81,6 +81,6 @@ extern "C" fn handle_irq(_context: u64, _elr: u64, esr: u64, _far: u64, sp: u64)
         IRQ_HANDLER();
     }
 
-    //crate::proc::process::schedule();
+    crate::proc::process::schedule();
 }
 

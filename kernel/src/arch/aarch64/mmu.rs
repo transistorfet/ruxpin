@@ -79,7 +79,19 @@ impl TranslationTable {
     }
 
     pub fn translate_addr(&mut self, vaddr: VirtualAddress) -> Result<PhysicalAddress, KernelError> {
-        lookup_level(TL0_ADDR_BITS, self.as_slice(), vaddr)
+        let (descriptor, granuale_size) = lookup_level(TL0_ADDR_BITS, self.as_slice(), vaddr)?;
+        Ok(PhysicalAddress::from(*descriptor & TT_BLOCK_MASK).add(usize::from(vaddr) & (granuale_size - 1)))
+    }
+
+    pub fn update_mapping(&mut self, vaddr: VirtualAddress, paddr: PhysicalAddress, expected_size: usize) -> Result<(), KernelError> {
+        let (descriptor, granuale_size) = lookup_level(TL0_ADDR_BITS, self.as_slice(), vaddr)?;
+        if granuale_size == expected_size {
+            *descriptor &= !TT_BLOCK_MASK;
+            *descriptor |= (u64::from(paddr) & TT_BLOCK_MASK) | TT_ACCESS_FLAG;
+            Ok(())
+        } else {
+            Err(KernelError::UnexpectedGranualeSize)
+        }
     }
 
     pub(crate) fn get_ttbr(&self) -> u64 {
@@ -229,12 +241,12 @@ where
     Ok(())
 }
 
-fn lookup_level(addr_bits: usize, table: &mut [u64], vaddr: VirtualAddress) -> Result<PhysicalAddress, KernelError> {
+fn lookup_level(addr_bits: usize, table: &mut [u64], vaddr: VirtualAddress) -> Result<(&mut u64, usize), KernelError> {
     let granuale_size = 1 << addr_bits;
 
     let index = table_index_from_vaddr(addr_bits, vaddr);
     if is_block(addr_bits, table, index) {
-        Ok(block_ptr(table, index).add(usize::from(vaddr) & (granuale_size - 1)))
+        Ok((&mut table[index], granuale_size))
     } else if addr_bits == 12 {
         Err(KernelError::AddressUnmapped)
     } else {
