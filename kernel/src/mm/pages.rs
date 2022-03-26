@@ -85,13 +85,13 @@ impl PageRegion {
         let page_size = mmu::page_size();
         let total_size = usize::from(end) - usize::from(start);
         let total_pages = total_size / page_size;
-        let table_size = total_pages / 8 / page_size + (total_pages / 8 % page_size != 0) as usize;
+        let table_pages = total_pages / 8 / page_size + (total_pages / 8 % page_size != 0) as usize;
 
-        printkln!("virtual memory: using region at {:?}, size {} MiB, pages {}", start, total_size / 1024 / 1024, total_pages - table_size);
+        printkln!("virtual memory: using region at {:?}, size {} MiB, pages {}", start, total_size / 1024 / 1024, total_pages - table_pages);
 
-        let pages = total_pages - table_size;
-        let table: &'static mut [u8] = unsafe { slice::from_raw_parts_mut(start.as_ptr(), table_size * page_size / 8) };
-        let pages_start = PhysicalAddress::from(start).add(table_size * page_size);
+        let pages = total_pages - table_pages;
+        let table: &'static mut [u8] = unsafe { slice::from_raw_parts_mut(start.as_ptr(), table_pages * page_size) };
+        let pages_start = PhysicalAddress::from(start).add(table_pages * page_size);
 
         for byte in table.iter_mut() {
             *byte = 0;

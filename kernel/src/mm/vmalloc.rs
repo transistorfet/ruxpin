@@ -2,7 +2,7 @@
 use alloc::vec::Vec;
 
 use crate::mm::pages;
-use crate::mm::MemoryAccess;
+use crate::mm::{MemoryType, MemoryPermissions};
 use crate::arch::mmu::{self, TranslationTable};
 use crate::arch::types::{VirtualAddress, PhysicalAddress};
 
@@ -36,28 +36,29 @@ impl VirtualAddressSpace {
         }
     }
 
-    pub fn alloc_mapped(&mut self, access: MemoryAccess, mut vaddr: VirtualAddress, length: usize) -> *mut u8 {
+    pub fn alloc_mapped(&mut self, access: MemoryPermissions, vaddr: VirtualAddress, len: usize) -> *mut u8 {
         let pages = pages::get_page_area();
-        // TODO this needs to be replaced when then page allocator can do blocks
-        let mut first = None;
-        for _ in 0..(length / mmu::page_size()) {
-            let ptr = PhysicalAddress::from(pages.alloc_page_zeroed());
-            if first.is_none() {
-                first = Some(ptr);
-            }
-            self.map_existing(access, vaddr, ptr, mmu::page_size());
-            vaddr = vaddr.add(mmu::page_size());
-        }
 
+        self.table.map_addr(MemoryType::Existing, access, vaddr, len, pages, &|pages, current_vaddr, len| {
+            if len == mmu::page_size() {
+                Some(pages.alloc_page_zeroed())
+            } else {
+                None // Don't map granuales larger than a page
+            }
+        }).unwrap();
+
+        let first = self.table.translate_addr(vaddr).unwrap();
         unsafe {
-            first.unwrap().as_ptr()
+            first.as_ptr()
         }
     }
 
-    pub fn map_existing(&mut self, access: MemoryAccess, vaddr: VirtualAddress, paddr: PhysicalAddress, len: usize) {
+    pub fn map_existing(&mut self, access: MemoryPermissions, vaddr: VirtualAddress, paddr: PhysicalAddress, len: usize) {
         let pages = pages::get_page_area();
-        // TODO this readwritexecute is temporary until you get segment data recorded
-        self.table.map_addr(access, vaddr, paddr, len, pages).unwrap();
+        self.table.map_addr(MemoryType::Existing, access, vaddr, len, pages, &|_, current_vaddr, _| {
+            let voffset = usize::from(current_vaddr) - usize::from(vaddr);
+            Some(paddr.add(voffset))
+        }).unwrap();
     }
 
     pub fn unmap_range(&mut self, start: VirtualAddress, len: usize) {
@@ -65,8 +66,9 @@ impl VirtualAddressSpace {
         self.table.unmap_addr(start, len, pages, &|pages, vaddr, paddr| {
             for segment in &self.segments {
                 if vaddr >= segment.start && vaddr <= segment.end {
+                    // TODO this would normally call the segment operations to determine what to do
+                    pages.free_page(paddr);
                 }
-                pages.free_page(paddr);
             }
         }).unwrap();
     }

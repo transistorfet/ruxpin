@@ -1,8 +1,8 @@
 
 use core::slice;
 
-use crate::mm::MemoryAccess;
 use crate::errors::KernelError;
+use crate::mm::{MemoryType, MemoryPermissions};
 
 // TODO this should be changed to PagePool when you decide how you'd like to do it
 use crate::mm::pages::PagePool;
@@ -63,9 +63,12 @@ impl TranslationTable {
         Self(tl0.as_mut_ptr())
     }
 
-    pub fn map_addr(&mut self, access: MemoryAccess, mut vaddr: VirtualAddress, mut paddr: PhysicalAddress, mut len: usize, pages: &mut PagePool) -> Result<(), KernelError> {
-        let flags = memory_access_flags(access);
-        map_level(TL0_ADDR_BITS, self.as_slice(), &mut len, &mut vaddr, &mut paddr, flags, pages)
+    pub fn map_addr<F>(&mut self, mtype: MemoryType, access: MemoryPermissions, mut vaddr: VirtualAddress, mut len: usize, pages: &mut PagePool, map_block: &F) -> Result<(), KernelError>
+    where
+        F: Fn(&mut PagePool, VirtualAddress, usize) -> Option<PhysicalAddress>
+    {
+        let flags = memory_type_flags(mtype) | memory_permissions_flags(access);
+        map_level(TL0_ADDR_BITS, self.as_slice(), &mut len, &mut vaddr, flags, pages, map_block)
     }
 
     pub fn unmap_addr<F>(&mut self, mut vaddr: VirtualAddress, mut len: usize, pages: &mut PagePool, unmap_block: &F) -> Result<(), KernelError>
@@ -90,14 +93,19 @@ impl TranslationTable {
     }
 }
 
-fn map_level(addr_bits: usize, table: &mut [u64], len: &mut usize, vaddr: &mut VirtualAddress, paddr: &mut PhysicalAddress, flags: u64, pages: &mut PagePool) -> Result<(), KernelError> {
+fn map_level<F>(addr_bits: usize, table: &mut [u64], len: &mut usize, vaddr: &mut VirtualAddress, flags: u64, pages: &mut PagePool, map_block: &F) -> Result<(), KernelError>
+where
+    F: Fn(&mut PagePool, VirtualAddress, usize) -> Option<PhysicalAddress>
+{
     let granuale_size = 1 << addr_bits;
 
     while *len > 0 {
         let mut index = table_index_from_vaddr(addr_bits, *vaddr);
         if (usize::from(*vaddr) & (granuale_size - 1)) == 0 && *len >= granuale_size {
-            map_granuales(addr_bits, table, &mut index, len, vaddr, paddr, flags)?;
-            break;
+            let should_break = map_granuales(addr_bits, table, &mut index, len, vaddr, flags, pages, map_block)?;
+            if should_break {
+                break;
+            }
         }
 
         if addr_bits == 12 {
@@ -106,13 +114,16 @@ fn map_level(addr_bits: usize, table: &mut [u64], len: &mut usize, vaddr: &mut V
 
         ensure_table_entry(table, index, pages)?;
 
-        map_level(addr_bits - 9, table_ptr(table, index), len, vaddr, paddr, flags, pages)?;
+        map_level(addr_bits - 9, table_ptr(table, index), len, vaddr, flags, pages, map_block)?;
     }
 
     Ok(())
 }
 
-fn map_granuales(addr_bits: usize, table: &mut [u64], index: &mut usize, len: &mut usize, vaddr: &mut VirtualAddress, paddr: &mut PhysicalAddress, flags: u64) -> Result<(), KernelError> {
+fn map_granuales<F>(addr_bits: usize, table: &mut [u64], index: &mut usize, len: &mut usize, vaddr: &mut VirtualAddress, flags: u64, pages: &mut PagePool, map_block: &F) -> Result<bool, KernelError>
+where
+    F: Fn(&mut PagePool, VirtualAddress, usize) -> Option<PhysicalAddress>
+{
     let granuale_size = 1 << addr_bits;
     let block_flag = if addr_bits == 12 { TT3_DESCRIPTOR_BLOCK } else { TT2_DESCRIPTOR_BLOCK };
 
@@ -121,11 +132,14 @@ fn map_granuales(addr_bits: usize, table: &mut [u64], index: &mut usize, len: &m
             return Err(KernelError::AddressAlreadyMapped);
         }
 
-        table[*index] = (u64::from(*paddr) & TT_BLOCK_MASK) | TT_ACCESS_FLAG | flags | block_flag;
+        if let Some(paddr) = map_block(pages, *vaddr, granuale_size) {
+            table[*index] = (u64::from(paddr) & TT_BLOCK_MASK) | flags | block_flag;
+        } else {
+            return Ok(false);
+        }
 
         *index += 1;
         *vaddr = vaddr.add(granuale_size);
-        *paddr = paddr.add(granuale_size);
         *len -= granuale_size;
 
         if *index >= table_entries() {
@@ -134,7 +148,7 @@ fn map_granuales(addr_bits: usize, table: &mut [u64], index: &mut usize, len: &m
         }
     }
 
-    Ok(())
+    Ok(true)
 }
 
 fn ensure_table_entry(table: &mut [u64], index: usize, pages: &mut PagePool) -> Result<(), KernelError> {
@@ -273,12 +287,24 @@ fn table_is_empty(table: &mut [u64]) -> bool {
     true
 }
 
-fn memory_access_flags(access: MemoryAccess) -> u64 {
-    match access {
-        MemoryAccess::ReadOnly => TT_READ_ONLY_FLAG | TT_NO_EXECUTE_FLAG,
-        MemoryAccess::ReadExecute => TT_READ_ONLY_FLAG,
-        MemoryAccess::ReadWrite => TT_READ_WRITE_FLAG | TT_NO_EXECUTE_FLAG,
-        MemoryAccess::ReadWriteExecute => TT_READ_WRITE_FLAG,
+const fn attribute_index(index: u64) -> u64 {
+    (index & 0x7) << 2
+}
+
+const fn memory_type_flags(mtype: MemoryType) -> u64 {
+    match mtype {
+        MemoryType::Unallocated => 0 | attribute_index(0),
+        MemoryType::Existing => TT_ACCESS_FLAG | attribute_index(0),
+        MemoryType::ExistingNoCache => TT_ACCESS_FLAG | attribute_index(1),
+    }
+}
+
+const fn memory_permissions_flags(permissions: MemoryPermissions) -> u64 {
+    match permissions {
+        MemoryPermissions::ReadOnly => TT_READ_ONLY_FLAG | TT_NO_EXECUTE_FLAG,
+        MemoryPermissions::ReadExecute => TT_READ_ONLY_FLAG,
+        MemoryPermissions::ReadWrite => TT_READ_WRITE_FLAG | TT_NO_EXECUTE_FLAG,
+        MemoryPermissions::ReadWriteExecute => TT_READ_WRITE_FLAG,
     }
 }
 

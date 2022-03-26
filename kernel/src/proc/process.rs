@@ -3,7 +3,7 @@ use core::ptr;
 
 use alloc::vec::Vec;
 
-use crate::mm::MemoryAccess;
+use crate::mm::MemoryPermissions;
 use crate::mm::vmalloc::VirtualAddressSpace;
 
 use crate::arch::Context;
@@ -65,9 +65,9 @@ impl ProcessManager {
         self.current = self.processes.len() - 1;
         let proc = &mut self.processes[self.current];
         // Allocate text segment
-        let entry = proc.space.alloc_mapped(MemoryAccess::ReadExecute, VirtualAddress::from(0x77777000), 4096);
+        let entry = proc.space.alloc_mapped(MemoryPermissions::ReadExecute, VirtualAddress::from(0x77777000), 4096);
         // Allocate stack segment
-        proc.space.alloc_mapped(MemoryAccess::ReadWrite, VirtualAddress::from(0xFFFFF000), 4096);
+        proc.space.alloc_mapped(MemoryPermissions::ReadWrite, VirtualAddress::from(0xFF000000), 4096 * 4096);
         Context::init(&mut proc.context, VirtualAddress::from(0x1_0000_0000), VirtualAddress::from(0x77777000), proc.space.get_ttbr());
 
         entry

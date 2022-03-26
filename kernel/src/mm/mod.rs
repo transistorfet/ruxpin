@@ -8,7 +8,15 @@ pub static __KERNEL_VIRTUAL_BASE_ADDR: u64 = 0xffff_0000_0000_0000;
 
 #[allow(dead_code)]
 #[derive(Copy, Clone)]
-pub enum MemoryAccess {
+pub enum MemoryType {
+    Unallocated,
+    Existing,
+    ExistingNoCache,
+}
+
+#[allow(dead_code)]
+#[derive(Copy, Clone)]
+pub enum MemoryPermissions {
     ReadOnly,
     ReadExecute,
     ReadWrite,
