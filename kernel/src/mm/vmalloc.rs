@@ -36,10 +36,14 @@ impl VirtualAddressSpace {
         }
     }
 
-    pub fn alloc_mapped(&mut self, access: MemoryPermissions, vaddr: VirtualAddress, len: usize) -> *mut u8 {
+    //pub fn make_segment(&mut self, mtype: MemoryType, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) {
+    //    
+    //}
+
+    pub fn alloc_mapped(&mut self, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) -> *mut u8 {
         let pages = pages::get_page_area();
 
-        self.table.map_addr(MemoryType::Existing, access, vaddr, len, pages, &|pages, _, len| {
+        self.table.map_addr(MemoryType::Existing, permissions, vaddr, len, pages, &|pages, _, len| {
             if len == mmu::page_size() {
                 Some(pages.alloc_page_zeroed())
             } else {
@@ -53,9 +57,9 @@ impl VirtualAddressSpace {
         }
     }
 
-    pub fn map_on_demand(&mut self, access: MemoryPermissions, vaddr: VirtualAddress, len: usize) {
+    pub fn map_on_demand(&mut self, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) {
         let pages = pages::get_page_area();
-        self.table.map_addr(MemoryType::Unallocated, access, vaddr, len, pages, &|_, _, len| {
+        self.table.map_addr(MemoryType::Unallocated, permissions, vaddr, len, pages, &|_, _, len| {
             if len == mmu::page_size() {
                 Some(PhysicalAddress::from(0))
             } else {
@@ -64,9 +68,10 @@ impl VirtualAddressSpace {
         }).unwrap();
     }
 
-    pub fn map_existing(&mut self, access: MemoryPermissions, vaddr: VirtualAddress, paddr: PhysicalAddress, len: usize) {
+    #[allow(dead_code)]
+    pub fn map_existing(&mut self, permissions: MemoryPermissions, vaddr: VirtualAddress, paddr: PhysicalAddress, len: usize) {
         let pages = pages::get_page_area();
-        self.table.map_addr(MemoryType::Existing, access, vaddr, len, pages, &|_, current_vaddr, _| {
+        self.table.map_addr(MemoryType::Existing, permissions, vaddr, len, pages, &|_, current_vaddr, _| {
             let voffset = usize::from(current_vaddr) - usize::from(vaddr);
             Some(paddr.add(voffset))
         }).unwrap();
