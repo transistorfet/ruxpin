@@ -1,3 +1,6 @@
+use std::env;
+
 fn main() {
-    println!("cargo:rustc-link-arg=-Tsrc/kernel.ld");
+    let arch = env::var("ARCH").unwrap_or_default();
+    println!("cargo:rustc-link-arg=-Tsrc/arch/{}/kernel.ld", arch);
 }
