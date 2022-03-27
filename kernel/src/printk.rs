@@ -2,8 +2,11 @@
 use core::fmt;
 use core::fmt::Write;
 
+use crate::types::CharDriver;
+
 pub fn printk_args(args: fmt::Arguments) {
-    crate::console::get_console().write_fmt(args).unwrap()
+    let dev: &mut dyn CharDriver = &mut *crate::config::console::get_console_device();
+    dev.write_fmt(args).unwrap()
 }
 
 #[macro_export]
@@ -17,8 +20,10 @@ macro_rules! printk {
 macro_rules! printkln {
     ($($args:tt)*) => ({
         use core::fmt::Write;
+        use crate::types::CharDriver;
         $crate::printk::printk_args(format_args!($($args)*));
-        $crate::console::get_console().write_str("\n").unwrap();
+        let dev: &mut dyn CharDriver = &mut *$crate::config::console::get_console_device();
+        dev.write_str("\n").unwrap();
     })
 }
 

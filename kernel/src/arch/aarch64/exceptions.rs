@@ -44,6 +44,11 @@ const fn default_handler() {
     /* Do Nothing */
 }
 
+#[no_mangle]
+pub extern "C" fn fatal_error(elr: u64, esr: u64, far: u64) -> ! {
+    printkln!("Fatal Error: ESR: {:#x}, FAR: {:#x}, ELR: {:#x}", esr, far, elr);
+    loop {}
+}
 
 #[no_mangle]
 extern "C" fn handle_exception(_context: u64, elr: u64, esr: u64, far: u64, sp: u64) {
@@ -63,12 +68,12 @@ extern "C" fn handle_exception(_context: u64, elr: u64, esr: u64, far: u64, sp: 
                 use crate::proc::process::page_fault_handler;
                 page_fault_handler(far);
             } else {
-                crate::fatal_error(elr, esr, far);
+                fatal_error(elr, esr, far);
             }
         },
 
         _ => {
-            crate::fatal_error(elr, esr, far);
+            fatal_error(elr, esr, far);
         }
     }
 }

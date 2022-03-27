@@ -5,7 +5,8 @@ authors = ["transistor <trans@jabberwocky.ca>"]
 edition = "2021"
 
 [features]
-default = ["aarch64"]
-aarch64 = []
+default = ["config-raspberrypi3"]
+config-raspberrypi3 = ["arch-aarch64"]
+arch-aarch64 = []
 
 [dependencies]
