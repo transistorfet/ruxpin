@@ -14,7 +14,13 @@ SECTIONS
     .rodata : { *(.rodata*) }
     .got : { *(.got*) }
     .data : { *(.data*) }
-    .bss : { *(.bss*) }
+
+    .bss ALIGN(16) : {
+        __KERNEL_BSS_START = .;
+        *(.bss*)
+        . = ALIGN(16);
+        __KERNEL_BSS_END = .;
+    }
 
     __KERNEL_END_ADDR = .;
 }

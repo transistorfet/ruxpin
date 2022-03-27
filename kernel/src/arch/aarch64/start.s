@@ -2,7 +2,8 @@
 .extern kernel_start
 .extern _default_exceptions_table
 .extern _kernel_translation_table_l0
-
+.extern __KERNEL_BSS_START
+.extern __KERNEL_BSS_END
 
 .section .text._start
 
@@ -31,8 +32,6 @@ _start:
 	mov	sp, x1
 
 	bl	_setup_common_system_registers
-
-	// TODO initialize bss
 
 	// Switch to EL1
 	mov	x0, #0b00101
@@ -75,6 +74,15 @@ _start:
 	// Set up Exceptions Table for EL1
 	adrp	x1, _default_exceptions_table
 	msr	VBAR_EL1, x1
+
+	// Zero the BSS segment
+	ldr	x1, =__KERNEL_BSS_START
+	ldr	x2, =__KERNEL_BSS_END
+    L_bss_init:
+	stp	xzr, xzr, [x1]
+	add	x1, x1, #16
+	cmp	x1, x2
+	b.lt	L_bss_init
 
 	// Enter the kernel's Rust code
 	bl	kernel_start
