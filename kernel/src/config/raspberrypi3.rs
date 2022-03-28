@@ -17,14 +17,13 @@ pub mod raspberrypi;
 
 use self::arm::SystemTimer;
 use self::arm::GenericInterruptController;
-use self::raspberrypi::emmc::EmmcDevice;
 
-pub mod console {
-    pub use super::raspberrypi::console::{ConsoleDevice, get_console_device};
-}
+use self::raspberrypi::console;
+use self::raspberrypi::emmc::EmmcDevice;
 
 pub fn register_devices() -> Result<(), KernelError> {
     console::get_console_device().init()?;
+    crate::printk::set_console_device(console::get_console_device_spinlock());
 
     printkln!("starting kernel...");
 

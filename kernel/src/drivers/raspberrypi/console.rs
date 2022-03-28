@@ -6,6 +6,7 @@ use crate::arch::sync::{Spinlock, SpinlockGuard};
 use crate::errors::KernelError;
 use crate::types::{FileMode, CharDriver};
 
+
 const PL011_BASE: u64 = 0x3F20_1000;
 
 const PL011_DATA: *mut u32              = (PL011_BASE + 0x00) as *mut u32;
@@ -26,6 +27,7 @@ const PL011_CTL_TX_ENABLE: u32          = 1 << 8;
 const PL011_CTL_RX_ENABLE: u32          = 1 << 9;
 
 const PL011_LC_FIFO_ENABLE: u32         = 1 << 4;
+
 
 static DEFAULT_CONSOLE: Spinlock<ConsoleDevice> = Spinlock::new(ConsoleDevice { opens: 0 });
 
@@ -145,9 +147,7 @@ impl fmt::Write for ConsoleDevice {
         Ok(())
     }
 }
-*/
 
-/*
 pub fn get_console<'a>() -> SpinlockGuard<'a, impl fmt::Write> {
     DEFAULT_CONSOLE.lock()
 }
@@ -155,5 +155,9 @@ pub fn get_console<'a>() -> SpinlockGuard<'a, impl fmt::Write> {
 
 pub fn get_console_device<'a>() -> SpinlockGuard<'a, impl CharDriver> {
     DEFAULT_CONSOLE.lock()
+}
+
+pub fn get_console_device_spinlock() -> &'static Spinlock<dyn CharDriver> {
+    &DEFAULT_CONSOLE
 }
 

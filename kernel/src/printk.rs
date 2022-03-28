@@ -3,10 +3,21 @@ use core::fmt;
 use core::fmt::Write;
 
 use crate::types::CharDriver;
+use crate::arch::sync::Spinlock;
+
+
+static mut CONSOLE_DEVICE: Option<&Spinlock<dyn CharDriver>> = None;
+
+pub fn set_console_device(dev: &'static Spinlock<dyn CharDriver>) {
+    unsafe {
+        CONSOLE_DEVICE = Some(dev);
+    }
+}
 
 pub fn printk_args(args: fmt::Arguments) {
-    let dev: &mut dyn CharDriver = &mut *crate::config::console::get_console_device();
-    dev.write_fmt(args).unwrap()
+    unsafe {
+        CONSOLE_DEVICE.as_mut().unwrap().lock().write_fmt(args).unwrap()
+    }
 }
 
 #[macro_export]
@@ -19,11 +30,8 @@ macro_rules! printk {
 #[macro_export]
 macro_rules! printkln {
     ($($args:tt)*) => ({
-        use core::fmt::Write;
-        use crate::types::CharDriver;
         $crate::printk::printk_args(format_args!($($args)*));
-        let dev: &mut dyn CharDriver = &mut *$crate::config::console::get_console_device();
-        dev.write_str("\n").unwrap();
+        $crate::printk::printk_args(format_args!("\n"));
     })
 }
 
