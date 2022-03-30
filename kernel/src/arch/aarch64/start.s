@@ -48,15 +48,17 @@ _start:
         msr	TTBR1_EL1, x8
         msr	TTBR0_EL1, x8
         //mov	x8, #((0b101 << 32) | (0b10 << 30) | (0b00 << 14) | (64 - 42))
-        ldr	x8, =0x580100010   //(0b101 << 32) | (0b10 << 30) | ((64 - 48) << 16) | (0b00 << 14) | (64 - 48)
+        //ldr	x8, =0x585100510   //(0b101 << 32) | (0b10 << 30) | (0b01 << 26) | (0b01 << 24) | ((64 - 48) << 16) | (0b00 << 14) | (0b01 << 10) | (0b01 << 8) | (64 - 48)
+	ldr	x8, =0x5B5503510
         msr	TCR_EL1, x8
-	mov	x8, #0x00FF
+	mov	x8, #0x0477	// Set ID 1 to Device Mem nGnRE, ID 0 to Normal memory, Outer Write-Back Transient, R+W Allocate
 	msr	MAIR_EL1, x8
         isb
 
 	// Enable the MMU
         mrs	x8, SCTLR_EL1
-        orr	x8, x8, 1
+	mov	x9, #0x1005	// Enable the MMU and also Data and Instruction Caches
+        orr	x8, x8, x9
         msr	SCTLR_EL1, x8
         isb
 
