@@ -1,12 +1,12 @@
 
 use alloc::vec::Vec;
 use alloc::sync::Arc;
-use alloc::boxed::Box;
+
+use ruxpin_api::types::{FileFlags, FileAccess, Seek, UserID};
 
 use crate::misc::StrArray;
 use crate::errors::KernelError;
 use crate::arch::sync::Spinlock;
-use crate::types::{FileFlags, FileAccess, UserID};
 
 use super::types::{Filesystem, Mount, MountOperations, Vnode, VnodeOperations, FileAttributes, FilePointer};
 
@@ -139,6 +139,10 @@ impl VnodeOperations for TmpVnode {
     }
 
     fn write(&self, file: &mut FilePointer, buffer: &[u8]) -> Result<usize, KernelError> {
+        Ok(0)
+    }
+
+    fn seek(&self, file: &mut FilePointer, position: usize, whence: Seek) -> Result<usize, KernelError> {
         Ok(0)
     }
 }

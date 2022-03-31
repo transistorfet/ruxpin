@@ -1,10 +1,11 @@
 
-use core::fmt;
 use core::ptr;
+
+use ruxpin_api::types::FileFlags;
 
 use crate::arch::sync::{Spinlock, SpinlockGuard};
 use crate::errors::KernelError;
-use crate::types::{FileFlags, CharDriver};
+use crate::types::CharDriver;
 
 
 const PL011_BASE: u64 = 0x3F20_1000;
@@ -134,23 +135,6 @@ impl ConsoleDevice {
         }
     }
 }
-
-/*
-impl fmt::Write for ConsoleDevice {
-    fn write_str(&mut self, s: &str) -> fmt::Result { 
-        for ch in s.chars() {
-            self.put_char(ch as u8);
-        }
-
-        //self.flush();
-        Ok(())
-    }
-}
-
-pub fn get_console<'a>() -> SpinlockGuard<'a, impl fmt::Write> {
-    DEFAULT_CONSOLE.lock()
-}
-*/
 
 pub fn get_console_device<'a>() -> SpinlockGuard<'a, impl CharDriver> {
     DEFAULT_CONSOLE.lock()

@@ -1,10 +1,10 @@
 
 use alloc::sync::Arc;
-use alloc::boxed::Box;
+
+use ruxpin_api::types::{FileFlags, FileAccess, Seek, UserID, GroupID};
 
 use crate::errors::KernelError;
 use crate::arch::sync::Spinlock;
-use crate::types::{FileFlags, FileAccess, FileNumber, UserID, GroupID};
 
 
 pub(super) trait Filesystem: Sync + Send {
@@ -38,6 +38,9 @@ pub(super) trait VnodeOperations: Sync + Send {
     fn close(&self, file: &mut FilePointer) -> Result<(), KernelError>;
     fn read(&self, file: &mut FilePointer, buffer: &mut [u8]) -> Result<usize, KernelError>;
     fn write(&self, file: &mut FilePointer, buffer: &[u8]) -> Result<usize, KernelError>;
+    fn seek(&self, file: &mut FilePointer, position: usize, whence: Seek) -> Result<usize, KernelError>;
+    //fn readdir(&self, file: &mut FilePointer) -> Result<???, KernelError>;
+
     //int (*ioctl)(struct vfile *file, unsigned int request, void *argp, uid_t uid);
     //int (*poll)(struct vfile *file, int events);
     //offset_t (*seek)(struct vfile *file, offset_t position, int whence);

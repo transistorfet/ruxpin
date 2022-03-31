@@ -2,11 +2,12 @@
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 
-use crate::types::{FileFlags, FileAccess, FileNumber, UserID};
+use ruxpin_api::types::{FileFlags, FileAccess};
+
 use crate::errors::KernelError;
 use crate::arch::sync::Spinlock;
 
-use super::types::{Filesystem, Mount, VnodeOperations, Vnode, File, FilePointer};
+use super::types::{Filesystem, Mount, Vnode, File, FilePointer};
 
 
 static FILESYSTEMS: Spinlock<Vec<Arc<Spinlock<dyn Filesystem>>>> = Spinlock::new(Vec::new());
@@ -87,7 +88,7 @@ pub(super) fn lookup(path: &str) -> Result<Vnode, KernelError> {
     let root = ROOT_NODE.lock();
     let mut current = root.as_ref().unwrap().clone();
 
-    let mut component = "";
+    let mut component;
     let mut remaining = path;
     loop {
         if remaining == "" {

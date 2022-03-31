@@ -1,23 +1,23 @@
 
 use core::str;
 
-pub struct StrArray<const length: usize> {
+pub struct StrArray<const LENGTH: usize> {
     len: usize,
-    array: [u8; length],
+    array: [u8; LENGTH],
 }
 
-impl<const length: usize> StrArray<length> {
+impl<const LENGTH: usize> StrArray<LENGTH> {
     pub fn new() -> Self {
         Self {
             len: 0,
-            array: [0; length],
+            array: [0; LENGTH],
         }
     }
 
     pub fn copy_into(&mut self, s: &str) {
         self.len = 0;
         for ch in s.as_bytes() {
-            if self.len >= length {
+            if self.len >= LENGTH {
                 return;
             }
             self.array[self.len] = *ch;
