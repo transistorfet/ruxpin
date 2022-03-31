@@ -4,9 +4,9 @@ use alloc::sync::Arc;
 
 use ruxpin_api::types::{FileFlags, FileAccess, Seek, UserID};
 
+use crate::sync::Spinlock;
 use crate::misc::StrArray;
 use crate::errors::KernelError;
-use crate::arch::sync::Spinlock;
 
 use super::types::{Filesystem, Mount, MountOperations, Vnode, VnodeOperations, FileAttributes, FilePointer};
 

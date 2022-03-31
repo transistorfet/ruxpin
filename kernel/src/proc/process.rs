@@ -7,7 +7,7 @@ use crate::mm::MemoryPermissions;
 use crate::mm::vmalloc::VirtualAddressSpace;
 
 use crate::arch::Context;
-use crate::arch::sync::Spinlock;
+use crate::sync::Spinlock;
 use crate::arch::types::VirtualAddress;
 
 

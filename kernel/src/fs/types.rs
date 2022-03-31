@@ -3,8 +3,8 @@ use alloc::sync::Arc;
 
 use ruxpin_api::types::{FileFlags, FileAccess, Seek, UserID, GroupID};
 
+use crate::sync::Spinlock;
 use crate::errors::KernelError;
-use crate::arch::sync::Spinlock;
 
 
 pub(super) trait Filesystem: Sync + Send {

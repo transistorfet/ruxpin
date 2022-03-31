@@ -3,7 +3,7 @@ use core::ptr;
 
 use ruxpin_api::types::FileFlags;
 
-use crate::arch::sync::{Spinlock, SpinlockGuard};
+use crate::sync::{Spinlock, SpinlockGuard};
 use crate::errors::KernelError;
 use crate::types::CharDriver;
 

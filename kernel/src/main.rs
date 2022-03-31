@@ -8,6 +8,7 @@ pub mod mm;
 pub mod proc;
 pub mod config;
 pub mod misc;
+pub mod sync;
 pub mod types;
 pub mod errors;
 pub mod printk;

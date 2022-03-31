@@ -2,8 +2,8 @@
 use core::fmt;
 use core::fmt::Write;
 
+use crate::sync::Spinlock;
 use crate::types::CharDriver;
-use crate::arch::sync::Spinlock;
 
 
 static mut CONSOLE_DEVICE: Option<&Spinlock<dyn CharDriver>> = None;
