@@ -9,8 +9,11 @@ pub enum KernelError {
 
     DeviceTimeout,
     PermissionNotAllowed,
+    IOError,
 
     FileNotOpen,
-    IOError,
+    FileNotFound,
+    NotDirectory,
+    OutOfMemory,
 }
 

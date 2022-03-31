@@ -7,6 +7,7 @@ use crate::arch::types::PhysicalAddress;
 use crate::proc::process::init_processes;
 use crate::mm::kmalloc::init_kernel_heap;
 use crate::mm::vmalloc::init_virtual_memory;
+use crate::fs::vfs;
 
 
 #[path = "../drivers/arm/mod.rs"]
@@ -17,7 +18,6 @@ pub mod raspberrypi;
 
 use self::arm::SystemTimer;
 use self::arm::GenericInterruptController;
-
 use self::raspberrypi::console;
 use self::raspberrypi::emmc::EmmcDevice;
 
@@ -31,6 +31,8 @@ pub fn register_devices() -> Result<(), KernelError> {
     unsafe { init_kernel_heap(0xffff_0000_0020_0000 as *mut u8, 0xffff_0000_0100_0000 as *mut u8) };
 
     init_virtual_memory(PhysicalAddress::from(0x100_0000), PhysicalAddress::from(0x1000_0000));
+
+    vfs::initialize().unwrap();
     init_processes();
 
     let block_device: &mut dyn BlockDriver = &mut EmmcDevice{};

@@ -2,13 +2,15 @@
 #![no_main]
 #![feature(alloc_error_handler)]
 
-mod arch;
-mod mm;
-mod proc;
-mod config;
-mod types;
-mod errors;
-mod printk;
+pub mod arch;
+pub mod fs;
+pub mod mm;
+pub mod proc;
+pub mod config;
+pub mod misc;
+pub mod types;
+pub mod errors;
+pub mod printk;
 
 extern crate alloc;
 

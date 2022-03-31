@@ -18,6 +18,7 @@ pub fn printk_args(args: fmt::Arguments) {
     unsafe {
         CONSOLE_DEVICE.as_mut().unwrap().lock().write_fmt(args).unwrap()
     }
+    //crate::config::console::ConsoleDevice::new().write_fmt(args).unwrap()
 }
 
 #[macro_export]
@@ -33,6 +34,13 @@ macro_rules! printkln {
         $crate::printk::printk_args(format_args!($($args)*));
         $crate::printk::printk_args(format_args!("\n"));
     })
+}
+
+impl fmt::Write for dyn CharDriver {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.write(s.as_bytes()).unwrap();
+        Ok(())
+    }
 }
 
 pub unsafe fn printk_dump(mut ptr: *const u8, mut size: usize) {

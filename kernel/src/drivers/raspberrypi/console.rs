@@ -4,7 +4,7 @@ use core::ptr;
 
 use crate::arch::sync::{Spinlock, SpinlockGuard};
 use crate::errors::KernelError;
-use crate::types::{FileMode, CharDriver};
+use crate::types::{FileFlags, CharDriver};
 
 
 const PL011_BASE: u64 = 0x3F20_1000;
@@ -37,11 +37,11 @@ pub struct ConsoleDevice {
 
 impl CharDriver for ConsoleDevice {
     fn init(&mut self) -> Result<(), KernelError> {
-        ConsoleDevice::setup_basic_io();
+        self.setup_basic_io();
         Ok(())
     }
 
-    fn open(&mut self, _mode: FileMode) -> Result<(), KernelError> {
+    fn open(&mut self, _mode: FileFlags) -> Result<(), KernelError> {
         self.opens += 1;
         Ok(())
     }
@@ -78,7 +78,7 @@ impl CharDriver for ConsoleDevice {
 
 
 impl ConsoleDevice {
-    pub fn setup_basic_io() {
+    pub fn setup_basic_io(&self) {
         unsafe {
             // Disable UART
             ptr::write_volatile(PL011_CONTROL, 0);
@@ -121,18 +121,17 @@ impl ConsoleDevice {
         }
     }
 
+    pub fn write(&self, s: &str) {
+        for ch in s.chars() {
+            self.put_char(ch as u8);
+        }
+    }
+
     #[allow(dead_code)]
     pub fn flush(&self) {
         unsafe {
             while (ptr::read_volatile(PL011_FLAGS) & PL011_FLAGS_TX_FIFO_EMPTY) == 0 { }
         }
-    }
-}
-
-impl fmt::Write for dyn CharDriver {
-    fn write_str(&mut self, s: &str) -> fmt::Result { 
-        self.write(s.as_bytes()).unwrap();
-        Ok(())
     }
 }
 
