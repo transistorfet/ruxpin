@@ -2,7 +2,7 @@
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 
-use ruxpin_api::types::{FileFlags, FileAccess};
+use ruxpin_api::types::{FileFlags, FileAccess, Seek};
 
 use crate::sync::Spinlock;
 use crate::errors::KernelError;
@@ -21,7 +21,13 @@ pub fn initialize() -> Result<(), KernelError> {
 
     // TODO this is a temporary test
     mount("/", "tmpfs").unwrap();
-    create("test", FileAccess::Directory).unwrap();
+    open("test", FileFlags::Create, FileAccess::Directory.and(FileAccess::DefaultDir)).unwrap();
+    let file = open("test/file.txt", FileFlags::Create, FileAccess::DefaultFile).unwrap();
+    write(file.clone(), b"This is a test").unwrap();
+    seek(file.clone(), 0, Seek::FromStart).unwrap();
+    let mut buffer = [0; 100];
+    let n = read(file.clone(), &mut buffer).unwrap();
+    crate::printkln!("Read file {}: {}", n, core::str::from_utf8(&buffer).unwrap());
 
     Ok(())
 }
@@ -46,11 +52,15 @@ pub fn mount(path: &str, fstype: &str) -> Result<(), KernelError> {
     Err(KernelError::OutOfMemory)
 }
 
-pub fn open(path: &str, mode: FileFlags) -> Result<File, KernelError> {
-    let vnode = lookup(path)?;
+pub fn open(path: &str, flags: FileFlags, access: FileAccess) -> Result<File, KernelError> {
+    let vnode = if flags.is_set(FileFlags::Create) {
+        create(path, access)?
+    } else {
+        lookup(path)?
+    };
 
     let mut file = FilePointer::new(vnode.clone());
-    vnode.lock().open(&mut file, mode)?;
+    vnode.lock().open(&mut file, flags)?;
 
     Ok(Arc::new(Spinlock::new(file)))
 }
@@ -76,11 +86,18 @@ pub fn write(file: File, buffer: &[u8]) -> Result<usize, KernelError> {
     Ok(result)
 }
 
+pub fn seek(file: File, offset: usize, whence: Seek) -> Result<usize, KernelError> {
+    let mut fptr = file.lock();
+    let vnode = fptr.vnode.clone();
+    let result = vnode.lock().seek(&mut *fptr, offset, whence)?;
+    Ok(result)
+}
 
-pub(super) fn create(path: &str, mode: FileAccess) -> Result<Vnode, KernelError> {
+
+pub(super) fn create(path: &str, access: FileAccess) -> Result<Vnode, KernelError> {
     let (dirname, filename) = get_path_component_reverse(path);
     let vnode = lookup(dirname)?;
-    let newvnode = vnode.lock().create(filename, mode, 0)?;
+    let newvnode = vnode.lock().create(filename, access, 0)?;
     Ok(newvnode)
 }
 

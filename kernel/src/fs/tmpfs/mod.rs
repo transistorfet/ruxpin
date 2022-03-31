@@ -80,8 +80,8 @@ impl MountOperations for TmpMount {
 }
 
 impl TmpDirEntry {
-    pub fn new(name: &str, mode: FileAccess) -> Self {
-        let vnode = if mode.is_dir() {
+    pub fn new(name: &str, access: FileAccess) -> Self {
+        let vnode = if access.is_dir() {
             Arc::new(Spinlock::new(TmpVnode::new_directory()))
         } else {
             Arc::new(Spinlock::new(TmpVnode::new_file()))
@@ -97,10 +97,10 @@ impl TmpDirEntry {
 }
 
 impl VnodeOperations for TmpVnode {
-    fn create(&mut self, filename: &str, mode: FileAccess, uid: UserID) -> Result<Vnode, KernelError> {
+    fn create(&mut self, filename: &str, access: FileAccess, uid: UserID) -> Result<Vnode, KernelError> {
         let contents = self.as_dir()?;
 
-        let entry = TmpDirEntry::new(filename, mode);
+        let entry = TmpDirEntry::new(filename, access);
         let vnode = entry.vnode.clone();
         contents.push(entry);
         Ok(vnode)
@@ -118,7 +118,7 @@ impl VnodeOperations for TmpVnode {
     }
 
     fn attributes<'a>(&'a mut self) -> Result<&'a FileAttributes, KernelError> {
-        Ok(&self.attrs)
+        Ok(&mut self.attrs)
     }
 
     //fn attributes_mut<'a>(&'a mut self) -> Result<&'a mut FileAttributes, KernelError> {
@@ -126,24 +126,57 @@ impl VnodeOperations for TmpVnode {
     //    Ok(&mut self.attrs)
     //}
 
-    fn open(&self, file: &mut FilePointer, mode: FileFlags) -> Result<(), KernelError> {
+    fn open(&mut self, _file: &mut FilePointer, _flags: FileFlags) -> Result<(), KernelError> {
         Ok(())
     }
 
-    fn close(&self, file: &mut FilePointer) -> Result<(), KernelError> {
+    fn close(&mut self, _file: &mut FilePointer) -> Result<(), KernelError> {
         Ok(())
     }
 
-    fn read(&self, file: &mut FilePointer, buffer: &mut [u8]) -> Result<usize, KernelError> {
-        Ok(0)
+    fn read(&mut self, file: &mut FilePointer, buffer: &mut [u8]) -> Result<usize, KernelError> {
+        let data = self.as_file()?;
+
+        let start = file.position;
+        for byte in buffer {
+            if file.position >= data.len() {
+                break;
+            }
+            *byte = data[file.position];
+            file.position += 1;
+        }
+        Ok(file.position - start)
     }
 
-    fn write(&self, file: &mut FilePointer, buffer: &[u8]) -> Result<usize, KernelError> {
-        Ok(0)
+    fn write(&mut self, file: &mut FilePointer, buffer: &[u8]) -> Result<usize, KernelError> {
+        let data = self.as_file()?;
+
+        let start = file.position;
+        for byte in buffer {
+            if file.position >= data.len() {
+                for i in data.len()..=file.position {
+                    data.push(0);
+                }
+            }
+            data[file.position] = *byte;
+            file.position += 1;
+        }
+        Ok(file.position - start)
     }
 
-    fn seek(&self, file: &mut FilePointer, position: usize, whence: Seek) -> Result<usize, KernelError> {
-        Ok(0)
+    fn seek(&mut self, file: &mut FilePointer, offset: usize, whence: Seek) -> Result<usize, KernelError> {
+        let position = match whence {
+            Seek::FromStart => offset,
+            Seek::FromCurrent => file.position + offset,
+            Seek::FromEnd => self.attrs.size + offset,
+        };
+
+        if position >= self.attrs.size {
+            file.position = self.attrs.size;
+        } else {
+            file.position = position;
+        }
+        Ok(file.position)
     }
 }
 
@@ -167,6 +200,14 @@ impl TmpVnode {
             Ok(list)
         } else {
             Err(KernelError::NotDirectory)
+        }
+    }
+
+    pub fn as_file<'a>(&'a mut self) -> Result<&'a mut Vec<u8>, KernelError> {
+        if let TmpVnodeContents::File(data) = &mut self.contents {
+            Ok(data)
+        } else {
+            Err(KernelError::NotFile)
         }
     }
 }

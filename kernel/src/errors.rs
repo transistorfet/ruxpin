@@ -13,6 +13,7 @@ pub enum KernelError {
 
     FileNotOpen,
     FileNotFound,
+    NotFile,
     NotDirectory,
     OutOfMemory,
 }
