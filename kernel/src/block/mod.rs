@@ -7,6 +7,7 @@ use ruxpin_api::types::{OpenFlags, DeviceID, DriverID, SubDeviceID};
 use crate::sync::Spinlock;
 use crate::errors::KernelError;
 
+//mod bufcache;
 
 pub struct BlockDriver {
     prefix: &'static str,
@@ -37,20 +38,35 @@ pub fn register_block_driver(prefix: &'static str) -> Result<DriverID, KernelErr
     Ok(driver_id)
 }
 
-pub fn read(device: DeviceID, buffer: &mut [u8], offset: usize) -> Result<usize, KernelError> {
-    let DeviceID(driver_id, subdevice_id) = device;
+pub fn open(device_id: DeviceID, mode: OpenFlags) -> Result<(), KernelError> {
     let mut drivers_list = BLOCK_DRIVERS.lock();
-    let driver = drivers_list.get_mut(driver_id as usize).ok_or(KernelError::NoSuchDevice)?;
-    let device = driver.devices.get_mut(subdevice_id as usize).ok_or(KernelError::NoSuchDevice)?;
+    let device = get_device(&mut *drivers_list, device_id)?;
+    device.dev.open(mode)
+}
+
+pub fn close(device_id: DeviceID) -> Result<(), KernelError> {
+    let mut drivers_list = BLOCK_DRIVERS.lock();
+    let device = get_device(&mut *drivers_list, device_id)?;
+    device.dev.close()
+}
+
+pub fn read(device_id: DeviceID, buffer: &mut [u8], offset: usize) -> Result<usize, KernelError> {
+    let mut drivers_list = BLOCK_DRIVERS.lock();
+    let device = get_device(&mut *drivers_list, device_id)?;
     device.dev.read(buffer, offset)
 }
 
-pub fn write(device: DeviceID, buffer: &[u8], offset: usize) -> Result<usize, KernelError> {
-    let DeviceID(driver_id, subdevice_id) = device;
+pub fn write(device_id: DeviceID, buffer: &[u8], offset: usize) -> Result<usize, KernelError> {
     let mut drivers_list = BLOCK_DRIVERS.lock();
+    let device = get_device(&mut *drivers_list, device_id)?;
+    device.dev.write(buffer, offset)
+}
+
+fn get_device(drivers_list: &mut Vec<BlockDriver>, device_id: DeviceID) -> Result<&mut BlockDevice, KernelError> {
+    let DeviceID(driver_id, subdevice_id) = device_id;
     let driver = drivers_list.get_mut(driver_id as usize).ok_or(KernelError::NoSuchDevice)?;
     let device = driver.devices.get_mut(subdevice_id as usize).ok_or(KernelError::NoSuchDevice)?;
-    device.dev.write(buffer, offset)
+    Ok(device)
 }
 
 

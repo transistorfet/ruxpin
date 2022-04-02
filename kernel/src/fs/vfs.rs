@@ -124,9 +124,7 @@ pub(super) fn lookup(path: &str) -> Result<Vnode, KernelError> {
     let mut remaining = path;
     loop {
         let mounted_root_node = current.lock().get_mount_mut().ok().map(|mount| if let Some(mount) = mount { Some(mount.clone()) } else { None }).flatten();
-        let mut mounted_parent_node = None;
         if mounted_root_node.is_some() {
-            mounted_parent_node = Some(current);
             current = mounted_root_node.unwrap();
         }
 
