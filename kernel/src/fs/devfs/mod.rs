@@ -4,6 +4,7 @@ use alloc::sync::Arc;
 
 use ruxpin_api::types::{OpenFlags, FileAccess, Seek, UserID, DeviceID};
 
+use crate::tty;
 use crate::sync::Spinlock;
 use crate::misc::StrArray;
 use crate::errors::KernelError;
@@ -11,36 +12,40 @@ use crate::errors::KernelError;
 use super::types::{Filesystem, Mount, MountOperations, Vnode, VnodeOperations, FileAttributes, FilePointer, DirEntry};
 
 
-const TMPFS_MAX_FILENAME: usize = 32;
+const DEVFS_MAX_FILENAME: usize = 32;
 
-pub struct TmpFilesystem {
+pub struct DevFilesystem {
     
 }
 
-pub struct TmpMount {
+pub struct DevMount {
     root_node: Vnode,
     mounted_on: Option<Vnode>,
 }
 
-pub struct TmpDirEntry {
-    name: StrArray<TMPFS_MAX_FILENAME>,
+pub struct DevDirEntry {
+    name: StrArray<DEVFS_MAX_FILENAME>,
     vnode: Vnode,
 }
 
-pub struct TmpVnodeFile {
+pub struct DevVnodeDirectory {
     attrs: FileAttributes,
-    contents: Vec<u8>,
+    contents: Vec<DevDirEntry>,
 }
 
-pub struct TmpVnodeDirectory {
+pub struct DevVnodeRootDirectory {
     attrs: FileAttributes,
-    contents: Vec<TmpDirEntry>,
-    mounted_vnode: Option<Vnode>,
 }
 
-impl Filesystem for TmpFilesystem {
+pub struct DevVnodeCharDevice {
+    attrs: FileAttributes,
+    device_id: DeviceID,
+}
+
+
+impl Filesystem for DevFilesystem {
     fn fstype(&self) -> &'static str {
-        "tmpfs"
+        "devfs"
     }
 
     fn init(&self) -> Result<(), KernelError> {
@@ -49,9 +54,9 @@ impl Filesystem for TmpFilesystem {
     }
 
     fn mount(&mut self, parent: Option<Vnode>, device_id: Option<DeviceID>) -> Result<Mount, KernelError> {
-        let root_node = Arc::new(Spinlock::new(TmpVnodeDirectory::new()));
+        let root_node = Arc::new(Spinlock::new(DevVnodeRootDirectory::new()));
 
-        let mount = Arc::new(Spinlock::new(TmpMount {
+        let mount = Arc::new(Spinlock::new(DevMount {
             root_node,
             mounted_on: parent,
         }));
@@ -60,7 +65,7 @@ impl Filesystem for TmpFilesystem {
     }
 }
 
-impl TmpFilesystem {
+impl DevFilesystem {
     pub fn new() -> Self {
         Self {
 
@@ -68,7 +73,7 @@ impl TmpFilesystem {
     }
 }
 
-impl MountOperations for TmpMount {
+impl MountOperations for DevMount {
     fn get_root(&self) -> Result<Vnode, KernelError> {
         Ok(self.root_node.clone())
     }
@@ -82,13 +87,9 @@ impl MountOperations for TmpMount {
     }
 }
 
-impl VnodeOperations for TmpVnodeDirectory {
-    fn get_mount_mut<'a>(&'a mut self) -> Result<&'a mut Option<Vnode>, KernelError> {
-        Ok(&mut self.mounted_vnode)
-    }
-
+impl VnodeOperations for DevVnodeDirectory {
     fn create(&mut self, filename: &str, access: FileAccess, uid: UserID) -> Result<Vnode, KernelError> {
-        let entry = TmpDirEntry::new(filename, access);
+        let entry = DevDirEntry::try_new(filename, access)?;
         let vnode = entry.vnode.clone();
         self.contents.push(entry);
         Ok(vnode)
@@ -106,11 +107,6 @@ impl VnodeOperations for TmpVnodeDirectory {
     fn attributes<'a>(&'a mut self) -> Result<&'a FileAttributes, KernelError> {
         Ok(&mut self.attrs)
     }
-
-    //fn attributes_mut<'a>(&'a mut self) -> Result<&'a mut FileAttributes, KernelError> {
-    //    // TODO this isn't right because you need to update
-    //    Ok(&mut self.attrs)
-    //}
 
     fn open(&mut self, _file: &mut FilePointer, _flags: OpenFlags) -> Result<(), KernelError> {
         Ok(())
@@ -136,7 +132,13 @@ impl VnodeOperations for TmpVnodeDirectory {
     }
 }
 
-impl VnodeOperations for TmpVnodeFile {
+impl VnodeOperations for DevVnodeRootDirectory {
+    fn lookup(&mut self, filename: &str) -> Result<Vnode, KernelError> {
+        // TODO will need to support block devices as well
+        let device_id = tty::lookup_device(filename)?;
+        Ok(Arc::new(Spinlock::new(DevVnodeCharDevice::new(device_id))))
+    }
+
     fn attributes<'a>(&'a mut self) -> Result<&'a FileAttributes, KernelError> {
         Ok(&mut self.attrs)
     }
@@ -154,30 +156,30 @@ impl VnodeOperations for TmpVnodeFile {
         Ok(())
     }
 
+    //fn readdir(&mut self, file: &mut FilePointer) -> Result<Option<DirEntry>, KernelError> {
+    //
+    //}
+}
+
+impl VnodeOperations for DevVnodeCharDevice {
+    fn open(&mut self, _file: &mut FilePointer, flags: OpenFlags) -> Result<(), KernelError> {
+        tty::open(self.device_id, flags)
+    }
+
+    fn close(&mut self, _file: &mut FilePointer) -> Result<(), KernelError> {
+        tty::close(self.device_id)
+    }
+
     fn read(&mut self, file: &mut FilePointer, buffer: &mut [u8]) -> Result<usize, KernelError> {
-        let start = file.position;
-        for byte in buffer {
-            if file.position >= self.contents.len() {
-                break;
-            }
-            *byte = self.contents[file.position];
-            file.position += 1;
-        }
-        Ok(file.position - start)
+        let nbytes = tty::read(self.device_id, buffer)?;
+        file.position += nbytes;
+        Ok(nbytes)
     }
 
     fn write(&mut self, file: &mut FilePointer, buffer: &[u8]) -> Result<usize, KernelError> {
-        let start = file.position;
-        for byte in buffer {
-            if file.position >= self.contents.len() {
-                for _ in self.contents.len()..=file.position {
-                    self.contents.push(0);
-                }
-            }
-            self.contents[file.position] = *byte;
-            file.position += 1;
-        }
-        Ok(file.position - start)
+        let nbytes = tty::write(self.device_id, buffer)?;
+        file.position += nbytes;
+        Ok(nbytes)
     }
 
     fn seek(&mut self, file: &mut FilePointer, offset: usize, whence: Seek) -> Result<usize, KernelError> {
@@ -196,37 +198,46 @@ impl VnodeOperations for TmpVnodeFile {
     }
 }
 
-impl TmpDirEntry {
-    pub fn new(name: &str, access: FileAccess) -> Self {
-        let vnode: Vnode = if access.is_dir() {
-            Arc::new(Spinlock::new(TmpVnodeDirectory::new()))
+impl DevVnodeDirectory {
+    pub fn new() -> Self {
+        Self {
+            attrs: Default::default(),
+            contents: Vec::new(),
+        }
+    }
+}
+
+impl DevVnodeRootDirectory {
+    pub fn new() -> Self {
+        Self {
+            attrs: Default::default(),
+        }
+    }
+}
+
+impl DevVnodeCharDevice {
+    pub fn new(device_id: DeviceID) -> Self {
+        Self {
+            attrs: Default::default(),
+            device_id,
+        }
+    }
+}
+
+impl DevDirEntry {
+    pub fn try_new(name: &str, access: FileAccess) -> Result<Self, KernelError> {
+        let vnode = if access.is_dir() {
+            Arc::new(Spinlock::new(DevVnodeDirectory::new()))
         } else {
-            Arc::new(Spinlock::new(TmpVnodeFile::new()))
+            return Err(KernelError::OperationNotPermitted);
         };
 
-        Self {
-            name: name.try_into().unwrap(),
+        let mut array = StrArray::new();
+        array.copy_into(name);
+        Ok(Self {
+            name: array,
             vnode,
-        }
-    }
-}
-
-impl TmpVnodeDirectory {
-    pub fn new() -> Self {
-        Self {
-            attrs: Default::default(),
-            contents: Vec::new(),
-            mounted_vnode: None,
-        }
-    }
-}
-
-impl TmpVnodeFile {
-    pub fn new() -> Self {
-        Self {
-            attrs: Default::default(),
-            contents: Vec::new(),
-        }
+        })
     }
 }
 

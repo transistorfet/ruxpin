@@ -30,25 +30,55 @@ pub fn register_tty_driver(prefix: &'static str) -> Result<DriverID, KernelError
 }
 
 pub fn register_tty_device(driver_id: DriverID, dev: Box<dyn CharOperations>) -> Result<SubDeviceID, KernelError> {
-    let mut driver_list = TTY_DRIVERS.lock();
-    let driver = driver_list.get_mut(driver_id as usize).ok_or(KernelError::NoSuchDevice)?;
+    let mut drivers_list = TTY_DRIVERS.lock();
+    let driver = drivers_list.get_mut(driver_id as usize).ok_or(KernelError::NoSuchDevice)?;
     driver.add_device(dev)
 }
 
-pub fn read(device: DeviceID, buffer: &mut [u8]) -> Result<usize, KernelError> {
-    let DeviceID(driver_id, subdevice_id) = device;
+pub fn lookup_device(name: &str) -> Result<DeviceID, KernelError> {
     let mut drivers_list = TTY_DRIVERS.lock();
-    let driver = drivers_list.get_mut(driver_id as usize).ok_or(KernelError::NoSuchDevice)?;
-    let device = driver.devices.get_mut(subdevice_id as usize).ok_or(KernelError::NoSuchDevice)?;
+    for (driver_id, driver) in drivers_list.iter().enumerate() {
+        if driver.prefix == &name[..driver.prefix.len()] {
+            let subdevice_id = name[driver.prefix.len()..].parse::<SubDeviceID>().map_err(|_| KernelError::NoSuchDevice)?;
+            if (subdevice_id as usize) < driver.devices.len() {
+                return Ok(DeviceID(driver_id as DriverID, subdevice_id));
+            }
+            break;
+        }
+    }
+    Err(KernelError::NoSuchDevice)
+}
+
+
+pub fn open(device_id: DeviceID, mode: OpenFlags) -> Result<(), KernelError> {
+    let mut drivers_list = TTY_DRIVERS.lock();
+    let device = get_device(&mut *drivers_list, device_id)?;
+    device.dev.open(mode)
+}
+
+pub fn close(device_id: DeviceID) -> Result<(), KernelError> {
+    let mut drivers_list = TTY_DRIVERS.lock();
+    let device = get_device(&mut *drivers_list, device_id)?;
+    device.dev.close()
+}
+
+pub fn read(device_id: DeviceID, buffer: &mut [u8]) -> Result<usize, KernelError> {
+    let mut drivers_list = TTY_DRIVERS.lock();
+    let device = get_device(&mut *drivers_list, device_id)?;
     device.dev.read(buffer)
 }
 
-pub fn write(device: DeviceID, buffer: &[u8]) -> Result<usize, KernelError> {
-    let DeviceID(driver_id, subdevice_id) = device;
+pub fn write(device_id: DeviceID, buffer: &[u8]) -> Result<usize, KernelError> {
     let mut drivers_list = TTY_DRIVERS.lock();
+    let device = get_device(&mut *drivers_list, device_id)?;
+    device.dev.write(buffer)
+}
+
+fn get_device(drivers_list: &mut Vec<CharDriver>, device_id: DeviceID) -> Result<&mut TtyDevice, KernelError> {
+    let DeviceID(driver_id, subdevice_id) = device_id;
     let driver = drivers_list.get_mut(driver_id as usize).ok_or(KernelError::NoSuchDevice)?;
     let device = driver.devices.get_mut(subdevice_id as usize).ok_or(KernelError::NoSuchDevice)?;
-    device.dev.write(buffer)
+    Ok(device)
 }
 
 

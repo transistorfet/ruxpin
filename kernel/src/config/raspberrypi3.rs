@@ -9,7 +9,7 @@ use crate::mm::kmalloc::init_kernel_heap;
 use crate::mm::vmalloc::init_virtual_memory;
 use crate::fs::vfs;
 
-use ruxpin_api::types::OpenFlags;
+use ruxpin_api::types::{OpenFlags, FileAccess};
 
 #[path = "../drivers/arm/mod.rs"]
 pub mod arm;
@@ -36,6 +36,10 @@ pub fn register_devices() -> Result<(), KernelError> {
     init_processes();
 
     console::init()?;
+
+    let mut file = vfs::open("/dev/console0", OpenFlags::ReadOnly, FileAccess::DefaultFile).unwrap();
+    vfs::write(&mut file, b"the device file can write\n").unwrap();
+    vfs::close(&mut file).unwrap();
 
     let block_device: &mut dyn BlockOperations = &mut EmmcDevice{};
     printkln!("emmc: initializing");

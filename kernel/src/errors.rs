@@ -20,6 +20,6 @@ pub enum KernelError {
     NoSuchDevice,
     NotFile,
     NotDirectory,
-    NotSupported,
+    NoSuchFilesystem,
 }
 

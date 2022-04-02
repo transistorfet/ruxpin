@@ -17,7 +17,7 @@ pub struct DirEntry {
 pub(super) trait Filesystem: Sync + Send {
     fn fstype(&self) -> &'static str; 
     fn init(&self) -> Result<(), KernelError>;
-    fn mount(&mut self) -> Result<Mount, KernelError>;
+    fn mount(&mut self, parent: Option<Vnode>, device_id: Option<DeviceID>) -> Result<Mount, KernelError>;
 }
 
 pub(super) trait MountOperations: Sync + Send {
@@ -27,6 +27,10 @@ pub(super) trait MountOperations: Sync + Send {
 }
 
 pub(super) trait VnodeOperations: Sync + Send {
+    fn get_mount_mut<'a>(&'a mut self) -> Result<&'a mut Option<Vnode>, KernelError> {
+        Err(KernelError::OperationNotPermitted)
+    }
+
     fn create(&mut self, _filename: &str, _access: FileAccess, _uid: UserID) -> Result<Vnode, KernelError> {
         Err(KernelError::OperationNotPermitted)
     }
