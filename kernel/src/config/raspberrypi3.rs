@@ -1,7 +1,7 @@
  
 use crate::printkln;
 use crate::errors::KernelError;
-use crate::types::{CharDriver, BlockDriver};
+use crate::block::BlockOperations;
 use crate::arch::types::PhysicalAddress;
 
 use crate::proc::process::init_processes;
@@ -9,6 +9,7 @@ use crate::mm::kmalloc::init_kernel_heap;
 use crate::mm::vmalloc::init_virtual_memory;
 use crate::fs::vfs;
 
+use ruxpin_api::types::OpenFlags;
 
 #[path = "../drivers/arm/mod.rs"]
 pub mod arm;
@@ -22,8 +23,7 @@ use self::raspberrypi::console;
 use self::raspberrypi::emmc::EmmcDevice;
 
 pub fn register_devices() -> Result<(), KernelError> {
-    console::get_console_device().init()?;
-    crate::printk::set_console_device(console::get_console_device_spinlock());
+    console::set_safe_console();
 
     printkln!("starting kernel...");
 
@@ -35,9 +35,11 @@ pub fn register_devices() -> Result<(), KernelError> {
     vfs::initialize().unwrap();
     init_processes();
 
-    let block_device: &mut dyn BlockDriver = &mut EmmcDevice{};
+    console::init()?;
+
+    let block_device: &mut dyn BlockOperations = &mut EmmcDevice{};
     printkln!("emmc: initializing");
-    block_device.init().unwrap();
+    block_device.open(OpenFlags::ReadOnly).unwrap();
     let mut data = [0; 1024];
     block_device.read(&mut data, 0).unwrap();
     unsafe {

@@ -2,7 +2,7 @@
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 
-use ruxpin_api::types::{FileFlags, FileAccess, Seek};
+use ruxpin_api::types::{OpenFlags, FileAccess, Seek};
 
 use crate::sync::Spinlock;
 use crate::errors::KernelError;
@@ -21,8 +21,8 @@ pub fn initialize() -> Result<(), KernelError> {
 
     // TODO this is a temporary test
     mount("/", "tmpfs").unwrap();
-    open("test", FileFlags::Create, FileAccess::Directory.and(FileAccess::DefaultDir)).unwrap();
-    let file = open("test/file.txt", FileFlags::Create, FileAccess::DefaultFile).unwrap();
+    open("test", OpenFlags::Create, FileAccess::Directory.and(FileAccess::DefaultDir)).unwrap();
+    let file = open("test/file.txt", OpenFlags::Create, FileAccess::DefaultFile).unwrap();
     write(file.clone(), b"This is a test").unwrap();
     seek(file.clone(), 0, Seek::FromStart).unwrap();
     let mut buffer = [0; 100];
@@ -52,8 +52,8 @@ pub fn mount(path: &str, fstype: &str) -> Result<(), KernelError> {
     Err(KernelError::OutOfMemory)
 }
 
-pub fn open(path: &str, flags: FileFlags, access: FileAccess) -> Result<File, KernelError> {
-    let vnode = if flags.is_set(FileFlags::Create) {
+pub fn open(path: &str, flags: OpenFlags, access: FileAccess) -> Result<File, KernelError> {
+    let vnode = if flags.is_set(OpenFlags::Create) {
         create(path, access)?
     } else {
         lookup(path)?

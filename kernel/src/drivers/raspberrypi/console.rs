@@ -1,48 +1,58 @@
 
 use core::ptr;
 
-use ruxpin_api::types::FileFlags;
+use alloc::boxed::Box;
 
-use crate::sync::{Spinlock, SpinlockGuard};
+use ruxpin_api::types::{OpenFlags, DeviceID};
+
 use crate::errors::KernelError;
-use crate::types::CharDriver;
+use crate::tty::{self, CharOperations};
+use crate::printk::set_console_device;
+
+static mut SAFE_CONSOLE: PL011Device = PL011Device { opens: 0 };
+static mut NORMAL_CONSOLE: DeviceID = DeviceID(0, 0);
 
 
-const PL011_BASE: u64 = 0x3F20_1000;
+pub fn init() -> Result<(), KernelError> {
+    let driver_id = tty::register_tty_driver("console")?;
+    let console = PL011Device { opens: 0 };
+    console.init();
+    let subdevice_id = tty::register_tty_device(driver_id, Box::new(console))?;
+    set_normal_console(DeviceID(driver_id, subdevice_id));
 
-const PL011_DATA: *mut u32              = (PL011_BASE + 0x00) as *mut u32;
-const PL011_FLAGS: *mut u32             = (PL011_BASE + 0x18) as *mut u32;
-const PL011_BAUD_INTEGER: *mut u32      = (PL011_BASE + 0x24) as *mut u32;
-const PL011_BAUD_FRACTIONAL: *mut u32   = (PL011_BASE + 0x28) as *mut u32;
-const PL011_LINE_CONTROL: *mut u32      = (PL011_BASE + 0x2C) as *mut u32;
-const PL011_CONTROL: *mut u32           = (PL011_BASE + 0x30) as *mut u32;
-const PL011_INTERRUPT_MASK: *mut u32    = (PL011_BASE + 0x38) as *mut u32;
-const PL011_INTERRUPT_CLEAR: *mut u32   = (PL011_BASE + 0x44) as *mut u32;
+    Ok(())
+}
 
-const PL011_FLAGS_RX_FIFO_EMPTY: u32    = 1 << 4;
-const PL011_FLAGS_TX_FIFO_FULL: u32     = 1 << 5;
-const PL011_FLAGS_TX_FIFO_EMPTY: u32    = 1 << 7;
+pub fn set_safe_console() {
+    set_console_device(safe_console_print);
+}
 
-const PL011_CTL_UART_ENABLE: u32        = 1 << 0;
-const PL011_CTL_TX_ENABLE: u32          = 1 << 8;
-const PL011_CTL_RX_ENABLE: u32          = 1 << 9;
+fn safe_console_print(s: &str) {
+    unsafe {
+        SAFE_CONSOLE.print(s);
+    }
+}
 
-const PL011_LC_FIFO_ENABLE: u32         = 1 << 4;
+pub fn set_normal_console(device: DeviceID) {
+    unsafe {
+        NORMAL_CONSOLE = device;
+    }
+    set_console_device(normal_console_print);
+}
+
+fn normal_console_print(s: &str) {
+    unsafe {
+        tty::write(NORMAL_CONSOLE, s.as_bytes()).unwrap();
+    }
+}
 
 
-static DEFAULT_CONSOLE: Spinlock<ConsoleDevice> = Spinlock::new(ConsoleDevice { opens: 0 });
-
-pub struct ConsoleDevice {
+pub struct PL011Device {
     opens: u32,
 }
 
-impl CharDriver for ConsoleDevice {
-    fn init(&mut self) -> Result<(), KernelError> {
-        self.setup_basic_io();
-        Ok(())
-    }
-
-    fn open(&mut self, _mode: FileFlags) -> Result<(), KernelError> {
+impl CharOperations for PL011Device {
+    fn open(&mut self, _mode: OpenFlags) -> Result<(), KernelError> {
         self.opens += 1;
         Ok(())
     }
@@ -78,8 +88,30 @@ impl CharDriver for ConsoleDevice {
 }
 
 
-impl ConsoleDevice {
-    pub fn setup_basic_io(&self) {
+const PL011_BASE: u64 = 0x3F20_1000;
+
+const PL011_DATA: *mut u32              = (PL011_BASE + 0x00) as *mut u32;
+const PL011_FLAGS: *mut u32             = (PL011_BASE + 0x18) as *mut u32;
+const PL011_BAUD_INTEGER: *mut u32      = (PL011_BASE + 0x24) as *mut u32;
+const PL011_BAUD_FRACTIONAL: *mut u32   = (PL011_BASE + 0x28) as *mut u32;
+const PL011_LINE_CONTROL: *mut u32      = (PL011_BASE + 0x2C) as *mut u32;
+const PL011_CONTROL: *mut u32           = (PL011_BASE + 0x30) as *mut u32;
+const PL011_INTERRUPT_MASK: *mut u32    = (PL011_BASE + 0x38) as *mut u32;
+const PL011_INTERRUPT_CLEAR: *mut u32   = (PL011_BASE + 0x44) as *mut u32;
+
+const PL011_FLAGS_RX_FIFO_EMPTY: u32    = 1 << 4;
+const PL011_FLAGS_TX_FIFO_FULL: u32     = 1 << 5;
+const PL011_FLAGS_TX_FIFO_EMPTY: u32    = 1 << 7;
+
+const PL011_CTL_UART_ENABLE: u32        = 1 << 0;
+const PL011_CTL_TX_ENABLE: u32          = 1 << 8;
+const PL011_CTL_RX_ENABLE: u32          = 1 << 9;
+
+const PL011_LC_FIFO_ENABLE: u32         = 1 << 4;
+
+
+impl PL011Device {
+    pub fn init(&self) {
         unsafe {
             // Disable UART
             ptr::write_volatile(PL011_CONTROL, 0);
@@ -122,7 +154,7 @@ impl ConsoleDevice {
         }
     }
 
-    pub fn write(&self, s: &str) {
+    pub fn print(&self, s: &str) {
         for ch in s.chars() {
             self.put_char(ch as u8);
         }
@@ -134,13 +166,5 @@ impl ConsoleDevice {
             while (ptr::read_volatile(PL011_FLAGS) & PL011_FLAGS_TX_FIFO_EMPTY) == 0 { }
         }
     }
-}
-
-pub fn get_console_device<'a>() -> SpinlockGuard<'a, impl CharDriver> {
-    DEFAULT_CONSOLE.lock()
-}
-
-pub fn get_console_device_spinlock() -> &'static Spinlock<dyn CharDriver> {
-    &DEFAULT_CONSOLE
 }
 

@@ -2,14 +2,33 @@
 use core::ptr;
 
 use crate::printkln;
-use crate::types::BlockDriver;
 use crate::errors::KernelError;
+use crate::block::BlockOperations;
+
+use ruxpin_api::types::OpenFlags;
 
 //use super::gpio;
 
 
-const MMC_RESP_COMMAND_COMPLETE: u32     = 1 << 31;
+impl BlockOperations for EmmcDevice {
+    fn open(&mut self, _mode: OpenFlags) -> Result<(), KernelError> {
+        EmmcDevice::init()
+    }
 
+    fn close(&mut self) -> Result<(), KernelError> {
+        Ok(())
+    }
+
+    fn read(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, KernelError> {
+        EmmcDevice::read_data(buffer, offset)
+    }
+
+    fn write(&mut self, _buffer: &[u8], _offset: usize) -> Result<usize, KernelError> {
+        Err(KernelError::PermissionNotAllowed)
+    }
+}
+
+const MMC_RESP_COMMAND_COMPLETE: u32     = 1 << 31;
 
 #[derive(Debug)]
 enum Command {
@@ -48,7 +67,7 @@ impl EmmcDevice {
         Ok(())
     }
 
-    pub fn read_data(buffer: &mut [u8], offset: usize) -> Result<(), KernelError> {
+    pub fn read_data(buffer: &mut [u8], offset: usize) -> Result<usize, KernelError> {
         let blocksize = 512;
         let mut i = 0;
         let mut len = buffer.len();
@@ -61,7 +80,7 @@ impl EmmcDevice {
 
         EmmcHost::send_command(Command::StopTransmission, 0)?;
 
-        Ok(())
+        Ok(i)
     }
 
     fn read_segment(offset: usize, buffer: &mut [u8]) -> Result<(), KernelError> {
@@ -73,21 +92,6 @@ impl EmmcDevice {
         Ok(())
     }
 }
-
-impl BlockDriver for EmmcDevice {
-    fn init(&self) -> Result<(), KernelError> {
-        EmmcDevice::init()
-    }
-
-    fn read(&self, buffer: &mut [u8], offset: usize) -> Result<(), KernelError> {
-        EmmcDevice::read_data(buffer, offset)
-    }
-
-    fn write(&self, _buffer: &[u8], _offset: usize) -> Result<(), KernelError> {
-        Err(KernelError::PermissionNotAllowed)
-    }
-}
-
 
 
 const EMMC1_BASE_ADDR: u64 = 0x3F30_0000;

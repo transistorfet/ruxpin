@@ -16,5 +16,6 @@ pub enum KernelError {
     NotFile,
     NotDirectory,
     OutOfMemory,
+    NoSuchDevice,
 }
 

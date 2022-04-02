@@ -6,12 +6,13 @@ pub mod arch;
 pub mod fs;
 pub mod mm;
 pub mod proc;
-pub mod config;
+pub mod tty;
+pub mod block;
 pub mod misc;
 pub mod sync;
-pub mod types;
 pub mod errors;
 pub mod printk;
+pub mod config;
 
 extern crate alloc;
 

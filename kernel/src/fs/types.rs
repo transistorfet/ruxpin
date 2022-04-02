@@ -1,7 +1,7 @@
 
 use alloc::sync::Arc;
 
-use ruxpin_api::types::{FileFlags, FileAccess, Seek, UserID, GroupID};
+use ruxpin_api::types::{OpenFlags, FileAccess, Seek, UserID, GroupID};
 
 use crate::sync::Spinlock;
 use crate::errors::KernelError;
@@ -34,7 +34,7 @@ pub(super) trait VnodeOperations: Sync + Send {
     fn attributes<'a>(&'a mut self) -> Result<&'a FileAttributes, KernelError>;
     //fn attributes_mut<'a>(&'a mut self) -> Result<&'a mut FileAttributes, KernelError>;
 
-    fn open(&mut self, file: &mut FilePointer, flags: FileFlags) -> Result<(), KernelError>;
+    fn open(&mut self, file: &mut FilePointer, flags: OpenFlags) -> Result<(), KernelError>;
     fn close(&mut self, file: &mut FilePointer) -> Result<(), KernelError>;
     fn read(&mut self, file: &mut FilePointer, buffer: &mut [u8]) -> Result<usize, KernelError>;
     fn write(&mut self, file: &mut FilePointer, buffer: &[u8]) -> Result<usize, KernelError>;

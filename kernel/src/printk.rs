@@ -2,23 +2,33 @@
 use core::fmt;
 use core::fmt::Write;
 
-use crate::sync::Spinlock;
-use crate::types::CharDriver;
 
+static mut CONSOLE_DEVICE: ConsoleDevice = ConsoleDevice(null_printk);
 
-static mut CONSOLE_DEVICE: Option<&Spinlock<dyn CharDriver>> = None;
+fn null_printk(_: &str) {
+    // Do Nothing
+}
 
-pub fn set_console_device(dev: &'static Spinlock<dyn CharDriver>) {
+pub fn set_console_device(func: fn(&str)) {
     unsafe {
-        CONSOLE_DEVICE = Some(dev);
+        CONSOLE_DEVICE = ConsoleDevice(func);
     }
 }
 
 pub fn printk_args(args: fmt::Arguments) {
     unsafe {
-        CONSOLE_DEVICE.as_mut().unwrap().lock().write_fmt(args).unwrap()
+        CONSOLE_DEVICE.write_fmt(args).unwrap();
     }
-    //crate::config::console::ConsoleDevice::new().write_fmt(args).unwrap()
+}
+
+struct ConsoleDevice(fn(&str));
+
+impl Write for ConsoleDevice {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        //tty::write(self.0, s.as_bytes()).unwrap();
+        self.0(s);
+        Ok(())
+    }
 }
 
 #[macro_export]
@@ -34,13 +44,6 @@ macro_rules! printkln {
         $crate::printk::printk_args(format_args!($($args)*));
         $crate::printk::printk_args(format_args!("\n"));
     })
-}
-
-impl fmt::Write for dyn CharDriver {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.write(s.as_bytes()).unwrap();
-        Ok(())
-    }
 }
 
 pub unsafe fn printk_dump(mut ptr: *const u8, mut size: usize) {

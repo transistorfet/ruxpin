@@ -2,7 +2,7 @@
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 
-use ruxpin_api::types::{FileFlags, FileAccess, Seek, UserID};
+use ruxpin_api::types::{OpenFlags, FileAccess, Seek, UserID};
 
 use crate::sync::Spinlock;
 use crate::misc::StrArray;
@@ -126,7 +126,7 @@ impl VnodeOperations for TmpVnode {
     //    Ok(&mut self.attrs)
     //}
 
-    fn open(&mut self, _file: &mut FilePointer, _flags: FileFlags) -> Result<(), KernelError> {
+    fn open(&mut self, _file: &mut FilePointer, _flags: OpenFlags) -> Result<(), KernelError> {
         Ok(())
     }
 
@@ -154,7 +154,7 @@ impl VnodeOperations for TmpVnode {
         let start = file.position;
         for byte in buffer {
             if file.position >= data.len() {
-                for i in data.len()..=file.position {
+                for _ in data.len()..=file.position {
                     data.push(0);
                 }
             }
