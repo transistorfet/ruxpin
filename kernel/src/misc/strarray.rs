@@ -1,6 +1,8 @@
 
 use core::str;
 
+use crate::errors::KernelError;
+
 pub struct StrArray<const LENGTH: usize> {
     len: usize,
     array: [u8; LENGTH],
@@ -32,4 +34,13 @@ impl<const LENGTH: usize> StrArray<LENGTH> {
     }
 }
 
+impl<const LENGTH: usize> TryInto<StrArray<LENGTH>> for &str {
+    type Error = KernelError;
+
+    fn try_into(self) -> Result<StrArray<LENGTH>, KernelError> {
+        let mut array = StrArray::new();
+        array.copy_into(self);
+        Ok(array)
+    }
+}
 

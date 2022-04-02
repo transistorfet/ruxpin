@@ -7,7 +7,7 @@ use ruxpin_api::types::{OpenFlags, FileAccess, Seek};
 use crate::sync::Spinlock;
 use crate::errors::KernelError;
 
-use super::types::{Filesystem, Mount, Vnode, File, FilePointer};
+use super::types::{Filesystem, Mount, Vnode, File, FilePointer, DirEntry};
 
 
 static FILESYSTEMS: Spinlock<Vec<Arc<Spinlock<dyn Filesystem>>>> = Spinlock::new(Vec::new());
@@ -35,7 +35,7 @@ pub fn initialize() -> Result<(), KernelError> {
 pub fn mount(path: &str, fstype: &str) -> Result<(), KernelError> {
     // TODO this is a hack.  Only allowing mounting to root
     if path != "/" {
-        return Err(KernelError::PermissionNotAllowed);
+        return Err(KernelError::OperationNotPermitted);
     }
 
     for fs in FILESYSTEMS.lock().iter() {
@@ -90,6 +90,13 @@ pub fn seek(file: File, offset: usize, whence: Seek) -> Result<usize, KernelErro
     let mut fptr = file.lock();
     let vnode = fptr.vnode.clone();
     let result = vnode.lock().seek(&mut *fptr, offset, whence)?;
+    Ok(result)
+}
+
+pub fn readdir(file: File) -> Result<Option<DirEntry>, KernelError> {
+    let mut fptr = file.lock();
+    let vnode = fptr.vnode.clone();
+    let result = vnode.lock().readdir(&mut *fptr)?;
     Ok(result)
 }
 

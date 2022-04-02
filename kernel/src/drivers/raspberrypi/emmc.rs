@@ -24,7 +24,7 @@ impl BlockOperations for EmmcDevice {
     }
 
     fn write(&mut self, _buffer: &[u8], _offset: usize) -> Result<usize, KernelError> {
-        Err(KernelError::PermissionNotAllowed)
+        Err(KernelError::OperationNotPermitted)
     }
 }
 

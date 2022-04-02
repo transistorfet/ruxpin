@@ -8,10 +8,10 @@ use crate::sync::Spinlock;
 use crate::misc::StrArray;
 use crate::errors::KernelError;
 
-use super::types::{Filesystem, Mount, MountOperations, Vnode, VnodeOperations, FileAttributes, FilePointer};
+use super::types::{Filesystem, Mount, MountOperations, Vnode, VnodeOperations, FileAttributes, FilePointer, DirEntry};
 
 
-const TMPFS_MAX_FILENAME: usize = 14;
+const TMPFS_MAX_FILENAME: usize = 32;
 
 pub struct TmpFilesystem {
     
@@ -26,14 +26,14 @@ pub struct TmpDirEntry {
     vnode: Vnode,
 }
 
-pub enum TmpVnodeContents {
-    Directory(Vec<TmpDirEntry>),
-    File(Vec<u8>),
+pub struct TmpVnodeFile {
+    attrs: FileAttributes,
+    contents: Vec<u8>,
 }
 
-pub struct TmpVnode {
+pub struct TmpVnodeDirectory {
     attrs: FileAttributes,
-    contents: TmpVnodeContents,
+    contents: Vec<TmpDirEntry>,
 }
 
 impl Filesystem for TmpFilesystem {
@@ -47,7 +47,7 @@ impl Filesystem for TmpFilesystem {
     }
 
     fn mount(&mut self) -> Result<Mount, KernelError> {
-        let root_node = Arc::new(Spinlock::new(TmpVnode::new_directory()));
+        let root_node = Arc::new(Spinlock::new(TmpVnodeDirectory::new()));
 
         let mount = Arc::new(Spinlock::new(TmpMount {
             root_node,
@@ -79,37 +79,16 @@ impl MountOperations for TmpMount {
     }
 }
 
-impl TmpDirEntry {
-    pub fn new(name: &str, access: FileAccess) -> Self {
-        let vnode = if access.is_dir() {
-            Arc::new(Spinlock::new(TmpVnode::new_directory()))
-        } else {
-            Arc::new(Spinlock::new(TmpVnode::new_file()))
-        };
-
-        let mut array = StrArray::new();
-        array.copy_into(name);
-        Self {
-            name: array,
-            vnode,
-        }
-    }
-}
-
-impl VnodeOperations for TmpVnode {
+impl VnodeOperations for TmpVnodeDirectory {
     fn create(&mut self, filename: &str, access: FileAccess, uid: UserID) -> Result<Vnode, KernelError> {
-        let contents = self.as_dir()?;
-
         let entry = TmpDirEntry::new(filename, access);
         let vnode = entry.vnode.clone();
-        contents.push(entry);
+        self.contents.push(entry);
         Ok(vnode)
     }
 
     fn lookup(&mut self, filename: &str) -> Result<Vnode, KernelError> {
-        let contents = self.as_dir()?;
-
-        for entry in contents {
+        for entry in &self.contents {
             if entry.name.as_str() == filename {
                 return Ok(entry.vnode.clone());
             }
@@ -134,31 +113,61 @@ impl VnodeOperations for TmpVnode {
         Ok(())
     }
 
-    fn read(&mut self, file: &mut FilePointer, buffer: &mut [u8]) -> Result<usize, KernelError> {
-        let data = self.as_file()?;
+    fn readdir(&mut self, file: &mut FilePointer) -> Result<Option<DirEntry>, KernelError> {
+        if file.position >= self.contents.len() {
+            return Ok(None);
+        }
 
+        let result = DirEntry {
+            inode: 0,
+            name: self.contents[file.position].name.as_str().try_into()?,
+        };
+
+        file.position += 1;
+
+        Ok(Some(result))
+    }
+}
+
+impl VnodeOperations for TmpVnodeFile {
+    fn attributes<'a>(&'a mut self) -> Result<&'a FileAttributes, KernelError> {
+        Ok(&mut self.attrs)
+    }
+
+    //fn attributes_mut<'a>(&'a mut self) -> Result<&'a mut FileAttributes, KernelError> {
+    //    // TODO this isn't right because you need to update
+    //    Ok(&mut self.attrs)
+    //}
+
+    fn open(&mut self, _file: &mut FilePointer, _flags: OpenFlags) -> Result<(), KernelError> {
+        Ok(())
+    }
+
+    fn close(&mut self, _file: &mut FilePointer) -> Result<(), KernelError> {
+        Ok(())
+    }
+
+    fn read(&mut self, file: &mut FilePointer, buffer: &mut [u8]) -> Result<usize, KernelError> {
         let start = file.position;
         for byte in buffer {
-            if file.position >= data.len() {
+            if file.position >= self.contents.len() {
                 break;
             }
-            *byte = data[file.position];
+            *byte = self.contents[file.position];
             file.position += 1;
         }
         Ok(file.position - start)
     }
 
     fn write(&mut self, file: &mut FilePointer, buffer: &[u8]) -> Result<usize, KernelError> {
-        let data = self.as_file()?;
-
         let start = file.position;
         for byte in buffer {
-            if file.position >= data.len() {
-                for _ in data.len()..=file.position {
-                    data.push(0);
+            if file.position >= self.contents.len() {
+                for _ in self.contents.len()..=file.position {
+                    self.contents.push(0);
                 }
             }
-            data[file.position] = *byte;
+            self.contents[file.position] = *byte;
             file.position += 1;
         }
         Ok(file.position - start)
@@ -180,34 +189,35 @@ impl VnodeOperations for TmpVnode {
     }
 }
 
-impl TmpVnode {
-    pub fn new_directory() -> Self {
+impl TmpDirEntry {
+    pub fn new(name: &str, access: FileAccess) -> Self {
+        let vnode: Vnode = if access.is_dir() {
+            Arc::new(Spinlock::new(TmpVnodeDirectory::new()))
+        } else {
+            Arc::new(Spinlock::new(TmpVnodeFile::new()))
+        };
+
+        Self {
+            name: name.try_into().unwrap(),
+            vnode,
+        }
+    }
+}
+
+impl TmpVnodeDirectory {
+    pub fn new() -> Self {
         Self {
             attrs: Default::default(),
-            contents: TmpVnodeContents::Directory(Vec::new()),
+            contents: Vec::new(),
         }
     }
+}
 
-    pub fn new_file() -> Self {
+impl TmpVnodeFile {
+    pub fn new() -> Self {
         Self {
             attrs: Default::default(),
-            contents: TmpVnodeContents::File(Vec::new()),
-        }
-    }
-
-    pub fn as_dir<'a>(&'a mut self) -> Result<&'a mut Vec<TmpDirEntry>, KernelError> {
-        if let TmpVnodeContents::Directory(list) = &mut self.contents {
-            Ok(list)
-        } else {
-            Err(KernelError::NotDirectory)
-        }
-    }
-
-    pub fn as_file<'a>(&'a mut self) -> Result<&'a mut Vec<u8>, KernelError> {
-        if let TmpVnodeContents::File(data) = &mut self.contents {
-            Ok(data)
-        } else {
-            Err(KernelError::NotFile)
+            contents: Vec::new(),
         }
     }
 }
