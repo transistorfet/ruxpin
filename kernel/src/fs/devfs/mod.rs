@@ -2,7 +2,7 @@
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 
-use ruxpin_api::types::{OpenFlags, FileAccess, Seek, UserID, DeviceID};
+use ruxpin_api::types::{OpenFlags, FileAccess, Seek, UserID, DeviceID, GroupID};
 
 use crate::tty;
 use crate::sync::Spinlock;
@@ -88,8 +88,8 @@ impl MountOperations for DevMount {
 }
 
 impl VnodeOperations for DevVnodeDirectory {
-    fn create(&mut self, filename: &str, access: FileAccess, uid: UserID) -> Result<Vnode, KernelError> {
-        let entry = DevDirEntry::try_new(filename, access)?;
+    fn create(&mut self, filename: &str, access: FileAccess, current_uid: UserID) -> Result<Vnode, KernelError> {
+        let entry = DevDirEntry::try_new(filename, access, current_uid)?;
         let vnode = entry.vnode.clone();
         self.contents.push(entry);
         Ok(vnode)
@@ -203,9 +203,9 @@ impl VnodeOperations for DevVnodeCharDevice {
 }
 
 impl DevVnodeDirectory {
-    pub fn new() -> Self {
+    pub fn new(access: FileAccess, uid: UserID, gid: GroupID) -> Self {
         Self {
-            attrs: Default::default(),
+            attrs: FileAttributes::new(access, uid, gid),
             contents: Vec::new(),
         }
     }
@@ -214,7 +214,7 @@ impl DevVnodeDirectory {
 impl DevVnodeRootDirectory {
     pub fn new() -> Self {
         Self {
-            attrs: Default::default(),
+            attrs: FileAttributes::new(FileAccess::DefaultDir, 0, 0),
         }
     }
 }
@@ -229,9 +229,9 @@ impl DevVnodeCharDevice {
 }
 
 impl DevDirEntry {
-    pub fn try_new(name: &str, access: FileAccess) -> Result<Self, KernelError> {
+    pub fn try_new(name: &str, access: FileAccess, uid: UserID) -> Result<Self, KernelError> {
         let vnode = if access.is_dir() {
-            Arc::new(Spinlock::new(DevVnodeDirectory::new()))
+            Arc::new(Spinlock::new(DevVnodeDirectory::new(access, uid, 0)))
         } else {
             return Err(KernelError::OperationNotPermitted);
         };

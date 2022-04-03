@@ -2,7 +2,7 @@
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 
-use ruxpin_api::types::{OpenFlags, FileAccess, Seek, UserID, DeviceID};
+use ruxpin_api::types::{OpenFlags, FileAccess, Seek, UserID, GroupID, DeviceID};
 
 use crate::sync::Spinlock;
 use crate::misc::StrArray;
@@ -49,7 +49,7 @@ impl Filesystem for TmpFilesystem {
     }
 
     fn mount(&mut self, parent: Option<Vnode>, _device_id: Option<DeviceID>) -> Result<Mount, KernelError> {
-        let root_node = Arc::new(Spinlock::new(TmpVnodeDirectory::new()));
+        let root_node = Arc::new(Spinlock::new(TmpVnodeDirectory::new(FileAccess::DefaultDir, 0, 0)));
 
         let mount = Arc::new(Spinlock::new(TmpMount {
             root_node,
@@ -87,8 +87,8 @@ impl VnodeOperations for TmpVnodeDirectory {
         Ok(&mut self.mounted_vnode)
     }
 
-    fn create(&mut self, filename: &str, access: FileAccess, uid: UserID) -> Result<Vnode, KernelError> {
-        let entry = TmpDirEntry::new(filename, access);
+    fn create(&mut self, filename: &str, access: FileAccess, current_uid: UserID) -> Result<Vnode, KernelError> {
+        let entry = TmpDirEntry::new(filename, access, current_uid);
         let vnode = entry.vnode.clone();
         self.contents.push(entry);
         Ok(vnode)
@@ -208,11 +208,11 @@ impl VnodeOperations for TmpVnodeFile {
 }
 
 impl TmpDirEntry {
-    pub fn new(name: &str, access: FileAccess) -> Self {
+    pub fn new(name: &str, access: FileAccess, uid: UserID) -> Self {
         let vnode: Vnode = if access.is_dir() {
-            Arc::new(Spinlock::new(TmpVnodeDirectory::new()))
+            Arc::new(Spinlock::new(TmpVnodeDirectory::new(access, uid, 0)))
         } else {
-            Arc::new(Spinlock::new(TmpVnodeFile::new()))
+            Arc::new(Spinlock::new(TmpVnodeFile::new(access, uid, 0)))
         };
 
         Self {
@@ -223,9 +223,9 @@ impl TmpDirEntry {
 }
 
 impl TmpVnodeDirectory {
-    pub fn new() -> Self {
+    pub fn new(access: FileAccess, uid: UserID, gid: GroupID) -> Self {
         Self {
-            attrs: Default::default(),
+            attrs: FileAttributes::new(access, uid, gid),
             contents: Vec::new(),
             mounted_vnode: None,
         }
@@ -233,9 +233,9 @@ impl TmpVnodeDirectory {
 }
 
 impl TmpVnodeFile {
-    pub fn new() -> Self {
+    pub fn new(access: FileAccess, uid: UserID, gid: GroupID) -> Self {
         Self {
-            attrs: Default::default(),
+            attrs: FileAttributes::new(access, uid, gid),
             contents: Vec::new(),
         }
     }

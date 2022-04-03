@@ -95,6 +95,7 @@ pub trait VnodeOperations: Sync + Send {
     //int (*poll)(struct vfile *file, int events);
 }
 
+#[derive(Debug)]
 pub struct FileAttributes {
     pub access: FileAccess,
     pub nlinks: u16,
@@ -126,6 +127,24 @@ impl FilePointer {
         Self {
             vnode,
             position: 0,
+        }
+    }
+}
+
+impl FileAttributes {
+    pub fn new(access: FileAccess, uid: UserID, gid: GroupID) -> Self {
+        Self {
+            access,
+            nlinks: 1,
+            uid,
+            gid,
+            rdev: None,
+            inode: 0,
+            size: 0,
+
+            atime: Timestamp(0),
+            ctime: Timestamp(0),
+            mtime: Timestamp(0),
         }
     }
 }
