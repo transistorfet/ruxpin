@@ -20,7 +20,7 @@ pub type SubDeviceID = u8;
 pub struct DeviceID(pub DriverID, pub SubDeviceID);
 
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct OpenFlags(u16);
 
 #[allow(dead_code)]
@@ -41,6 +41,15 @@ impl OpenFlags {
     pub fn is_set(self, flag: Self) -> bool {
         self.0 & flag.0 != 0
     }
+
+    pub fn required_access(self) -> FileAccess {
+        match OpenFlags(0o3 & self.0) {
+            OpenFlags::ReadOnly => FileAccess::Read,
+            OpenFlags::WriteOnly => FileAccess::Write,
+            OpenFlags::ReadWrite => FileAccess::Read.and(FileAccess::Write),
+            _ => FileAccess::Read,
+        }
+    }
 }
 
 
@@ -56,6 +65,18 @@ impl FileAccess {
     pub const OwnerWrite: FileAccess    = FileAccess(0o00200);
     pub const OwnerExec: FileAccess     = FileAccess(0o00100);
 
+    pub const GroupRead: FileAccess     = FileAccess(0o00040);
+    pub const GroupWrite: FileAccess    = FileAccess(0o00020);
+    pub const GroupExec: FileAccess     = FileAccess(0o00010);
+
+    pub const EveryoneRead: FileAccess  = FileAccess(0o00004);
+    pub const EveryoneWrite: FileAccess = FileAccess(0o00002);
+    pub const EveryoneExec: FileAccess  = FileAccess(0o00001);
+
+    pub const Read: FileAccess          = FileAccess(0o00004);
+    pub const Write: FileAccess         = FileAccess(0o00002);
+    pub const Exec: FileAccess          = FileAccess(0o00001);
+
     pub const DefaultFile: FileAccess   = FileAccess(0o00644);
     pub const DefaultDir: FileAccess    = FileAccess(0o40755);
 
@@ -70,5 +91,16 @@ impl FileAccess {
     pub fn is_dir(self) -> bool {
         self.is_set(FileAccess::Directory)
     }
+
+    pub fn require_owner(self, required_access: Self) -> bool {
+        (self.0 >> 6) & 0o7 & required_access.0 == required_access.0
+    }
+
+    pub fn require_everyone(self, required_access: Self) -> bool {
+        self.0 & 0o7 & required_access.0 == required_access.0
+    }
 }
+
+#[derive(Copy, Clone, Debug)]
+pub struct Timestamp(pub u64);
 

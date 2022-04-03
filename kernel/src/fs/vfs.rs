@@ -2,12 +2,12 @@
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 
-use ruxpin_api::types::{OpenFlags, FileAccess, Seek};
+use ruxpin_api::types::{OpenFlags, FileAccess, Seek, UserID, GroupID};
 
 use crate::sync::Spinlock;
 use crate::errors::KernelError;
 
-use super::types::{Filesystem, Mount, Vnode, VnodeOperations, File, FilePointer, DirEntry};
+use super::types::{Filesystem, Mount, Vnode, File, FilePointer, DirEntry, FileAttributes};
 
 
 static FILESYSTEMS: Spinlock<Vec<Arc<Spinlock<dyn Filesystem>>>> = Spinlock::new(Vec::new());
@@ -23,13 +23,13 @@ pub fn initialize() -> Result<(), KernelError> {
     FILESYSTEMS.lock().push(Arc::new(Spinlock::new(DevFilesystem::new())));
 
     // TODO this is a temporary test
-    mount("/", "tmpfs").unwrap();
-    let mut file = open("/dev", OpenFlags::Create, FileAccess::Directory.and(FileAccess::DefaultDir)).unwrap();
+    mount(None, "/", "tmpfs", 0).unwrap();
+    let mut file = open(None, "/dev", OpenFlags::Create, FileAccess::Directory.and(FileAccess::DefaultDir), 0).unwrap();
     close(&mut file).unwrap();
-    mount("/dev", "devfs").unwrap();
+    mount(None, "/dev", "devfs", 0).unwrap();
 
-    open("test", OpenFlags::Create, FileAccess::Directory.and(FileAccess::DefaultDir)).unwrap();
-    let mut file = open("test/file.txt", OpenFlags::Create, FileAccess::DefaultFile).unwrap();
+    open(None, "test", OpenFlags::Create, FileAccess::Directory.and(FileAccess::DefaultDir), 0).unwrap();
+    let mut file = open(None, "test/file.txt", OpenFlags::Create, FileAccess::DefaultFile, 0).unwrap();
     write(&mut file, b"This is a test").unwrap();
     seek(&mut file, 0, Seek::FromStart).unwrap();
     let mut buffer = [0; 100];
@@ -39,10 +39,14 @@ pub fn initialize() -> Result<(), KernelError> {
     Ok(())
 }
 
-pub fn mount(path: &str, fstype: &str) -> Result<(), KernelError> {
+pub fn mount(cwd: Option<Vnode>, path: &str, fstype: &str, current_uid: UserID) -> Result<(), KernelError> {
+    if current_uid != 0 {
+        return Err(KernelError::OperationNotPermitted);
+    }
+
     let fs = find_filesystem(fstype)?;
 
-    let vnode = lookup(path).ok();
+    let vnode = lookup(cwd, path, current_uid).ok();
     if vnode.is_none() && path != "/" {
         return Err(KernelError::OperationNotPermitted);
     }
@@ -60,14 +64,35 @@ pub fn mount(path: &str, fstype: &str) -> Result<(), KernelError> {
     Ok(())
 }
 
-pub fn open(path: &str, flags: OpenFlags, access: FileAccess) -> Result<File, KernelError> {
+pub fn access(cwd: Option<Vnode>, path: &str, access: FileAccess, current_uid: UserID) -> Result<(), KernelError> {
+    let vnode = lookup(cwd, path, current_uid)?;
+
+    if !verify_file_access(current_uid, access, vnode.lock().attributes()?) {
+        return Err(KernelError::OperationNotPermitted);
+    }
+    Ok(())
+}
+
+pub fn open(cwd: Option<Vnode>, path: &str, flags: OpenFlags, access: FileAccess, current_uid: UserID) -> Result<File, KernelError> {
     let vnode = if flags.is_set(OpenFlags::Create) {
-        create(path, access)?
+        create(cwd, path, access, current_uid)?
     } else {
-        lookup(path)?
+        lookup(cwd, path, current_uid)?
     };
 
+    if !verify_file_access(current_uid, flags.required_access(), vnode.lock().attributes()?) {
+        return Err(KernelError::OperationNotPermitted);
+    }
+
+    if flags.is_set(OpenFlags::Truncate) {
+        vnode.lock().truncate()?;
+    }
+
     let mut file = FilePointer::new(vnode.clone());
+    if flags.is_set(OpenFlags::Append) {
+        file.position = vnode.lock().attributes()?.size;
+    }
+
     vnode.lock().open(&mut file, flags)?;
 
     Ok(Arc::new(Spinlock::new(file)))
@@ -110,15 +135,24 @@ pub fn readdir(file: &mut File) -> Result<Option<DirEntry>, KernelError> {
 
 
 
-pub(super) fn create(path: &str, access: FileAccess) -> Result<Vnode, KernelError> {
+pub(super) fn create(cwd: Option<Vnode>, path: &str, access: FileAccess, current_uid: UserID) -> Result<Vnode, KernelError> {
     let (dirname, filename) = get_path_component_reverse(path);
-    let vnode = lookup(dirname)?;
+    let vnode = lookup(cwd, dirname, current_uid)?;
+
+    if !verify_file_access(current_uid, FileAccess::Write, vnode.lock().attributes()?) {
+        return Err(KernelError::OperationNotPermitted);
+    }
+
     let newvnode = vnode.lock().create(filename, access, 0)?;
     Ok(newvnode)
 }
 
-pub(super) fn lookup(path: &str) -> Result<Vnode, KernelError> {
-    let mut current = ROOT_NODE.lock().as_ref().ok_or(KernelError::FileNotFound)?.clone();
+pub(super) fn lookup(cwd: Option<Vnode>, path: &str, current_uid: UserID) -> Result<Vnode, KernelError> {
+    let mut current = if cwd.is_none() || &path[..1] == "/" {
+        ROOT_NODE.lock().as_ref().ok_or(KernelError::FileNotFound)?.clone()
+    } else {
+        cwd.unwrap()
+    };
 
     let mut component;
     let mut remaining = path;
@@ -132,7 +166,9 @@ pub(super) fn lookup(path: &str) -> Result<Vnode, KernelError> {
             return Ok(current);
         }
 
-        // TODO verify file access
+        if !verify_file_access(current_uid, FileAccess::Read, current.lock().attributes()?) {
+            return Err(KernelError::OperationNotPermitted);
+        }
 
         (component, remaining) = get_path_component(remaining);
 
@@ -177,5 +213,13 @@ fn find_filesystem(fstype: &str) -> Result<Arc<Spinlock<dyn Filesystem>>, Kernel
         }
     }
     Err(KernelError::NoSuchFilesystem)
+}
+
+fn verify_file_access(current_uid: UserID, require_access: FileAccess, file_attributes: &FileAttributes) -> bool {
+    if current_uid == 0 || current_uid == file_attributes.uid {
+        file_attributes.access.require_owner(require_access)
+    } else {
+        file_attributes.access.require_everyone(require_access)
+    }
 }
 

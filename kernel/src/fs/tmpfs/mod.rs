@@ -48,7 +48,7 @@ impl Filesystem for TmpFilesystem {
         Ok(())
     }
 
-    fn mount(&mut self, parent: Option<Vnode>, device_id: Option<DeviceID>) -> Result<Mount, KernelError> {
+    fn mount(&mut self, parent: Option<Vnode>, _device_id: Option<DeviceID>) -> Result<Mount, KernelError> {
         let root_node = Arc::new(Spinlock::new(TmpVnodeDirectory::new()));
 
         let mount = Arc::new(Spinlock::new(TmpMount {
@@ -103,6 +103,12 @@ impl VnodeOperations for TmpVnodeDirectory {
         Err(KernelError::FileNotFound)
     }
 
+
+    // TODO add link
+    // TODO add unlink
+    // TODO add rename
+
+
     fn attributes<'a>(&'a mut self) -> Result<&'a FileAttributes, KernelError> {
         Ok(&mut self.attrs)
     }
@@ -137,6 +143,11 @@ impl VnodeOperations for TmpVnodeDirectory {
 }
 
 impl VnodeOperations for TmpVnodeFile {
+    fn truncate(&mut self) -> Result<(), KernelError> {
+        self.contents.clear();
+        Ok(())
+    }
+
     fn attributes<'a>(&'a mut self) -> Result<&'a FileAttributes, KernelError> {
         Ok(&mut self.attrs)
     }

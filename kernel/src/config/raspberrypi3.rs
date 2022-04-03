@@ -37,7 +37,7 @@ pub fn register_devices() -> Result<(), KernelError> {
 
     console::init()?;
 
-    let mut file = vfs::open("/dev/console0", OpenFlags::ReadOnly, FileAccess::DefaultFile).unwrap();
+    let mut file = vfs::open(None, "/dev/console0", OpenFlags::ReadOnly, FileAccess::DefaultFile, 0).unwrap();
     vfs::write(&mut file, b"the device file can write\n").unwrap();
     vfs::close(&mut file).unwrap();
 

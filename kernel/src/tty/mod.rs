@@ -36,7 +36,7 @@ pub fn register_tty_device(driver_id: DriverID, dev: Box<dyn CharOperations>) ->
 }
 
 pub fn lookup_device(name: &str) -> Result<DeviceID, KernelError> {
-    let mut drivers_list = TTY_DRIVERS.lock();
+    let drivers_list = TTY_DRIVERS.lock();
     for (driver_id, driver) in drivers_list.iter().enumerate() {
         if driver.prefix == &name[..driver.prefix.len()] {
             let subdevice_id = name[driver.prefix.len()..].parse::<SubDeviceID>().map_err(|_| KernelError::NoSuchDevice)?;

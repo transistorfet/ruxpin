@@ -1,7 +1,7 @@
 
 use alloc::sync::Arc;
 
-use ruxpin_api::types::{OpenFlags, FileAccess, Seek, UserID, GroupID, InodeNum, DeviceID};
+use ruxpin_api::types::{OpenFlags, FileAccess, Seek, UserID, GroupID, InodeNum, DeviceID, Timestamp};
 
 use crate::sync::Spinlock;
 use crate::misc::StrArray;
@@ -26,7 +26,7 @@ pub(super) trait MountOperations: Sync + Send {
     fn unmount(&mut self) -> Result<(), KernelError>;
 }
 
-pub(super) trait VnodeOperations: Sync + Send {
+pub trait VnodeOperations: Sync + Send {
     fn get_mount_mut<'a>(&'a mut self) -> Result<&'a mut Option<Vnode>, KernelError> {
         Err(KernelError::OperationNotPermitted)
     }
@@ -43,15 +43,28 @@ pub(super) trait VnodeOperations: Sync + Send {
         Err(KernelError::OperationNotPermitted)
     }
 
-    //int (*link)(struct vnode *oldvnode, struct vnode *newparent, const char *filename);
-    //int (*unlink)(struct vnode *parent, struct vnode *vnode, const char *filename);
-    //int (*rename)(struct vnode *vnode, struct vnode *oldparent, const char *oldname, struct vnode *newparent, const char *newname);
-    //int (*truncate)(struct vnode *vnode);                        // Truncate the file data (size should be 0 after)
-    //int (*update)(struct vnode *vnode);
+    fn link(&mut self, _newparent: Vnode, _filename: &str) -> Result<Vnode, KernelError> {
+        Err(KernelError::OperationNotPermitted)
+    }
+
+    fn unlink(&mut self, _target: Vnode, _filename: &str) -> Result<Vnode, KernelError> {
+        Err(KernelError::OperationNotPermitted)
+    }
+
+    fn rename(&mut self, _filename: &str) -> Result<Vnode, KernelError> {
+        Err(KernelError::OperationNotPermitted)
+    }
+
+    fn truncate(&mut self) -> Result<(), KernelError> {
+        Err(KernelError::OperationNotPermitted)
+    }
 
     fn attributes<'a>(&'a mut self) -> Result<&'a FileAttributes, KernelError> {
         Err(KernelError::OperationNotPermitted)
     }
+
+    // TODO how can you update this, such that the fs can update the inode on disk afterwards??
+    //      could use a closure passed in, or a special struct like RefMut?
     //fn attributes_mut<'a>(&'a mut self) -> Result<&'a mut FileAttributes, KernelError>;
 
     fn open(&mut self, _file: &mut FilePointer, _flags: OpenFlags) -> Result<(), KernelError> {
@@ -82,7 +95,7 @@ pub(super) trait VnodeOperations: Sync + Send {
     //int (*poll)(struct vfile *file, int events);
 }
 
-pub(super) struct FileAttributes {
+pub struct FileAttributes {
     pub access: FileAccess,
     pub nlinks: u16,
     pub uid: UserID,
@@ -91,25 +104,14 @@ pub(super) struct FileAttributes {
     pub inode: InodeNum,
     pub size: usize,
 
-    /*
-    mode_t mode;
-    short nlinks;
-    uid_t uid;
-    gid_t gid;
-    uint16_t bits;
-    device_t rdev;
-    inode_t ino;
-    offset_t size;
-
-    time_t atime;
-    time_t mtime;
-    time_t ctime;
-    */
+    pub atime: Timestamp,
+    pub mtime: Timestamp,
+    pub ctime: Timestamp,
 }
 
 
 pub(super) type Mount = Arc<Spinlock<dyn MountOperations>>;
-pub(super) type Vnode = Arc<Spinlock<dyn VnodeOperations>>;
+pub type Vnode = Arc<Spinlock<dyn VnodeOperations>>;
 
 pub struct FilePointer {
     pub(super) vnode: Vnode,
@@ -138,6 +140,10 @@ impl Default for FileAttributes {
             rdev: None,
             inode: 0,
             size: 0,
+
+            atime: Timestamp(0),
+            ctime: Timestamp(0),
+            mtime: Timestamp(0),
         }
     }
 }
