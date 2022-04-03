@@ -40,7 +40,7 @@ impl VirtualAddressSpace {
     //    
     //}
 
-    pub fn alloc_mapped(&mut self, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) -> *mut u8 {
+    pub fn alloc_mapped(&mut self, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) -> PhysicalAddress {
         let pages = pages::get_page_area();
 
         self.table.map_addr(MemoryType::Existing, permissions, vaddr, len, pages, &|pages, _, len| {
@@ -51,10 +51,7 @@ impl VirtualAddressSpace {
             }
         }).unwrap();
 
-        let first = self.table.translate_addr(vaddr).unwrap();
-        unsafe {
-            first.as_mut()
-        }
+        self.table.translate_addr(vaddr).unwrap()
     }
 
     pub fn map_on_demand(&mut self, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) {

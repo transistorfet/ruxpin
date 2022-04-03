@@ -61,18 +61,11 @@ impl PhysicalAddress {
         Self(self.0 + offset as u64)
     }
 
-    pub unsafe fn as_ptr<T>(self) -> *const T {
-        self.0 as *const T
-    }
-
-    pub unsafe fn as_mut<T>(self) -> *mut T {
-        self.0 as *mut T
-    }
-
     pub fn to_kernel_addr(self) -> KernelVirtualAddress {
         KernelVirtualAddress::from(self)
     }
 }
+
 
 
 impl From<u64> for VirtualAddress {
@@ -103,15 +96,9 @@ impl VirtualAddress {
     pub fn add(self, offset: usize) -> Self {
         Self(self.0 + offset as u64)
     }
-
-    pub unsafe fn as_ptr<T>(self) -> *const T {
-        self.0 as *const T
-    }
-
-    pub unsafe fn as_mut<T>(self) -> *mut T {
-        self.0 as *mut T
-    }
 }
+
+
 
 impl From<PhysicalAddress> for KernelVirtualAddress {
     fn from(addr: PhysicalAddress) -> Self {
