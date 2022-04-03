@@ -3,7 +3,7 @@ use core::ptr;
 
 use crate::arch::exceptions::register_irq;
 
-const SYS_TIMER_BASE: u64 = 0x3F00_3000;
+const SYS_TIMER_BASE: u64 = 0xFFFF_0000_3F00_3000;
 
 const SYS_TIMER_CONTROL: *mut u32 = (SYS_TIMER_BASE + 0x00) as *mut u32;
 const SYS_TIMER_COUNT_LOW: *mut u32 = (SYS_TIMER_BASE + 0x04) as *mut u32;

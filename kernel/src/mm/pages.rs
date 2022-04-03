@@ -90,7 +90,7 @@ impl PageRegion {
         printkln!("virtual memory: using region at {:?}, size {} MiB, pages {}", start, total_size / 1024 / 1024, total_pages - table_pages);
 
         let pages = total_pages - table_pages;
-        let table: &'static mut [u8] = unsafe { slice::from_raw_parts_mut(start.as_ptr(), table_pages * page_size) };
+        let table: &'static mut [u8] = unsafe { slice::from_raw_parts_mut(start.to_kernel_addr().as_mut(), table_pages * page_size) };
         let pages_start = PhysicalAddress::from(start).add(table_pages * page_size);
 
         for byte in table.iter_mut() {
@@ -142,7 +142,7 @@ impl PageRegion {
 }
 
 unsafe fn zero_page(paddr: PhysicalAddress) {
-    let page = slice::from_raw_parts_mut(paddr.as_ptr(), mmu::page_size());
+    let page = slice::from_raw_parts_mut(paddr.to_kernel_addr().as_mut(), mmu::page_size());
     for ptr in page.iter_mut() {
         *ptr = 0;
     }

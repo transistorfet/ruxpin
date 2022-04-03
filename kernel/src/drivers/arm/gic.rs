@@ -34,7 +34,7 @@ trait InterruptController {
 
 
 
-const GIC_BASE: u64 = 0x3F00_B200;
+const GIC_BASE: u64 = 0xFFFF_0000_3F00_B200;
 
 //const GIC_IRQ_PENDING_BASIC: *mut u32 = (GIC_BASE + 0x00) as *mut u32;
 const GIC_IRQ_ENABLE1: *mut u32 = (GIC_BASE + 0x10) as *mut u32;

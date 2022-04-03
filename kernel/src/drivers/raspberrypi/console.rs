@@ -88,7 +88,7 @@ impl CharOperations for PL011Device {
 }
 
 
-const PL011_BASE: u64 = 0x3F20_1000;
+const PL011_BASE: u64 = 0xFFFF_0000_3F20_1000;
 
 const PL011_DATA: *mut u32              = (PL011_BASE + 0x00) as *mut u32;
 const PL011_FLAGS: *mut u32             = (PL011_BASE + 0x18) as *mut u32;

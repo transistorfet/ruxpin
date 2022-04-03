@@ -53,7 +53,7 @@ impl VirtualAddressSpace {
 
         let first = self.table.translate_addr(vaddr).unwrap();
         unsafe {
-            first.as_ptr()
+            first.as_mut()
         }
     }
 

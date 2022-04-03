@@ -94,7 +94,7 @@ impl EmmcDevice {
 }
 
 
-const EMMC1_BASE_ADDR: u64 = 0x3F30_0000;
+const EMMC1_BASE_ADDR: u64 = 0xFFFF_0000_3F30_0000;
 
 //const EMMC1_ARG2: *mut u32              = (EMMC1_BASE_ADDR + 0x00) as *mut u32;
 const EMMC1_BLOCK_COUNT_SIZE: *mut u32  = (EMMC1_BASE_ADDR + 0x04) as *mut u32;

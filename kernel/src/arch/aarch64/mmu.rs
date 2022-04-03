@@ -2,10 +2,8 @@
 use core::slice;
 
 use crate::errors::KernelError;
-use crate::mm::{MemoryType, MemoryPermissions};
-
-// TODO this should be changed to PagePool when you decide how you'd like to do it
 use crate::mm::pages::PagePool;
+use crate::mm::{MemoryType, MemoryPermissions};
 
 use super::types::{PhysicalAddress, VirtualAddress};
 
@@ -44,7 +42,7 @@ pub static DEFAULT_TCR: i64 =
 
 
 
-pub struct TranslationTable(*mut u64);
+pub struct TranslationTable(u64);
 
 
 #[inline(always)]
@@ -59,8 +57,8 @@ pub const fn table_entries() -> usize {
 
 impl TranslationTable {
     pub fn new_user_table(pages: &mut PagePool) -> Self {
-        let tl0 = allocacte_table(pages);
-        Self(tl0.as_mut_ptr())
+        let tl0 = allocate_table(pages);
+        Self(u64::from(tl0))
     }
 
     pub fn map_addr<F>(&mut self, mtype: MemoryType, access: MemoryPermissions, mut vaddr: VirtualAddress, mut len: usize, pages: &mut PagePool, map_block: &F) -> Result<(), KernelError>
@@ -99,9 +97,7 @@ impl TranslationTable {
     }
 
     fn as_slice(&mut self) -> &mut [u64] {
-        unsafe {
-            slice::from_raw_parts_mut(self.0, table_entries())
-        }
+        table_as_slice(PhysicalAddress::from(self.0))
     }
 }
 
@@ -126,7 +122,7 @@ where
 
         ensure_table_entry(table, index, pages)?;
 
-        map_level(addr_bits - 9, table_ptr(table, index), len, vaddr, flags, pages, map_block)?;
+        map_level(addr_bits - 9, table_ref(table, index), len, vaddr, flags, pages, map_block)?;
     }
 
     Ok(())
@@ -173,8 +169,8 @@ fn ensure_table_entry(table: &mut [u64], index: usize, pages: &mut PagePool) -> 
         },
 
         TT_DESCRIPTOR_EMPTY => {
-            let next_table = allocacte_table(pages);
-            table[index] = (next_table.as_ptr() as u64 & TT_TABLE_MASK) | TT2_DESCRIPTOR_TABLE;
+            let next_table = allocate_table(pages);
+            table[index] = (u64::from(next_table) & TT_TABLE_MASK) | TT2_DESCRIPTOR_TABLE;
             Ok(())
         },
         TT2_DESCRIPTOR_BLOCK => {
@@ -199,7 +195,7 @@ where
         }
 
         if addr_bits != 12 && descriptor_type(table, index) == TT2_DESCRIPTOR_TABLE {
-            let subtable = table_ptr(table, index);
+            let subtable = table_ref(table, index);
             unmap_level(addr_bits - 9, subtable, len, vaddr, pages, unmap_block)?;
 
             if table_is_empty(subtable) {
@@ -250,15 +246,12 @@ fn lookup_level(addr_bits: usize, table: &mut [u64], vaddr: VirtualAddress) -> R
     } else if addr_bits == 12 {
         Err(KernelError::AddressUnmapped)
     } else {
-        lookup_level(addr_bits - 9, table_ptr(table, index), vaddr)
+        lookup_level(addr_bits - 9, table_ref(table, index), vaddr)
     }
 }
 
-fn allocacte_table(pages: &mut PagePool) -> &'static mut [u64] {
-    unsafe {
-        let addr: *mut u64 = pages.alloc_page_zeroed().as_ptr() as *mut u64;
-        slice::from_raw_parts_mut(addr, table_entries())
-    }
+fn allocate_table(pages: &mut PagePool) -> PhysicalAddress {
+    pages.alloc_page_zeroed()
 }
 
 
@@ -267,10 +260,18 @@ fn table_index_from_vaddr(bits: usize, vaddr: VirtualAddress) -> usize {
     ((usize::from(vaddr) >> bits) & 0x1ff) as usize
 }
 
-fn table_ptr(table: &mut [u64], index: usize) -> &mut [u64] {
+fn table_ref(table: &mut [u64], index: usize) -> &mut [u64] {
+    table_as_slice(table_ptr(table, index))
+}
+
+fn table_as_slice(paddr: PhysicalAddress) -> &'static mut [u64] {
     unsafe {
-        slice::from_raw_parts_mut((table[index] & TT_TABLE_MASK) as *mut u64, table_entries())
+        slice::from_raw_parts_mut(paddr.to_kernel_addr().as_mut(), table_entries())
     }
+}
+
+fn table_ptr(table: &mut [u64], index: usize) -> PhysicalAddress {
+    PhysicalAddress::from(table[index] & TT_TABLE_MASK)
 }
 
 fn block_ptr(table: &mut [u64], index: usize) -> PhysicalAddress {

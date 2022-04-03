@@ -186,7 +186,7 @@ _exception_fatal:
 	msr	TTBR0_EL1, x0
 
 	// Print a ! character (for debugging when printing from rust causes exceptions)
-	ldr	x1, =0x3F201000
+	ldr	x1, =0xFFFF00003F201000
 	mov	w0, #0x21
 	strb	w0, [x1]
 
@@ -207,8 +207,11 @@ _loop:
 	stp	x0, x30, [sp, 0]
 
 	// Restore the kernel translation table so we can directly access lower memory
-	mrs	x0, TTBR1_EL1
-	msr	TTBR0_EL1, x0
+	// TODO this should be avoided if possible I think, for performance reasons.  I'm not actually invalidating the TLB
+	//	here either, so there could be an invalid reference if not careful.  It'd be best if we can modify all the
+	//	addresses in the kernel so that we don't need to do this
+	//mrs	x0, TTBR1_EL1
+	//msr	TTBR0_EL1, x0
 
 	// EL2/EL3 will cause a fatal error for now
 	mrs	x0, CurrentEL
@@ -237,7 +240,7 @@ _loop:
 // save kernel registers on the stack instead of the process context).
 .macro HANDLE_KERNEL_EXCEPTION handler
 	// Print a $ character (for debugging when printing from rust causes exceptions)
-	ldr	x1, =0x3F201000
+	ldr	x1, =0xFFFF00003F201000
 	mov	w0, #0x24
 	strb	w0, [x1]
 
