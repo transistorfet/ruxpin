@@ -93,11 +93,11 @@ impl FileAccess {
     }
 
     pub fn require_owner(self, required_access: Self) -> bool {
-        (self.0 >> 6) & 0o7 & required_access.0 == required_access.0
+        ((self.0 >> 6) & 0o7 & required_access.0) == required_access.0
     }
 
     pub fn require_everyone(self, required_access: Self) -> bool {
-        self.0 & 0o7 & required_access.0 == required_access.0
+        (self.0 & 0o7 & required_access.0) == required_access.0
     }
 }
 

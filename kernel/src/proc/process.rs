@@ -3,20 +3,24 @@ use core::ptr;
 
 use alloc::vec::Vec;
 
+use ruxpin_api::types::UserID;
+
 use crate::mm::MemoryPermissions;
 use crate::mm::vmalloc::VirtualAddressSpace;
 
 use crate::arch::Context;
 use crate::sync::Spinlock;
 use crate::arch::types::VirtualAddress;
-
+use crate::fs::filedesc::FileDescriptors;
 
 pub type Pid = i32;
 
 pub struct Process {
     pid: Pid,
+    uid: UserID,
     context: Context,
     space: VirtualAddressSpace,
+    files: FileDescriptors,
 }
 
 struct ProcessManager {
@@ -58,8 +62,10 @@ impl ProcessManager {
 
         self.processes.push(Process {
             pid,
+            uid: 0,
             context: Default::default(),
             space: VirtualAddressSpace::new_user_space(),
+            files: FileDescriptors::new(),
         });
 
         self.current = self.processes.len() - 1;

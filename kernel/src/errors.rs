@@ -21,5 +21,7 @@ pub enum KernelError {
     NotFile,
     NotDirectory,
     NoSuchFilesystem,
+    BadFileNumber,
+    TooManyFilesOpen,
 }
 

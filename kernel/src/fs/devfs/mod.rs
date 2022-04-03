@@ -162,6 +162,10 @@ impl VnodeOperations for DevVnodeRootDirectory {
 }
 
 impl VnodeOperations for DevVnodeCharDevice {
+    fn attributes<'a>(&'a mut self) -> Result<&'a FileAttributes, KernelError> {
+        Ok(&mut self.attrs)
+    }
+
     fn open(&mut self, _file: &mut FilePointer, flags: OpenFlags) -> Result<(), KernelError> {
         tty::open(self.device_id, flags)
     }
