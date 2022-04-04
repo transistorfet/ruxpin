@@ -4,15 +4,8 @@ use core::mem;
 use core::alloc::{GlobalAlloc, Layout};
 
 use crate::printkln;
+use crate::arch::types::PhysicalAddress;
 
-
-#[global_allocator]
-static mut MAIN_HEAP: Heap = Heap { free_blocks: ptr::null_mut() };
-
-#[alloc_error_handler]
-fn out_of_memory(_: Layout) -> ! {
-    panic!("Out Of Memory");
-}
 
 struct Block {
     size: usize,
@@ -23,12 +16,48 @@ struct Heap {
     free_blocks: *mut Block,
 }
 
-impl Heap {
-    pub unsafe fn init(&mut self, start: *mut u8, end: *mut u8) {
-        let mut space: *mut Block = start.cast();
+#[global_allocator]
+static mut MAIN_HEAP: Heap = Heap { free_blocks: ptr::null_mut() };
 
-        let size = end as usize - start as usize;
-        printkln!("kernel heap: using {:#x}, size {}MiB", start as u64, size / 1024 / 1024);
+#[alloc_error_handler]
+fn out_of_memory(_: Layout) -> ! {
+    panic!("Out Of Memory");
+}
+
+pub fn init_kernel_heap(start: PhysicalAddress, end: PhysicalAddress) {
+    unsafe {
+        MAIN_HEAP.init(start, end);
+    }
+}
+
+pub unsafe fn kmalloc(size: usize) -> *mut u8 {
+    MAIN_HEAP.malloc(size)
+}
+
+pub unsafe fn kmfree(ptr: *mut u8) {
+    MAIN_HEAP.free(ptr);
+}
+
+unsafe impl GlobalAlloc for Heap {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        // TODO add mutex??
+        kmalloc(layout.size())
+        //self.malloc(layout.size())
+    }
+
+    unsafe fn dealloc(&self, ptr: *mut u8, _layout: Layout) {
+        // TODO add mutex??
+        kmfree(ptr);
+        //self.free(ptr);
+    }
+}
+
+impl Heap {
+    pub unsafe fn init(&mut self, start: PhysicalAddress, end: PhysicalAddress) {
+        let mut space: *mut Block = start.to_kernel_addr().as_mut();
+
+        let size = usize::from(end) - usize::from(start);
+        printkln!("kernel heap: using {:#x}, size {}MiB", u64::from(start), size / 1024 / 1024);
 
         (*space).size = size;
         (*space).next = ptr::null_mut();
@@ -118,33 +147,6 @@ impl Heap {
             prev = cur;
             cur = (*cur).next;
         }
-    }
-}
-
-
-pub unsafe fn init_kernel_heap(start: *mut u8, end: *mut u8) {
-    MAIN_HEAP.init(start, end);
-}
-
-pub unsafe fn kmalloc(size: usize) -> *mut u8 {
-    MAIN_HEAP.malloc(size)
-}
-
-pub unsafe fn kmfree(ptr: *mut u8) {
-    MAIN_HEAP.free(ptr);
-}
-
-unsafe impl GlobalAlloc for Heap {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        // TODO add mutex??
-        kmalloc(layout.size())
-        //self.malloc(layout.size())
-    }
-
-    unsafe fn dealloc(&self, ptr: *mut u8, _layout: Layout) {
-        // TODO add mutex??
-        kmfree(ptr);
-        //self.free(ptr);
     }
 }
 

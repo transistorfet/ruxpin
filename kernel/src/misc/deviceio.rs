@@ -30,6 +30,7 @@ impl<T> DeviceRegisters<T> {
 
 
 
+/*
 mod option0 {
     use core::ptr;
     use core::marker::PhantomData;
@@ -172,7 +173,6 @@ mod option2 {
     }
 }
 
-/*
 mod option3 {
     use core::ptr;
     use core::marker::PhantomData;
@@ -200,9 +200,8 @@ mod option3 {
         }
     }
 }
-*/
 
-/*
+
 mod option4 {
     use core::ptr;
     use core::marker::PhantomData;
