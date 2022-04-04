@@ -1,13 +1,16 @@
 
-use core::ptr;
 
 use crate::arch::exceptions::register_irq;
+use crate::arch::types::KernelVirtualAddress;
+use crate::misc::deviceio::DeviceRegisters;
 
-const SYS_TIMER_BASE: u64 = 0xFFFF_0000_3F00_3000;
+mod registers {
+    pub const CONTROL: usize = 0x00;
+    pub const COUNT_LOW: usize = 0x04;
+    pub const COMPARE_1: usize = 0x10;
+}
 
-const SYS_TIMER_CONTROL: *mut u32 = (SYS_TIMER_BASE + 0x00) as *mut u32;
-const SYS_TIMER_COUNT_LOW: *mut u32 = (SYS_TIMER_BASE + 0x04) as *mut u32;
-const SYS_TIMER_COMPARE_1: *mut u32 = (SYS_TIMER_BASE + 0x10) as *mut u32;
+static SYS_TIMER: DeviceRegisters<u32> = DeviceRegisters::new(KernelVirtualAddress::new(0x3F00_3000));
 
 pub struct SystemTimer;
 
@@ -16,16 +19,16 @@ impl SystemTimer {
         register_irq(SystemTimer::handle_irq);
 
         unsafe {
-            let value = ptr::read_volatile(SYS_TIMER_COUNT_LOW as *mut u32) + 200000;
-            ptr::write_volatile(SYS_TIMER_COMPARE_1 as *mut u32, value);
+            let value = SYS_TIMER.get(registers::COUNT_LOW) + 200000;
+            SYS_TIMER.set(registers::COMPARE_1, value);
         }
     }
 
     pub fn reset() {
         unsafe {
-            core::ptr::write_volatile(SYS_TIMER_CONTROL as *mut u32, 1 << 1);
-            let value = core::ptr::read_volatile(SYS_TIMER_COUNT_LOW as *mut u32) + 200000;
-            core::ptr::write_volatile(SYS_TIMER_COMPARE_1 as *mut u32, value);
+            SYS_TIMER.set(registers::CONTROL, 1 << 1);
+            let value = SYS_TIMER.get(registers::COUNT_LOW) + 200000;
+            SYS_TIMER.set(registers::COMPARE_1, value);
         }
     }
 
