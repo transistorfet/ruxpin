@@ -10,7 +10,7 @@ mod registers {
     pub const COMPARE_1: usize = 0x10;
 }
 
-static SYS_TIMER: DeviceRegisters<u32> = DeviceRegisters::new(KernelVirtualAddress::new(0x3F00_3000));
+const SYS_TIMER: DeviceRegisters<u32> = DeviceRegisters::new(KernelVirtualAddress::new(0x3F00_3000));
 
 pub struct SystemTimer;
 

@@ -8,6 +8,9 @@ use ruxpin_api::types::{OpenFlags, DeviceID};
 use crate::errors::KernelError;
 use crate::tty::{self, CharOperations};
 use crate::printk::set_console_device;
+use crate::arch::types::KernelVirtualAddress;
+use crate::misc::deviceio::DeviceRegisters;
+
 
 static mut SAFE_CONSOLE: PL011Device = PL011Device { opens: 0 };
 static mut NORMAL_CONSOLE: DeviceID = DeviceID(0, 0);
@@ -88,16 +91,18 @@ impl CharOperations for PL011Device {
 }
 
 
-const PL011_BASE: u64 = 0xFFFF_0000_3F20_1000;
+const PL011: DeviceRegisters<u32> = DeviceRegisters::new(KernelVirtualAddress::new(0x3F20_1000));
 
-const PL011_DATA: *mut u32              = (PL011_BASE + 0x00) as *mut u32;
-const PL011_FLAGS: *mut u32             = (PL011_BASE + 0x18) as *mut u32;
-const PL011_BAUD_INTEGER: *mut u32      = (PL011_BASE + 0x24) as *mut u32;
-const PL011_BAUD_FRACTIONAL: *mut u32   = (PL011_BASE + 0x28) as *mut u32;
-const PL011_LINE_CONTROL: *mut u32      = (PL011_BASE + 0x2C) as *mut u32;
-const PL011_CONTROL: *mut u32           = (PL011_BASE + 0x30) as *mut u32;
-const PL011_INTERRUPT_MASK: *mut u32    = (PL011_BASE + 0x38) as *mut u32;
-const PL011_INTERRUPT_CLEAR: *mut u32   = (PL011_BASE + 0x44) as *mut u32;
+mod registers {
+    pub const DATA: usize               = 0x00;
+    pub const FLAGS: usize              = 0x18;
+    pub const BAUD_INTEGER: usize       = 0x24;
+    pub const BAUD_FRACTIONAL: usize    = 0x28;
+    pub const LINE_CONTROL: usize       = 0x2C;
+    pub const CONTROL: usize            = 0x30;
+    pub const INTERRUPT_MASK: usize     = 0x38;
+    pub const INTERRUPT_CLEAR: usize    = 0x44;
+}
 
 const PL011_FLAGS_RX_FIFO_EMPTY: u32    = 1 << 4;
 const PL011_FLAGS_TX_FIFO_FULL: u32     = 1 << 5;
@@ -114,40 +119,40 @@ impl PL011Device {
     pub fn init(&self) {
         unsafe {
             // Disable UART
-            ptr::write_volatile(PL011_CONTROL, 0);
+            PL011.set(registers::CONTROL, 0);
 
             // Clear all interrupt flags
-            ptr::write_volatile(PL011_INTERRUPT_CLEAR, 0x3FF);
+            PL011.set(registers::INTERRUPT_CLEAR, 0x3FF);
             // Mask all the interrupts
-            ptr::write_volatile(PL011_INTERRUPT_MASK, 0x3FF);
+            PL011.set(registers::INTERRUPT_MASK, 0x3FF);
 
             // Disable the FIFO before changing the baud rate
-            let lcr = ptr::read_volatile(PL011_LINE_CONTROL);
-            ptr::write_volatile(PL011_LINE_CONTROL, lcr & !PL011_LC_FIFO_ENABLE);
+            let lcr = PL011.get(registers::LINE_CONTROL);
+            PL011.set(registers::LINE_CONTROL, lcr & !PL011_LC_FIFO_ENABLE);
 
             // Set the speed to 921_600 baud (to match MiniLoad from https://github.com/rust-embedded/rust-raspberrypi-OS-tutorials)
-            ptr::write_volatile(PL011_BAUD_INTEGER, 3);
-            ptr::write_volatile(PL011_BAUD_FRACTIONAL, 16);
+            PL011.set(registers::BAUD_INTEGER, 3);
+            PL011.set(registers::BAUD_FRACTIONAL, 16);
 
             // Enable FIFO and configure for 8 bits, 1 stop bit, no parity
-            ptr::write_volatile(PL011_LINE_CONTROL, (0b11 << 5) | PL011_LC_FIFO_ENABLE);
+            PL011.set(registers::LINE_CONTROL, (0b11 << 5) | PL011_LC_FIFO_ENABLE);
 
             // Enable UART (TX only)
-            ptr::write_volatile(PL011_CONTROL, PL011_CTL_UART_ENABLE | PL011_CTL_TX_ENABLE | PL011_CTL_RX_ENABLE);
+            PL011.set(registers::CONTROL, PL011_CTL_UART_ENABLE | PL011_CTL_TX_ENABLE | PL011_CTL_RX_ENABLE);
         }
     }
 
     pub fn put_char(&self, byte: u8) {
         unsafe {
-            while (ptr::read_volatile(PL011_FLAGS) & PL011_FLAGS_TX_FIFO_FULL) != 0 { }
-            ptr::write_volatile(PL011_DATA, byte as u32);
+            while (PL011.get(registers::FLAGS) & PL011_FLAGS_TX_FIFO_FULL) != 0 { }
+            PL011.set(registers::DATA, byte as u32);
         }
     }
 
     pub fn get_char(&self) -> Option<u8> {
         unsafe {
-            if ptr::read_volatile(PL011_FLAGS) & PL011_FLAGS_RX_FIFO_EMPTY == 0 {
-                Some(ptr::read_volatile(PL011_DATA) as u8)
+            if PL011.get(registers::FLAGS) & PL011_FLAGS_RX_FIFO_EMPTY == 0 {
+                Some(PL011.get(registers::DATA) as u8)
             } else {
                 None
             }
@@ -163,7 +168,7 @@ impl PL011Device {
     #[allow(dead_code)]
     pub fn flush(&self) {
         unsafe {
-            while (ptr::read_volatile(PL011_FLAGS) & PL011_FLAGS_TX_FIFO_EMPTY) == 0 { }
+            while (PL011.get(registers::FLAGS) & PL011_FLAGS_TX_FIFO_EMPTY) == 0 { }
         }
     }
 }

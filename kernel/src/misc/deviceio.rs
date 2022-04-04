@@ -277,3 +277,95 @@ mod option4 {
 }
 */
 
+/*
+mod option5 {
+    use core::ptr;
+    use core::marker::PhantomData;
+    use crate::arch::types::KernelVirtualAddress;
+
+    trait Readable {
+        type T;
+        fn get(&self) -> Self::T;
+    }
+
+    trait Writable {
+        type T;
+        fn set(&self, data: Self::T);
+    }
+
+    struct Register<T>(PhantomData<T>);
+
+    //impl<T> Readable for Register<T> {
+    //    type T = T;
+    //    fn get() -> T {
+    //        unsafe {
+    //            ptr::read_volatile(base.add(OFFSET).as_ptr::<T>())
+    //        }
+    //    }
+    //}
+
+
+    struct SpecificRegisterType(u32);
+
+    impl Readable for SpecificRegisterType {
+        type T = u32;
+
+        fn get(&self) -> T {
+            const OFFSET: usize = 0x10;
+            unsafe {
+                ptr::read_volatile(base.add(OFFSET).as_ptr::<T>())
+            }
+        }
+    }
+}
+
+mod option6 {
+
+    use core::ptr;
+
+    use core::marker::PhantomData;
+    use crate::arch::types::KernelVirtualAddress;
+
+
+    pub struct DeviceRegisters<R: Into<usize>, T> {
+        base: KernelVirtualAddress,
+        regs: PhantomData<R>,
+        data: PhantomData<T>,
+    }
+
+    impl<R: Into<usize>, T> DeviceRegisters<R, T> {
+        pub const fn new(base: KernelVirtualAddress) -> Self {
+            Self {
+                base,
+                regs: PhantomData,
+                data: PhantomData,
+            }
+        }
+
+        pub unsafe fn get(&self, reg: R) -> T {
+            ptr::read_volatile(self.base.add(reg.into()).as_ptr::<T>())
+        }
+
+        pub unsafe fn set(&self, reg: R, data: T) {
+            ptr::write_volatile(self.base.add(reg.into()).as_mut::<T>(), data);
+        }
+    }
+
+
+    struct Timer {
+        regs: DeviceRegisters<TimerRegisters, u32>,
+    }
+
+    enum TimerRegisters {
+        Control = 0x00,
+        Compare1 = 0x10,
+    }
+
+    fn usecase() {
+        let device = Timer { regs: DeviceRegisters::new(KernelVirtualAddress::new(0x3F00_3000)) };
+        let value = device.regs.get(TimerRegisters::Control);
+    }
+
+}
+*/
+

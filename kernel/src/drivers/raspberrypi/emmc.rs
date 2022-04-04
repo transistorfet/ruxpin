@@ -4,6 +4,8 @@ use core::ptr;
 use crate::printkln;
 use crate::errors::KernelError;
 use crate::block::BlockOperations;
+use crate::arch::types::KernelVirtualAddress;
+use crate::misc::deviceio::DeviceRegisters;
 
 use ruxpin_api::types::OpenFlags;
 
@@ -94,24 +96,24 @@ impl EmmcDevice {
 }
 
 
-const EMMC1_BASE_ADDR: u64 = 0xFFFF_0000_3F30_0000;
+const EMMC1: DeviceRegisters<u32> = DeviceRegisters::new(KernelVirtualAddress::new(0x3F30_0000));
 
-//const EMMC1_ARG2: *mut u32              = (EMMC1_BASE_ADDR + 0x00) as *mut u32;
-const EMMC1_BLOCK_COUNT_SIZE: *mut u32  = (EMMC1_BASE_ADDR + 0x04) as *mut u32;
-const EMMC1_ARG1: *mut u32              = (EMMC1_BASE_ADDR + 0x08) as *mut u32;
-const EMMC1_COMMAND: *mut u32           = (EMMC1_BASE_ADDR + 0x0C) as *mut u32;
-const EMMC1_RESPONSE0: *mut u32         = (EMMC1_BASE_ADDR + 0x10) as *mut u32;
-const EMMC1_RESPONSE1: *mut u32         = (EMMC1_BASE_ADDR + 0x14) as *mut u32;
-const EMMC1_RESPONSE2: *mut u32         = (EMMC1_BASE_ADDR + 0x18) as *mut u32;
-const EMMC1_RESPONSE3: *mut u32         = (EMMC1_BASE_ADDR + 0x1C) as *mut u32;
-const EMMC1_DATA: *mut u32              = (EMMC1_BASE_ADDR + 0x20) as *mut u32;
-const EMMC1_STATUS: *mut u32            = (EMMC1_BASE_ADDR + 0x24) as *mut u32;
-const EMMC1_HOST_CONTROL0: *mut u32     = (EMMC1_BASE_ADDR + 0x28) as *mut u32;
-const EMMC1_HOST_CONTROL1: *mut u32     = (EMMC1_BASE_ADDR + 0x2C) as *mut u32;
-const EMMC1_INTERRUPT_FLAGS: *mut u32   = (EMMC1_BASE_ADDR + 0x30) as *mut u32;
-const EMMC1_INTERRUPT_MASK: *mut u32    = (EMMC1_BASE_ADDR + 0x34) as *mut u32;
-const EMMC1_INTERRUPT_ENABLE: *mut u32  = (EMMC1_BASE_ADDR + 0x38) as *mut u32;
-//const EMMC1_HOST_CONTROL2: *mut u32     = (EMMC1_BASE_ADDR + 0x3C) as *mut u32;
+mod registers {
+    pub const BLOCK_COUNT_SIZE: usize   = 0x04;
+    pub const ARG1: usize               = 0x08;
+    pub const COMMAND: usize            = 0x0C;
+    pub const RESPONSE0: usize          = 0x10;
+    pub const RESPONSE1: usize          = 0x14;
+    pub const RESPONSE2: usize          = 0x18;
+    pub const RESPONSE3: usize          = 0x1C;
+    pub const DATA: usize               = 0x20;
+    pub const STATUS: usize             = 0x24;
+    pub const HOST_CONTROL0: usize      = 0x28;
+    pub const HOST_CONTROL1: usize      = 0x2C;
+    pub const INTERRUPT_FLAGS: usize    = 0x30;
+    pub const INTERRUPT_MASK: usize     = 0x34;
+    pub const INTERRUPT_ENABLE: usize   = 0x38;
+}
 
 const EMMC1_HC1_CLOCK_STABLE: u32       = 1 << 1;
 const EMMC1_HC1_RESET_HOST: u32         = 1 << 24;
@@ -133,18 +135,18 @@ impl EmmcHost {
 
         unsafe {
             // Reset all host circuitry
-            ptr::write_volatile(EMMC1_HOST_CONTROL0, 0);
-            ptr::write_volatile(EMMC1_HOST_CONTROL1, EMMC1_HC1_RESET_HOST);
+            EMMC1.set(registers::HOST_CONTROL0, 0);
+            EMMC1.set(registers::HOST_CONTROL1, EMMC1_HC1_RESET_HOST);
 
             // Wait for reset to clear
-            while (ptr::read_volatile(EMMC1_HOST_CONTROL1) & EMMC1_HC1_RESET_HOST) != 0 { }
+            while (EMMC1.get(registers::HOST_CONTROL1) & EMMC1_HC1_RESET_HOST) != 0 { }
 
             // Configure the clock
-            ptr::write_volatile(EMMC1_HOST_CONTROL1, 0x000E_6805);
-            wait_until_set(EMMC1_HOST_CONTROL1, EMMC1_HC1_CLOCK_STABLE).unwrap();
+            EMMC1.set(registers::HOST_CONTROL1, 0x000E_6805);
+            wait_until_set(registers::HOST_CONTROL1, EMMC1_HC1_CLOCK_STABLE).unwrap();
 
-            ptr::write_volatile(EMMC1_INTERRUPT_ENABLE, 0xffff_ffff);
-            ptr::write_volatile(EMMC1_INTERRUPT_MASK, 0xffff_ffff);
+            EMMC1.set(registers::INTERRUPT_ENABLE, 0xffff_ffff);
+            EMMC1.set(registers::INTERRUPT_MASK, 0xffff_ffff);
         }
 
         Ok(())
@@ -152,27 +154,27 @@ impl EmmcHost {
 
     fn send_command(cmd: Command, arg1: u32) -> Result<u32, KernelError> {
         unsafe {
-            wait_until_clear(EMMC1_STATUS, EMMC1_STA_COMMAND_INHIBIT)?;
+            wait_until_clear(registers::STATUS, EMMC1_STA_COMMAND_INHIBIT)?;
 
             // TODO the initialization times out if this isn't present, but I'm not sure what it does
-            ptr::write_volatile(EMMC1_INTERRUPT_FLAGS, ptr::read_volatile(EMMC1_INTERRUPT_FLAGS));
+            EMMC1.set(registers::INTERRUPT_FLAGS, EMMC1.get(registers::INTERRUPT_FLAGS));
 
             printkln!("mmc: sending command {:?} {:x}", cmd, arg1);
-            ptr::write_volatile(EMMC1_ARG1, arg1);
-            ptr::write_volatile(EMMC1_COMMAND, command_code(cmd));
+            EMMC1.set(registers::ARG1, arg1);
+            EMMC1.set(registers::COMMAND, command_code(cmd));
 
-            wait_until_set(EMMC1_INTERRUPT_FLAGS, EMMC1_INT_COMMAND_DONE | EMMC1_INT_ANY_ERROR)?;
+            wait_until_set(registers::INTERRUPT_FLAGS, EMMC1_INT_COMMAND_DONE | EMMC1_INT_ANY_ERROR)?;
 
-            let flags = ptr::read_volatile(EMMC1_INTERRUPT_FLAGS);
+            let flags = EMMC1.get(registers::INTERRUPT_FLAGS);
             if flags & EMMC1_INT_ANY_ERROR != 0 {
                 printkln!("mmc: error occurred: {:x}", flags);
                 // TODO this is temporary until the error issue is solved
                 Ok(0)
             } else {
-                let r0 = ptr::read_volatile(EMMC1_RESPONSE0);
-                let r1 = ptr::read_volatile(EMMC1_RESPONSE1);
-                let r2 = ptr::read_volatile(EMMC1_RESPONSE2);
-                let r3 = ptr::read_volatile(EMMC1_RESPONSE3);
+                let r0 = EMMC1.get(registers::RESPONSE0);
+                let r1 = EMMC1.get(registers::RESPONSE1);
+                let r2 = EMMC1.get(registers::RESPONSE2);
+                let r3 = EMMC1.get(registers::RESPONSE3);
                 printkln!("mmc: received response {:x} {:x} {:x} {:x}", r0, r1, r2, r3);
                 Ok(r0)
             }
@@ -180,19 +182,19 @@ impl EmmcHost {
     }
 
     fn setup_data_transfer(numblocks: usize, blocksize: usize) -> Result<(), KernelError> {
-        wait_until_clear(EMMC1_STATUS, EMMC1_STA_DATA_INHIBIT)?;
+        wait_until_clear(registers::STATUS, EMMC1_STA_DATA_INHIBIT)?;
 
         unsafe {
-            ptr::write_volatile(EMMC1_BLOCK_COUNT_SIZE, ((numblocks << 16) | blocksize) as u32);
+            EMMC1.set(registers::BLOCK_COUNT_SIZE, ((numblocks << 16) | blocksize) as u32);
         }
         Ok(())
     }
 
     fn read_data(data: &mut [u8]) -> Result<(), KernelError> {
-        wait_until_set(EMMC1_INTERRUPT_FLAGS, EMMC1_INT_READ_READY)?;
+        wait_until_set(registers::INTERRUPT_FLAGS, EMMC1_INT_READ_READY)?;
 
         for i in (0..data.len()).step_by(4) {
-            let value = unsafe { ptr::read_volatile(EMMC1_DATA) };
+            let value = unsafe { EMMC1.get(registers::DATA) };
 
             let bytes = if data.len() - i < 4 { data.len() - i } else { 4 };
             for j in 0..bytes {
@@ -218,10 +220,10 @@ const fn command_code(cmd: Command) -> u32 {
     }
 }
 
-fn wait_until_set(reg: *const u32, mask: u32) -> Result<(), KernelError> {
+fn wait_until_set(reg: usize, mask: u32) -> Result<(), KernelError> {
     for _ in 0..100000 {
         unsafe {
-            if (ptr::read_volatile(reg) & mask) != 0 {
+            if (EMMC1.get(reg) & mask) != 0 {
                 return Ok(());
             }
         }
@@ -229,10 +231,10 @@ fn wait_until_set(reg: *const u32, mask: u32) -> Result<(), KernelError> {
     Err(KernelError::DeviceTimeout)
 }
 
-fn wait_until_clear(reg: *const u32, mask: u32) -> Result<(), KernelError> {
+fn wait_until_clear(reg: usize, mask: u32) -> Result<(), KernelError> {
     for _ in 0..100000 {
         unsafe {
-            if (ptr::read_volatile(reg) & mask) == 0 {
+            if (EMMC1.get(reg) & mask) == 0 {
                 return Ok(());
             }
         }
