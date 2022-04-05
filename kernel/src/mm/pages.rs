@@ -6,16 +6,15 @@ use alloc::vec::Vec;
 use crate::printkln;
 use crate::arch::mmu;
 use crate::arch::types::PhysicalAddress;
+use crate::misc::bitmap::Bitmap;
+
 
 pub struct PagePool {
     regions: Vec<PageRegion>,
 }
 
 pub struct PageRegion {
-    pages: usize,
-    pages_free: usize,
-    table: &'static mut [u8],
-    last_index: usize,
+    bitmap: Bitmap<'static>,
     pages_start: PhysicalAddress,
 }
 
@@ -62,7 +61,7 @@ impl PagePool {
 
     pub fn free_page(&mut self, ptr: PhysicalAddress) {
         for region in &mut self.regions {
-            if ptr >= region.pages_start && ptr <= region.pages_start.add(region.pages) {
+            if ptr >= region.pages_start && ptr <= region.pages_start.add(region.total_pages()) {
                 return region.free_page(ptr);
             }
         }
@@ -70,17 +69,6 @@ impl PagePool {
 }
 
 impl PageRegion {
-    pub fn alloc_page(&mut self) -> Option<PhysicalAddress> {
-        let bit = self.bit_alloc()?;
-        let page_addr = self.pages_start.add(bit * mmu::page_size());
-        Some(page_addr)
-    }
-
-    pub fn free_page(&mut self, ptr: PhysicalAddress) {
-        let bit = (usize::from(ptr) - usize::from(self.pages_start)) / mmu::page_size();
-        self.bit_free(bit);
-    }
-
     fn new(start: PhysicalAddress, end: PhysicalAddress) -> Self {
         let page_size = mmu::page_size();
         let total_size = usize::from(end) - usize::from(start);
@@ -93,51 +81,25 @@ impl PageRegion {
         let table: &'static mut [u8] = unsafe { slice::from_raw_parts_mut(start.to_kernel_addr().as_mut(), table_pages * page_size) };
         let pages_start = PhysicalAddress::from(start).add(table_pages * page_size);
 
-        for byte in table.iter_mut() {
-            *byte = 0;
-        }
-
         Self {
-            pages,
-            pages_free: pages,
-            table,
-            last_index: 0,
+            bitmap: Bitmap::new(pages, table),
             pages_start,
         }
     }
 
-    fn bit_alloc(&mut self) -> Option<usize> {
-        let mut i = self.last_index;
-
-        loop {
-            if i >= ceiling_div(self.pages, 8) {
-                i = 0;
-            }
-
-            if self.table[i] != 0xff {
-                let mut bit = 0;
-                while bit < 7 && (self.table[i] & (0x01 << bit)) != 0 {
-                    bit += 1;
-                }
-                self.table[i] |= 0x01 << bit;
-                self.last_index = i;
-                self.pages_free -= 1;
-                return Some((i * 8) + bit);
-            }
-
-            i += 1;
-            if i == self.last_index {
-                return None;
-            }
-        }
+    pub fn alloc_page(&mut self) -> Option<PhysicalAddress> {
+        let bit = self.bitmap.alloc()?;
+        let page_addr = self.pages_start.add(bit * mmu::page_size());
+        Some(page_addr)
     }
 
-    fn bit_free(&mut self, bitnum: usize) {
-        let i = bitnum >> 3;
-        let bit = bitnum & 0x7;
-        self.table[i] &= !(0x01 << bit);
-        self.pages_free += 1;
-        // NOTE we could set last_index here, but not doing that might mean more contiguous chunks get allocated
+    pub fn free_page(&mut self, ptr: PhysicalAddress) {
+        let bit = (usize::from(ptr) - usize::from(self.pages_start)) / mmu::page_size();
+        self.bitmap.free(bit);
+    }
+
+    pub const fn total_pages(&self) -> usize {
+        self.bitmap.total_bits()
     }
 }
 
