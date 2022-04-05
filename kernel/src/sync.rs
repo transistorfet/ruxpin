@@ -15,7 +15,7 @@ pub struct Spinlock<T: ?Sized> {
 }
 
 unsafe impl<T: ?Sized + Send> Send for Spinlock<T> {}
-unsafe impl<T: ?Sized + Send> Sync for Spinlock<T> {}
+unsafe impl<T: ?Sized + Sync> Sync for Spinlock<T> {}
 
 impl<T> Spinlock<T> {
     pub const fn new(t: T) -> Spinlock<T> {

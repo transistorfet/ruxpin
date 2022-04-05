@@ -28,10 +28,6 @@ struct ProcessManager {
     current: usize,
 }
 
-unsafe impl Send for Process {}
-unsafe impl Sync for Process {}
-
-
 static NEXT_PID: Spinlock<Pid> = Spinlock::new(1);
 static PROCESS_MANAGER: Spinlock<ProcessManager> = Spinlock::new(ProcessManager::new());
 
