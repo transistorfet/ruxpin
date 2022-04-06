@@ -1,6 +1,4 @@
 
-use core::ptr;
-
 use alloc::boxed::Box;
 
 use crate::block;
@@ -9,19 +7,48 @@ use crate::errors::KernelError;
 use crate::block::BlockOperations;
 use crate::arch::types::KernelVirtualAddress;
 use crate::misc::deviceio::DeviceRegisters;
+use crate::block::partition::Partition;
 
-use ruxpin_api::types::OpenFlags;
+use ruxpin_api::types::{OpenFlags, DeviceID};
 
 //use super::gpio;
 
 
-pub struct EmmcDevice;
+static EMMC_DRIVER_NAME: &'static str = "sd";
+
+pub struct EmmcDevice {
+    base: u64,
+    size: u64,
+}
 
 impl EmmcDevice {
     pub fn register() -> Result<(), KernelError> {
-        let driver_id = block::register_block_driver("sd")?;
-        let device_id = block::register_block_device(driver_id, Box::new(EmmcDevice {}))?;
+        let driver_id = block::register_block_driver(EMMC_DRIVER_NAME)?;
+        let device_id = block::register_block_device(driver_id, Box::new(EmmcDevice::new(0, 0)))?;
+        let raw_device = DeviceID(driver_id, device_id);
+
+        let mut buffer = [0; 512];
+        block::open(raw_device, OpenFlags::ReadOnly)?;
+        block::read(raw_device, &mut buffer, 0)?;
+        block::close(raw_device)?;
+
+        if let Some(iter) = Partition::read_mbr_partition_table_iter(&buffer) {
+            for (i, partition) in iter.enumerate() {
+                printkln!("{}: found partition {} at {:x}, {} MiB", EMMC_DRIVER_NAME, i, partition.base, partition.size / 2048);
+                block::register_block_device(driver_id, Box::new(EmmcDevice::new(partition.base as u64 * 512, partition.size as u64 * 512)))?;
+            }
+        } else {
+            printkln!("{}: no partition table found", EMMC_DRIVER_NAME);
+        }
+
         Ok(())
+    }
+
+    fn new(base: u64, size: u64) -> Self {
+        Self {
+            base,
+            size,
+        }
     }
 }
 
@@ -35,11 +62,14 @@ impl BlockOperations for EmmcDevice {
         Ok(())
     }
 
-    fn read(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, KernelError> {
-        EmmcDevice::read_data(buffer, offset)
+    fn read(&mut self, mut buffer: &mut [u8], offset: u64) -> Result<usize, KernelError> {
+        if self.size != 0 && offset + buffer.len() as u64 > self.size {
+            buffer = &mut buffer[..(self.size - offset as u64) as usize];
+        }
+        EmmcDevice::read_data(buffer, self.base + offset)
     }
 
-    fn write(&mut self, _buffer: &[u8], _offset: usize) -> Result<usize, KernelError> {
+    fn write(&mut self, _buffer: &[u8], _offset: u64) -> Result<usize, KernelError> {
         Err(KernelError::OperationNotPermitted)
     }
 }
@@ -81,13 +111,13 @@ impl EmmcDevice {
         Ok(())
     }
 
-    pub fn read_data(buffer: &mut [u8], offset: usize) -> Result<usize, KernelError> {
+    pub fn read_data(buffer: &mut [u8], offset: u64) -> Result<usize, KernelError> {
         let blocksize = 512;
         let mut i = 0;
         let mut len = buffer.len();
 
         while len > 0 {
-            EmmcDevice::read_segment(offset + i, &mut buffer[i..(i + blocksize)])?;
+            EmmcDevice::read_segment(offset + i as u64, &mut buffer[i..(i + blocksize)])?;
             len -= blocksize;
             i += blocksize;
         }
@@ -97,7 +127,7 @@ impl EmmcDevice {
         Ok(i)
     }
 
-    fn read_segment(offset: usize, buffer: &mut [u8]) -> Result<(), KernelError> {
+    fn read_segment(offset: u64, buffer: &mut [u8]) -> Result<(), KernelError> {
         EmmcHost::setup_data_transfer(1, buffer.len())?;
         EmmcHost::send_command(Command::ReadSingle, offset as u32)?;
 

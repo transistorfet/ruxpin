@@ -11,16 +11,17 @@ use ruxpin_api::types::{OpenFlags, DeviceID, DriverID, SubDeviceID};
 use crate::sync::Spinlock;
 use crate::errors::KernelError;
 
-mod bufcache;
+pub mod partition;
 
+mod bufcache;
 use self::bufcache::BufCache;
 
 
 pub trait BlockOperations: Sync + Send {
     fn open(&mut self, mode: OpenFlags) -> Result<(), KernelError>;
     fn close(&mut self) -> Result<(), KernelError>;
-    fn read(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, KernelError>;
-    fn write(&mut self, buffer: &[u8], offset: usize) -> Result<usize, KernelError>;
+    fn read(&mut self, buffer: &mut [u8], offset: u64) -> Result<usize, KernelError>;
+    fn write(&mut self, buffer: &[u8], offset: u64) -> Result<usize, KernelError>;
     //int (*ioctl)(devminor_t minor, unsigned int request, void *argp, uid_t uid);
     //int (*poll)(devminor_t minor, int events);
     //offset_t (*seek)(devminor_t minor, offset_t position, int whence, offset_t offset);
@@ -80,20 +81,20 @@ pub fn close(device_id: DeviceID) -> Result<(), KernelError> {
     result
 }
 
-pub fn read(device_id: DeviceID, buffer: &mut [u8], offset: usize) -> Result<usize, KernelError> {
+pub fn read(device_id: DeviceID, buffer: &mut [u8], offset: u64) -> Result<usize, KernelError> {
     let device = get_device(device_id)?;
     //let result = device.lock().dev.read(buffer, offset);
     let result = device.cache.lock().read(&mut *device.dev.lock(), buffer, offset);
     result
 }
 
-pub fn write(device_id: DeviceID, buffer: &[u8], offset: usize) -> Result<usize, KernelError> {
+pub fn write(device_id: DeviceID, buffer: &[u8], offset: u64) -> Result<usize, KernelError> {
     let device = get_device(device_id)?;
     let result = device.dev.lock().write(buffer, offset);
     result
 }
 
-pub fn read_struct<T>(location: &mut T, device_id: DeviceID, offset: usize) -> Result<(), KernelError> {
+pub fn read_struct<T>(location: &mut T, device_id: DeviceID, offset: u64) -> Result<(), KernelError> {
     let buffer = unsafe { slice::from_raw_parts_mut(location as *mut T as *mut u8, mem::size_of::<T>()) };
     read(device_id, buffer, offset)?;
     Ok(())
