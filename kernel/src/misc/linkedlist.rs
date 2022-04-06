@@ -14,6 +14,12 @@ pub struct UnownedLinkedListNode<T> {
     data: T,
 }
 
+unsafe impl<T: Sync + Send> Send for UnownedLinkedList<T> {}
+unsafe impl<T: Sync + Send> Sync for UnownedLinkedList<T> {}
+unsafe impl<T: Sync + Send> Send for UnownedLinkedListNode<T> {}
+unsafe impl<T: Sync + Send> Sync for UnownedLinkedListNode<T> {}
+
+
 impl<T> UnownedLinkedList<T> {
     pub fn new() -> Self {
         Self {

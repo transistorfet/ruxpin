@@ -1,6 +1,9 @@
 
 use core::ptr;
 
+use alloc::boxed::Box;
+
+use crate::block;
 use crate::printkln;
 use crate::errors::KernelError;
 use crate::block::BlockOperations;
@@ -10,6 +13,17 @@ use crate::misc::deviceio::DeviceRegisters;
 use ruxpin_api::types::OpenFlags;
 
 //use super::gpio;
+
+
+pub struct EmmcDevice;
+
+impl EmmcDevice {
+    pub fn register() -> Result<(), KernelError> {
+        let driver_id = block::register_block_driver("sd")?;
+        let device_id = block::register_block_device(driver_id, Box::new(EmmcDevice {}))?;
+        Ok(())
+    }
+}
 
 
 impl BlockOperations for EmmcDevice {
@@ -44,8 +58,6 @@ enum Command {
     SendOpCond,         // ACMD41
     AppCommand,         // CMD55
 }
-
-pub struct EmmcDevice;
 
 impl EmmcDevice {
     pub fn init() -> Result<(), KernelError> {

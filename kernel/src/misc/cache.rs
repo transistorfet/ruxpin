@@ -35,7 +35,11 @@ impl<T> Cache<T> {
         }
     }
 
-    pub fn get<C, F>(&mut self, compare: C, fetch: F) -> CacheArc<T> where C: Fn(&T) -> bool, F: FnOnce() -> T {
+    pub fn get<C, F, E>(&mut self, compare: C, fetch: F) -> Result<CacheArc<T>, E>
+    where
+        C: Fn(&T) -> bool,
+        F: FnOnce() -> Result<T, E>
+    {
         // Search the list for the matching object
         let mut iter = self.order.iter();
         while let Some(ptr) = iter.next() {
@@ -45,18 +49,18 @@ impl<T> Cache<T> {
                     self.order.remove_node(ptr);
                     self.order.insert_head(ptr);
                 }
-                return item.wrap_inner();
+                return Ok(item.wrap_inner());
             }
         }
 
         // If not every cache entry is in use, then allocate a new one and fetch the object
         if self.items.len() < self.max_size {
-            self.items.push(UnownedLinkedListNode::new(CacheArcInner::new(fetch())));
+            self.items.push(UnownedLinkedListNode::new(CacheArcInner::new(fetch()?)));
             let i = self.items.len() - 1;
             unsafe {
                 self.order.insert_head(self.items[i].wrap_non_null());
             }
-            return self.items[i].wrap_inner();
+            return Ok(self.items[i].wrap_inner());
         }
 
         // If the cache is full, then find the last entry in the list that has no references and recycle it
@@ -64,12 +68,12 @@ impl<T> Cache<T> {
         while let Some(ptr) = iter.next() {
             let item = unsafe { &mut (*ptr.as_ptr()) };
             if item.refcount.load(Ordering::Relaxed) == 0 {
-                item.data = fetch();
+                item.data = fetch()?;
                 unsafe {
                     self.order.remove_node(ptr);
                     self.order.insert_head(ptr);
                 }
-                return item.wrap_inner();
+                return Ok(item.wrap_inner());
             }
         }
 

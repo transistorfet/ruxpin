@@ -8,8 +8,9 @@ use crate::proc::process::init_processes;
 use crate::mm::kmalloc::init_kernel_heap;
 use crate::mm::vmalloc::init_virtual_memory;
 use crate::fs::vfs;
+use crate::block;
 
-use ruxpin_api::types::{OpenFlags, FileAccess};
+use ruxpin_api::types::{OpenFlags, FileAccess, DeviceID};
 
 #[path = "../drivers/arm/mod.rs"]
 pub mod arm;
@@ -30,7 +31,7 @@ pub fn register_devices() -> Result<(), KernelError> {
     init_kernel_heap(PhysicalAddress::from(0x20_0000), PhysicalAddress::from(0x100_0000));
     init_virtual_memory(PhysicalAddress::from(0x100_0000), PhysicalAddress::from(0x1000_0000));
 
-    vfs::initialize().unwrap();
+    vfs::initialize()?;
     init_processes();
 
     console::init()?;
@@ -39,17 +40,19 @@ pub fn register_devices() -> Result<(), KernelError> {
     vfs::write(&mut file, b"the device file can write\n").unwrap();
     vfs::close(&mut file).unwrap();
 
-    let block_device: &mut dyn BlockOperations = &mut EmmcDevice{};
     printkln!("emmc: initializing");
-    block_device.open(OpenFlags::ReadOnly).unwrap();
+    EmmcDevice::register()?;
+    let device_id = DeviceID(0, 0);
+    block::open(device_id, OpenFlags::ReadOnly).unwrap();
     let mut data = [0; 1024];
-    block_device.read(&mut data, 0).unwrap();
+    block::read(device_id, &mut data, 1024).unwrap();
     unsafe {
         crate::printk::printk_dump(&data as *const u8, 1024);
     }
 
-    SystemTimer::init();
-    GenericInterruptController::init();
+
+    //SystemTimer::init();
+    //GenericInterruptController::init();
 
     Ok(())
 }

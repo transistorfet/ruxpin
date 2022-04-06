@@ -1,22 +1,20 @@
 
+use core::mem;
+use core::slice;
+
 use alloc::vec::Vec;
 use alloc::boxed::Box;
+use alloc::sync::Arc;
  
 use ruxpin_api::types::{OpenFlags, DeviceID, DriverID, SubDeviceID};
 
 use crate::sync::Spinlock;
 use crate::errors::KernelError;
 
-//mod bufcache;
+mod bufcache;
 
-pub struct BlockDriver {
-    prefix: &'static str,
-    devices: Vec<BlockDevice>,
-}
+use self::bufcache::BufCache;
 
-pub struct BlockDevice {
-    dev: Box<dyn BlockOperations>,
-}
 
 pub trait BlockOperations: Sync + Send {
     fn open(&mut self, mode: OpenFlags) -> Result<(), KernelError>;
@@ -26,6 +24,18 @@ pub trait BlockOperations: Sync + Send {
     //int (*ioctl)(devminor_t minor, unsigned int request, void *argp, uid_t uid);
     //int (*poll)(devminor_t minor, int events);
     //offset_t (*seek)(devminor_t minor, offset_t position, int whence, offset_t offset);
+}
+
+struct BlockDevice {
+    dev: Spinlock<Box<dyn BlockOperations>>,
+    cache: Spinlock<BufCache>,
+}
+
+type BlockDeviceEntry = Arc<BlockDevice>;
+
+struct BlockDriver {
+    prefix: &'static str,
+    devices: Vec<BlockDeviceEntry>,
 }
 
 
@@ -38,35 +48,64 @@ pub fn register_block_driver(prefix: &'static str) -> Result<DriverID, KernelErr
     Ok(driver_id)
 }
 
-pub fn open(device_id: DeviceID, mode: OpenFlags) -> Result<(), KernelError> {
+pub fn register_block_device(driver_id: DriverID, dev: Box<dyn BlockOperations>) -> Result<SubDeviceID, KernelError> {
     let mut drivers_list = BLOCK_DRIVERS.lock();
-    let device = get_device(&mut *drivers_list, device_id)?;
-    device.dev.open(mode)
+    let driver = drivers_list.get_mut(driver_id as usize).ok_or(KernelError::NoSuchDevice)?;
+    driver.add_device(dev)
+}
+
+pub fn lookup_device(name: &str) -> Result<DeviceID, KernelError> {
+    let drivers_list = BLOCK_DRIVERS.lock();
+    for (driver_id, driver) in drivers_list.iter().enumerate() {
+        if driver.prefix == &name[..driver.prefix.len()] {
+            let subdevice_id = name[driver.prefix.len()..].parse::<SubDeviceID>().map_err(|_| KernelError::NoSuchDevice)?;
+            if (subdevice_id as usize) < driver.devices.len() {
+                return Ok(DeviceID(driver_id as DriverID, subdevice_id));
+            }
+            break;
+        }
+    }
+    Err(KernelError::NoSuchDevice)
+}
+
+pub fn open(device_id: DeviceID, mode: OpenFlags) -> Result<(), KernelError> {
+    let device = get_device(device_id)?;
+    let result = device.dev.lock().open(mode);
+    result
 }
 
 pub fn close(device_id: DeviceID) -> Result<(), KernelError> {
-    let mut drivers_list = BLOCK_DRIVERS.lock();
-    let device = get_device(&mut *drivers_list, device_id)?;
-    device.dev.close()
+    let device = get_device(device_id)?;
+    let result = device.dev.lock().close();
+    result
 }
 
 pub fn read(device_id: DeviceID, buffer: &mut [u8], offset: usize) -> Result<usize, KernelError> {
-    let mut drivers_list = BLOCK_DRIVERS.lock();
-    let device = get_device(&mut *drivers_list, device_id)?;
-    device.dev.read(buffer, offset)
+    let device = get_device(device_id)?;
+    //let result = device.lock().dev.read(buffer, offset);
+    let result = device.cache.lock().read(&mut *device.dev.lock(), buffer, offset);
+    result
 }
 
 pub fn write(device_id: DeviceID, buffer: &[u8], offset: usize) -> Result<usize, KernelError> {
-    let mut drivers_list = BLOCK_DRIVERS.lock();
-    let device = get_device(&mut *drivers_list, device_id)?;
-    device.dev.write(buffer, offset)
+    let device = get_device(device_id)?;
+    let result = device.dev.lock().write(buffer, offset);
+    result
 }
 
-fn get_device(drivers_list: &mut Vec<BlockDriver>, device_id: DeviceID) -> Result<&mut BlockDevice, KernelError> {
+pub fn read_struct<T>(location: &mut T, device_id: DeviceID, offset: usize) -> Result<(), KernelError> {
+    let buffer = unsafe { slice::from_raw_parts_mut(location as *mut T as *mut u8, mem::size_of::<T>()) };
+    read(device_id, buffer, offset)?;
+    Ok(())
+}
+
+
+fn get_device(device_id: DeviceID) -> Result<BlockDeviceEntry, KernelError> {
     let DeviceID(driver_id, subdevice_id) = device_id;
+    let mut drivers_list = BLOCK_DRIVERS.lock();
     let driver = drivers_list.get_mut(driver_id as usize).ok_or(KernelError::NoSuchDevice)?;
     let device = driver.devices.get_mut(subdevice_id as usize).ok_or(KernelError::NoSuchDevice)?;
-    Ok(device)
+    Ok(device.clone())
 }
 
 
@@ -80,7 +119,7 @@ impl BlockDriver {
 
     pub fn add_device(&mut self, dev: Box<dyn BlockOperations>) -> Result<SubDeviceID, KernelError> {
         let device_id = self.devices.len() as SubDeviceID;
-        self.devices.push(BlockDevice::new(dev));
+        self.devices.push(Arc::new(BlockDevice::new(dev)));
         Ok(device_id)
     }
 }
@@ -88,7 +127,8 @@ impl BlockDriver {
 impl BlockDevice {
     pub fn new(dev: Box<dyn BlockOperations>) -> Self {
         Self {
-            dev,
+            dev: Spinlock::new(dev),
+            cache: Spinlock::new(BufCache::new(1024)),
         }
     }
 }
