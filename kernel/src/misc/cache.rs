@@ -7,9 +7,13 @@ use core::sync::atomic::{self, AtomicUsize, Ordering};
 
 use alloc::vec::Vec;
 
+use crate::misc::linkedlist::{UnownedLinkedList, UnownedLinkedListNode};
+
+
 pub struct Cache<T> {
     max_size: usize,
-    items: Vec<CacheArcInner<T>>,
+    items: Vec<UnownedLinkedListNode<CacheArcInner<T>>>,
+    order: UnownedLinkedList<CacheArcInner<T>>,
 }
 
 pub struct CacheArc<T> {
@@ -27,31 +31,62 @@ impl<T> Cache<T> {
         Self {
             max_size,
             items: Vec::with_capacity(max_size),
+            order: UnownedLinkedList::new(),
         }
     }
 
     pub fn get<C, F>(&mut self, compare: C, fetch: F) -> CacheArc<T> where C: Fn(&T) -> bool, F: FnOnce() -> T {
-        for item in self.items.iter_mut() {
+        // Search the list for the matching object
+        let mut iter = self.order.iter();
+        while let Some(ptr) = iter.next() {
+            let item = unsafe { &mut (*ptr.as_ptr()) };
             if compare(&item.data) {
+                unsafe {
+                    self.order.remove_node(ptr);
+                    self.order.insert_head(ptr);
+                }
                 return item.wrap_inner();
             }
         }
 
-        // TODO need a linked list or something to track age of last use
-        for item in self.items.iter_mut() {
-            if item.refcount.load(Ordering::Relaxed) == 0 {
-                item.data = fetch();
-                return item.wrap_inner();
-            }
-        }
-
+        // If not every cache entry is in use, then allocate a new one and fetch the object
         if self.items.len() < self.max_size {
-            self.items.push(CacheArcInner::new(fetch()));
+            self.items.push(UnownedLinkedListNode::new(CacheArcInner::new(fetch())));
             let i = self.items.len() - 1;
+            unsafe {
+                self.order.insert_head(self.items[i].wrap_non_null());
+            }
             return self.items[i].wrap_inner();
         }
 
+        // If the cache is full, then find the last entry in the list that has no references and recycle it
+        let mut iter = self.order.iter_rev();
+        while let Some(ptr) = iter.next() {
+            let item = unsafe { &mut (*ptr.as_ptr()) };
+            if item.refcount.load(Ordering::Relaxed) == 0 {
+                item.data = fetch();
+                unsafe {
+                    self.order.remove_node(ptr);
+                    self.order.insert_head(ptr);
+                }
+                return item.wrap_inner();
+            }
+        }
+
         panic!("Out of Cache");
+    }
+}
+
+impl<T: core::fmt::Debug> Cache<T> {
+    pub fn print(&mut self) {
+        let mut i = 0;
+        let mut iter = self.order.iter();
+        crate::printkln!("Cache contents:");
+        while let Some(ptr) = iter.next() {
+            let item = unsafe { &mut (*ptr.as_ptr()) };
+            crate::printkln!("{}: {:?}", i, item.data);
+            i += 1;
+        }
     }
 }
 
