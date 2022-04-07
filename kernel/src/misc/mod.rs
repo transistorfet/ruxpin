@@ -1,6 +1,7 @@
 
 pub mod cache;
 pub mod bitmap;
+pub mod byteorder;
 pub mod strarray;
 pub use self::strarray::StrArray;
 

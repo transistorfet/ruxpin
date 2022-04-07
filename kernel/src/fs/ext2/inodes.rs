@@ -7,6 +7,7 @@ use alloc::sync::Arc;
 use crate::block;
 use crate::sync::Spinlock;
 use crate::errors::KernelError;
+use crate::misc::byteorder::{leu16, leu32};
 use crate::fs::types::{Vnode, FileAttributes};
 
 use super::Ext2Mount;
@@ -24,45 +25,45 @@ const EXT2_INODE_BLOCK_ENTRIES: usize           = EXT2_INODE_TRIPLE_INDIRECT_BLO
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 struct Ext2InodeOnDisk {
-    mode: u16,
-    uid: u16,
-    size: u32,
-    atime: u32,
-    ctime: u32,
-    mtime: u32,
-    dtime: u32,
-    gid: u16,
-    num_links: u16,
-    num_blocks: u32,
-    flags: u32,
-    _reserved1: u32,
-    blocks: [u32; EXT2_INODE_BLOCK_ENTRIES],
-    file_generation: u32,
-    file_acl: u32,
-    dir_acl: u32,
-    fragment_addr: u32,
+    mode: leu16,
+    uid: leu16,
+    size: leu32,
+    atime: leu32,
+    ctime: leu32,
+    mtime: leu32,
+    dtime: leu32,
+    gid: leu16,
+    num_links: leu16,
+    num_blocks: leu32,
+    flags: leu32,
+    _reserved1: leu32,
+    blocks: [leu32; EXT2_INODE_BLOCK_ENTRIES],
+    file_generation: leu32,
+    file_acl: leu32,
+    dir_acl: leu32,
+    fragment_addr: leu32,
     fragment_num: u8,
     fragment_size: u8,
-    _pad1: u16,
-    uid_high: u16,
-    gid_high: u16,
-    _reserved2: u32,
+    _pad1: leu16,
+    uid_high: leu16,
+    gid_high: leu16,
+    _reserved2: leu32,
 }
 
 impl Into<FileAttributes> for Ext2InodeOnDisk {
     fn into(self) -> FileAttributes {
         FileAttributes {
-            access: self.mode.into(),
-            nlinks: self.num_links,
-            uid: self.uid,
-            gid: self.gid,
+            access: u16::from(self.mode).into(),
+            nlinks: self.num_links.into(),
+            uid: self.uid.into(),
+            gid: self.gid.into(),
             rdev: None,
             inode: 0,
-            size: self.size as usize,
+            size: u32::from(self.size) as usize,
 
-            atime: self.atime.into(),
-            mtime: self.mtime.into(),
-            ctime: self.ctime.into(),
+            atime: u32::from(self.atime).into(),
+            mtime: u32::from(self.mtime).into(),
+            ctime: u32::from(self.ctime).into(),
         }
     }
 }
@@ -119,13 +120,13 @@ impl Ext2Mount {
             slice::from_raw_parts((buf.block.lock()).as_ptr() as *mut Ext2InodeOnDisk, self.superblock.inodes_per_block)
         };
 
-        vnode.blocks = data[index].blocks;
+        for i in 0..vnode.blocks.len() {
+            vnode.blocks[i] = data[index].blocks[i].into();
+        }
 
         vnode.attrs = data[index].into();
         vnode.attrs.inode = inode_num;
 
-
-        crate::printkln!("loaded inode {} {:#?}", inode_num, data[index]);
         Ok(())
     }
 }

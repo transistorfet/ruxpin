@@ -10,64 +10,65 @@ use crate::printkln;
 use crate::block::BlockNum;
 use crate::misc::ceiling_div;
 use crate::errors::KernelError;
+use crate::misc::byteorder::{leu16, leu32};
 
 use super::Ext2InodeNum;
 
 
 #[repr(C)]
 struct Ext2SuperBlockOnDisk {
-    total_inodes: u32,
-    total_blocks: u32,
-    reserved_su_blocks: u32,
-    total_unalloc_blocks: u32,
-    total_unalloc_inodes: u32,
-    superblock_block: u32,
-    log_block_size: u32,
-    log_fragment_size: u32,
+    total_inodes: leu32,
+    total_blocks: leu32,
+    reserved_su_blocks: leu32,
+    total_unalloc_blocks: leu32,
+    total_unalloc_inodes: leu32,
+    superblock_block: leu32,
+    log_block_size: leu32,
+    log_fragment_size: leu32,
 
-    blocks_per_group: u32,
-    fragments_per_block: u32,
-    inodes_per_group: u32,
+    blocks_per_group: leu32,
+    fragments_per_block: leu32,
+    inodes_per_group: leu32,
 
-    last_mount_time: u32,
-    last_write_time: u32,
+    last_mount_time: leu32,
+    last_write_time: leu32,
 
-    mounts_since_check: u16,
-    mounts_before_check: u16,
-    magic: u16,
-    state: u16,
+    mounts_since_check: leu16,
+    mounts_before_check: leu16,
+    magic: leu16,
+    state: leu16,
 
-    errors: u16,
-    minor_version: u16,
-    last_check: u32,
-    check_interval: u32,
-    creator_os: u32,
-    major_version: u32,
+    errors: leu16,
+    minor_version: leu16,
+    last_check: leu32,
+    check_interval: leu32,
+    creator_os: leu32,
+    major_version: leu32,
 
-    reserved_uid: u16,
-    reserved_gid: u16,
+    reserved_uid: leu16,
+    reserved_gid: leu16,
 
     extended: Ext2ExtendedSuperBlockOnDisk,
 }
 
 #[repr(C)]
 struct Ext2ExtendedSuperBlockOnDisk {
-    first_reserved_inode: u32,
-    inode_size: u16,
-    blockgroup_of_super: u32,
-    optional_features: u32,
+    first_reserved_inode: leu32,
+    inode_size: leu16,
+    blockgroup_of_super: leu32,
+    optional_features: leu32,
 }
 
 #[repr(C)]
 struct Ext2GroupDescriptorOnDisk {
-    block_bitmap: u32,
-    inode_bitmap: u32,
-    inode_table: u32,
-    free_block_count: u16,
-    free_inode_count: u16,
-    used_dirs_count: u16,
-    _padding: u16,
-    _reserved: [u32; 3],
+    block_bitmap: leu32,
+    inode_bitmap: leu32,
+    inode_table: leu32,
+    free_block_count: leu16,
+    free_inode_count: leu16,
+    used_dirs_count: leu16,
+    _padding: leu16,
+    _reserved: [leu32; 3],
 }
 
 
@@ -131,41 +132,45 @@ impl Ext2SuperBlock {
             &*((buf.block.lock()).as_ptr() as *mut Ext2SuperBlockOnDisk)
         };
 
-        if data.magic != 0xEF53 {
-            printkln!("ext2: invalid superblock magic number {:x}", data.magic);
+        if u16::from(data.magic) != 0xEF53 {
+            printkln!("ext2: invalid superblock magic number {:x}", u16::from(data.magic));
             return Err(KernelError::InvalidSuperblock);
         }
 
-        if data.log_block_size != data.log_fragment_size {
+        let block_size = 1024 << u32::from(data.log_block_size) as usize;
+        let fragment_size = 1024 << u32::from(data.log_fragment_size) as usize;
+
+        if block_size != fragment_size {
             printkln!("ext2: block size and fragment size don't match");
             return Err(KernelError::InvalidSuperblock);
         }
 
-        let block_size = 1024 << data.log_block_size as usize;
-        let inode_size = if data.major_version > 1 { data.extended.inode_size as usize } else { 128 };
-        let total_block_groups = ceiling_div(data.total_blocks as usize, data.blocks_per_group as usize);
+        let inode_size = if u32::from(data.major_version) > 1 { u16::from(data.extended.inode_size) as usize } else { 128 };
+        let total_blocks = data.total_blocks.into();
+        let blocks_per_group = data.blocks_per_group.into();
+        let total_block_groups = ceiling_div(total_blocks as usize, blocks_per_group as usize);
 
         let superblock = Self {
-            total_inodes: data.total_inodes,
-            total_blocks: data.total_blocks,
-            reserved_su_blocks: data.reserved_su_blocks,
-            total_unalloc_blocks: data.total_unalloc_blocks,
-            total_unalloc_inodes: data.total_unalloc_inodes,
-            superblock_block: data.superblock_block,
-            block_size: block_size,
-            fragment_size: 1024 << data.log_fragment_size as usize,
+            total_inodes: data.total_inodes.into(),
+            total_blocks,
+            reserved_su_blocks: data.reserved_su_blocks.into(),
+            total_unalloc_blocks: data.total_unalloc_blocks.into(),
+            total_unalloc_inodes: data.total_unalloc_inodes.into(),
+            superblock_block: data.superblock_block.into(),
+            block_size,
+            fragment_size,
 
-            blocks_per_group: data.blocks_per_group,
-            fragments_per_block: data.fragments_per_block,
-            inodes_per_group: data.inodes_per_group,
+            blocks_per_group,
+            fragments_per_block: data.fragments_per_block.into(),
+            inodes_per_group: data.inodes_per_group.into(),
 
-            last_mount_time: data.last_mount_time,
-            last_write_time: data.last_write_time,
+            last_mount_time: data.last_mount_time.into(),
+            last_write_time: data.last_write_time.into(),
 
-            mounts_since_check: data.mounts_since_check,
-            mounts_before_check: data.mounts_before_check,
-            magic: data.magic,
-            state: data.state,
+            mounts_since_check: data.mounts_since_check.into(),
+            mounts_before_check: data.mounts_before_check.into(),
+            magic: data.magic.into(),
+            state: data.state.into(),
 
             inode_size,
             inodes_per_block: block_size / inode_size,
@@ -202,12 +207,12 @@ impl Ext2BlockGroup {
 
         for i in 0..total_block_groups {
             let group = Self {
-                block_bitmap: data[i].block_bitmap,
-                inode_bitmap: data[i].inode_bitmap,
-                inode_table: data[i].inode_table,
-                free_block_count: data[i].free_block_count,
-                free_inode_count: data[i].free_inode_count,
-                used_dirs_count: data[i].used_dirs_count,
+                block_bitmap: data[i].block_bitmap.into(),
+                inode_bitmap: data[i].inode_bitmap.into(),
+                inode_table: data[i].inode_table.into(),
+                free_block_count: data[i].free_block_count.into(),
+                free_inode_count: data[i].free_inode_count.into(),
+                used_dirs_count: data[i].used_dirs_count.into(),
             };
 
             groups.push(group);
