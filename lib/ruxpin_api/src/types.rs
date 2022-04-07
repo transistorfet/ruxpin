@@ -2,7 +2,7 @@
 pub type UserID = u16;
 pub type GroupID = u16;
 pub type FileNum = usize;
-pub type InodeNum = usize;
+pub type InodeNum = u32;
 
 
 #[repr(u16)]
@@ -59,26 +59,39 @@ pub struct FileAccess(u16);
 #[allow(dead_code)]
 #[allow(non_upper_case_globals)]
 impl FileAccess {
-    pub const Directory: FileAccess     = FileAccess(0o40000);
+    pub const FileTypeMask: FileAccess  = FileAccess(0o170000);
 
-    pub const OwnerRead: FileAccess     = FileAccess(0o00400);
-    pub const OwnerWrite: FileAccess    = FileAccess(0o00200);
-    pub const OwnerExec: FileAccess     = FileAccess(0o00100);
+    pub const Socket: FileAccess        = FileAccess(0o140000);
+    pub const SymbolicLink: FileAccess  = FileAccess(0o120000);
+    pub const Regular: FileAccess       = FileAccess(0o100000);
 
-    pub const GroupRead: FileAccess     = FileAccess(0o00040);
-    pub const GroupWrite: FileAccess    = FileAccess(0o00020);
-    pub const GroupExec: FileAccess     = FileAccess(0o00010);
+    pub const BlockDevice: FileAccess   = FileAccess(0o060000);
+    pub const Directory: FileAccess     = FileAccess(0o040000);
+    pub const CharDevice: FileAccess    = FileAccess(0o020000);
+    pub const Fifo: FileAccess          = FileAccess(0o010000);
 
-    pub const EveryoneRead: FileAccess  = FileAccess(0o00004);
-    pub const EveryoneWrite: FileAccess = FileAccess(0o00002);
-    pub const EveryoneExec: FileAccess  = FileAccess(0o00001);
+    pub const SUID: FileAccess          = FileAccess(0o004000);
+    pub const SGID: FileAccess          = FileAccess(0o002000);
+    pub const StickBit: FileAccess      = FileAccess(0o001000);
 
-    pub const Read: FileAccess          = FileAccess(0o00004);
-    pub const Write: FileAccess         = FileAccess(0o00002);
-    pub const Exec: FileAccess          = FileAccess(0o00001);
+    pub const OwnerRead: FileAccess     = FileAccess(0o000400);
+    pub const OwnerWrite: FileAccess    = FileAccess(0o000200);
+    pub const OwnerExec: FileAccess     = FileAccess(0o000100);
 
-    pub const DefaultFile: FileAccess   = FileAccess(0o00644);
-    pub const DefaultDir: FileAccess    = FileAccess(0o40755);
+    pub const GroupRead: FileAccess     = FileAccess(0o000040);
+    pub const GroupWrite: FileAccess    = FileAccess(0o000020);
+    pub const GroupExec: FileAccess     = FileAccess(0o000010);
+
+    pub const EveryoneRead: FileAccess  = FileAccess(0o000004);
+    pub const EveryoneWrite: FileAccess = FileAccess(0o000002);
+    pub const EveryoneExec: FileAccess  = FileAccess(0o000001);
+
+    pub const Read: FileAccess          = FileAccess(0o000004);
+    pub const Write: FileAccess         = FileAccess(0o000002);
+    pub const Exec: FileAccess          = FileAccess(0o000001);
+
+    pub const DefaultFile: FileAccess   = FileAccess(0o000644);
+    pub const DefaultDir: FileAccess    = FileAccess(0o040755);
 
     pub fn and(self, flag: Self) -> Self {
         FileAccess(self.0 | flag.0)
@@ -89,7 +102,11 @@ impl FileAccess {
     }
 
     pub fn is_dir(self) -> bool {
-        self.is_set(FileAccess::Directory)
+        (self.0 & FileAccess::FileTypeMask.0) == FileAccess::Directory.0
+    }
+
+    pub fn is_file(self) -> bool {
+        (self.0 & FileAccess::FileTypeMask.0) == FileAccess::Regular.0
     }
 
     pub fn require_owner(self, required_access: Self) -> bool {

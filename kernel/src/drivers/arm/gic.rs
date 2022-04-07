@@ -1,7 +1,4 @@
 
-
-use core::ptr;
-
 use crate::arch::types::KernelVirtualAddress;
 use crate::misc::deviceio::DeviceRegisters;
 

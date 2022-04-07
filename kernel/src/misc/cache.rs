@@ -1,6 +1,6 @@
 
 use core::ops::Deref;
-
+use core::fmt::Debug;
 use core::ptr::NonNull;
 use core::marker::PhantomData;
 use core::sync::atomic::{self, AtomicUsize, Ordering};
@@ -81,7 +81,7 @@ impl<T> Cache<T> {
     }
 }
 
-impl<T: core::fmt::Debug> Cache<T> {
+impl<T: Debug> Cache<T> {
     pub fn print(&mut self) {
         let mut i = 0;
         let mut iter = self.order.iter();
@@ -111,7 +111,7 @@ impl<T> CacheArc<T> {
     }
 }
 
-impl<T: Clone> Clone for CacheArc<T> {
+impl<T> Clone for CacheArc<T> {
     fn clone(&self) -> Self {
         CacheArc::from_inner(self.ptr)
     }

@@ -1,6 +1,5 @@
 
 use alloc::vec;
-use alloc::vec::Vec;
 use alloc::boxed::Box;
 
 use crate::sync::Spinlock;
@@ -11,14 +10,14 @@ use super::BlockOperations;
 
 pub type BlockNum = u32;
 
-pub struct Entry {
-    num: BlockNum,
-    block: Spinlock<Box<[u8]>>,
+pub struct Buf {
+    pub num: BlockNum,
+    pub block: Spinlock<Box<[u8]>>,
 }
 
 pub struct BufCache {
     block_size: usize,
-    cache: Cache<Entry>,
+    cache: Cache<Buf>,
 }
 
 impl BufCache {
@@ -27,6 +26,10 @@ impl BufCache {
             block_size,
             cache: Cache::new(20),
         }
+    }
+
+    pub fn block_size(&self) -> usize {
+        self.block_size
     }
 
     pub fn read(&mut self, dev: &mut Box<dyn BlockOperations>, buffer: &mut [u8], offset: u64) -> Result<usize, KernelError> {
@@ -54,16 +57,16 @@ impl BufCache {
         Err(KernelError::OperationNotPermitted)
     }
 
-    pub fn get_block(&mut self, dev: &mut Box<dyn BlockOperations>, num: BlockNum) -> Result<CacheArc<Entry>, KernelError> {
+    pub fn get_block(&mut self, dev: &mut Box<dyn BlockOperations>, num: BlockNum) -> Result<CacheArc<Buf>, KernelError> {
         self.cache.get(|entry| entry.num == num, || {
-            let entry = Entry::new(num, self.block_size);
+            let entry = Buf::new(num, self.block_size);
             dev.read(&mut *entry.block.lock(), (num as usize * self.block_size) as u64)?;
             Ok(entry)
         })
     }
 }
 
-impl Entry {
+impl Buf {
     pub fn new(num: BlockNum, block_size: usize) -> Self {
         Self {
             num,

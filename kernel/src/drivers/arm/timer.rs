@@ -1,5 +1,4 @@
 
-
 use crate::arch::exceptions::register_irq;
 use crate::arch::types::KernelVirtualAddress;
 use crate::misc::deviceio::DeviceRegisters;

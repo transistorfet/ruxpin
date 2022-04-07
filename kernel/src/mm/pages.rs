@@ -7,6 +7,7 @@ use crate::printkln;
 use crate::arch::mmu;
 use crate::arch::types::PhysicalAddress;
 use crate::misc::bitmap::Bitmap;
+use crate::misc::ceiling_div;
 
 
 pub struct PagePool {
@@ -73,7 +74,7 @@ impl PageRegion {
         let page_size = mmu::page_size();
         let total_size = usize::from(end) - usize::from(start);
         let total_pages = total_size / page_size;
-        let table_pages = total_pages / 8 / page_size + (total_pages / 8 % page_size != 0) as usize;
+        let table_pages = ceiling_div(total_pages / 8, page_size) as usize;
 
         printkln!("virtual memory: using region at {:?}, size {} MiB, pages {}", start, total_size / 1024 / 1024, total_pages - table_pages);
 
@@ -108,9 +109,5 @@ unsafe fn zero_page(paddr: PhysicalAddress) {
     for ptr in page.iter_mut() {
         *ptr = 0;
     }
-}
-
-fn ceiling_div(size: usize, units: usize) -> usize {
-    (size / units) + (size % units != 0) as usize
 }
 

@@ -1,6 +1,4 @@
 
-use core::ptr;
-
 use alloc::boxed::Box;
 
 use ruxpin_api::types::{OpenFlags, DeviceID};

@@ -1,20 +1,18 @@
 
-use core::mem;
-use core::slice;
-
 use alloc::vec::Vec;
-use alloc::boxed::Box;
 use alloc::sync::Arc;
+use alloc::boxed::Box;
  
 use ruxpin_api::types::{OpenFlags, DeviceID, DriverID, SubDeviceID};
 
 use crate::sync::Spinlock;
 use crate::errors::KernelError;
+use crate::misc::cache::CacheArc;
 
+pub mod bufcache;
 pub mod partition;
 
-mod bufcache;
-use self::bufcache::BufCache;
+use self::bufcache::{BlockNum, Buf, BufCache};
 
 
 pub trait BlockOperations: Sync + Send {
@@ -94,10 +92,17 @@ pub fn write(device_id: DeviceID, buffer: &[u8], offset: u64) -> Result<usize, K
     result
 }
 
-pub fn read_struct<T>(location: &mut T, device_id: DeviceID, offset: u64) -> Result<(), KernelError> {
-    let buffer = unsafe { slice::from_raw_parts_mut(location as *mut T as *mut u8, mem::size_of::<T>()) };
-    read(device_id, buffer, offset)?;
-    Ok(())
+
+pub fn get_buf_size(device_id: DeviceID) -> Result<usize, KernelError> {
+    let device = get_device(device_id)?;
+    let size = device.cache.lock().block_size();
+    Ok(size)
+}
+
+pub fn get_buf(device_id: DeviceID, block_num: BlockNum) -> Result<CacheArc<Buf>, KernelError> {
+    let device = get_device(device_id)?;
+    let buf = device.cache.lock().get_block(&mut *device.dev.lock(), block_num)?;
+    Ok(buf)
 }
 
 
