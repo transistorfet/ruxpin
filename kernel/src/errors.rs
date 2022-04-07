@@ -23,5 +23,7 @@ pub enum KernelError {
     NoSuchFilesystem,
     BadFileNumber,
     TooManyFilesOpen,
+    InvalidSuperblock,
+    InvalidInode,
 }
 

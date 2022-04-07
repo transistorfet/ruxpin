@@ -32,6 +32,12 @@ impl BufCache {
         self.block_size
     }
 
+    pub fn set_block_size(&mut self, block_size: usize) -> Result<(), KernelError> {
+        self.cache.clear().map_err(|_| KernelError::OperationNotPermitted)?;
+        self.block_size = block_size;
+        Ok(())
+    }
+
     pub fn read(&mut self, dev: &mut Box<dyn BlockOperations>, buffer: &mut [u8], offset: u64) -> Result<usize, KernelError> {
         let block_size = self.block_size as u64;
 

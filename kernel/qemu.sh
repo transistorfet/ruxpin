@@ -8,7 +8,7 @@ qemu-system-aarch64 \
 	-kernel "$KERNEL" \
 	-no-reboot -gdb tcp::1234 \
 	-d "int" \
-	-drive format=raw,if=sd,file=../bin/testapp/target/aarch64-unknown-none/release/testapp \
+	-drive format=raw,if=sd,file=../ext2-disk-image.img \
 	-serial stdio
 	#-serial stdio -monitor tcp:localhost:1235 -S
 	#-chardev stdio,mux=on,id=char0 -monitor chardev:char0 -S

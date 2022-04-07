@@ -118,6 +118,19 @@ impl FileAccess {
     }
 }
 
+impl Into<FileAccess> for u16 {
+    fn into(self) -> FileAccess {
+        FileAccess(self)
+    }
+}
+
+
 #[derive(Copy, Clone, Debug)]
 pub struct Timestamp(pub u64);
+
+impl Into<Timestamp> for u32 {
+    fn into(self) -> Timestamp {
+        Timestamp(self as u64)
+    }
+}
 

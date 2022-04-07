@@ -7,6 +7,7 @@ use core::sync::atomic::{self, AtomicUsize, Ordering};
 
 use alloc::vec::Vec;
 
+use crate::printkln;
 use crate::misc::linkedlist::{UnownedLinkedList, UnownedLinkedListNode};
 
 
@@ -35,6 +36,17 @@ impl<T> Cache<T> {
         }
     }
 
+    pub fn clear(&mut self) -> Result<(), ()> {
+        for i in 0..self.items.len() {
+            if self.items[i].refcount.load(Ordering::Relaxed) != 0 {
+                return Err(());
+            }
+        }
+
+        *self = Cache::new(self.max_size);
+        Ok(())
+    }
+
     pub fn get<C, F, E>(&mut self, compare: C, fetch: F) -> Result<CacheArc<T>, E>
     where
         C: Fn(&T) -> bool,
@@ -49,6 +61,7 @@ impl<T> Cache<T> {
                     self.order.remove_node(ptr);
                     self.order.insert_head(ptr);
                 }
+                printkln!("cache: returning existing");
                 return Ok(item.wrap_inner());
             }
         }
@@ -60,6 +73,7 @@ impl<T> Cache<T> {
             unsafe {
                 self.order.insert_head(self.items[i].wrap_non_null());
             }
+                printkln!("cache: returning new");
             return Ok(self.items[i].wrap_inner());
         }
 
@@ -73,6 +87,7 @@ impl<T> Cache<T> {
                     self.order.remove_node(ptr);
                     self.order.insert_head(ptr);
                 }
+                printkln!("cache: recycling old");
                 return Ok(item.wrap_inner());
             }
         }
@@ -85,10 +100,10 @@ impl<T: Debug> Cache<T> {
     pub fn print(&mut self) {
         let mut i = 0;
         let mut iter = self.order.iter();
-        crate::printkln!("Cache contents:");
+        printkln!("Cache contents:");
         while let Some(ptr) = iter.next() {
             let item = unsafe { &mut (*ptr.as_ptr()) };
-            crate::printkln!("{}: {:?}", i, item.data);
+            printkln!("{}: {:?}", i, item.data);
             i += 1;
         }
     }
@@ -129,8 +144,9 @@ impl<T> Deref for CacheArc<T> {
 impl<T> Drop for CacheArc<T> {
     fn drop(&mut self) {
         let inner = unsafe { self.ptr.as_ref() };
+        // TODO I have no idea if this is right.  I don't want to decrement the count if it's already 0
         if inner.refcount.load(Ordering::Acquire) != 0 {
-            inner.refcount.fetch_sub(1, Ordering::Release);
+            inner.refcount.fetch_sub(1, Ordering::Acquire);
         }
         atomic::fence(Ordering::Release);
         // Don't need to drop inner because it's stored in the Vec in Cache<T>

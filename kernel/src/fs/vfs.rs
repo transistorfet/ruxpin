@@ -2,7 +2,7 @@
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 
-use ruxpin_api::types::{OpenFlags, FileAccess, Seek, UserID};
+use ruxpin_api::types::{OpenFlags, FileAccess, Seek, UserID, DeviceID};
 
 use crate::sync::Spinlock;
 use crate::errors::KernelError;
@@ -21,12 +21,16 @@ pub fn initialize() -> Result<(), KernelError> {
     FILESYSTEMS.lock().push(Arc::new(Spinlock::new(TmpFilesystem::new())));
     use super::devfs::DevFilesystem;
     FILESYSTEMS.lock().push(Arc::new(Spinlock::new(DevFilesystem::new())));
+    use super::ext2::Ext2Filesystem;
+    FILESYSTEMS.lock().push(Arc::new(Spinlock::new(Ext2Filesystem::new())));
 
     // TODO this is a temporary test
-    mount(None, "/", "tmpfs", 0).unwrap();
+    mount(None, "/", "tmpfs", None, 0).unwrap();
     let mut file = open(None, "/dev", OpenFlags::Create, FileAccess::Directory.and(FileAccess::DefaultDir), 0).unwrap();
     close(&mut file).unwrap();
-    mount(None, "/dev", "devfs", 0).unwrap();
+    let mut file = open(None, "/mnt", OpenFlags::Create, FileAccess::Directory.and(FileAccess::DefaultDir), 0).unwrap();
+    close(&mut file).unwrap();
+    mount(None, "/dev", "devfs", None, 0).unwrap();
 
     open(None, "test", OpenFlags::Create, FileAccess::Directory.and(FileAccess::DefaultDir), 0).unwrap();
     let mut file = open(None, "test/file.txt", OpenFlags::Create, FileAccess::DefaultFile, 0).unwrap();
@@ -39,7 +43,7 @@ pub fn initialize() -> Result<(), KernelError> {
     Ok(())
 }
 
-pub fn mount(cwd: Option<Vnode>, path: &str, fstype: &str, current_uid: UserID) -> Result<(), KernelError> {
+pub fn mount(cwd: Option<Vnode>, path: &str, fstype: &str, device_id: Option<DeviceID>, current_uid: UserID) -> Result<(), KernelError> {
     if current_uid != 0 {
         return Err(KernelError::OperationNotPermitted);
     }
@@ -51,16 +55,24 @@ pub fn mount(cwd: Option<Vnode>, path: &str, fstype: &str, current_uid: UserID) 
         return Err(KernelError::OperationNotPermitted);
     }
 
-    let mount = fs.lock().mount(vnode.clone(), None)?;
+    let mount = fs.lock().mount(vnode.clone(), device_id)?;
 
+    if let Err(err) = _link_mount_to_vnode(mount.clone(), vnode) {
+        mount.lock().unmount()?;
+        return Err(err);
+    }
+
+    MOUNTPOINTS.lock().push(mount);
+    Ok(())
+}
+
+fn _link_mount_to_vnode(mount: Mount, vnode: Option<Vnode>) -> Result<(), KernelError> {
     let root = mount.lock().get_root()?;
     if let Some(vnode) = vnode.as_ref() {
         *vnode.lock().get_mount_mut()? = Some(root);
     } else {
         *ROOT_NODE.lock() = Some(root);
     }
-
-    MOUNTPOINTS.lock().push(mount);
     Ok(())
 }
 

@@ -5,4 +5,5 @@ pub mod filedesc;
 
 pub mod tmpfs;
 pub mod devfs;
+pub mod ext2;
 

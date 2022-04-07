@@ -45,10 +45,30 @@ pub fn register_devices() -> Result<(), KernelError> {
     let device_id = DeviceID(0, 0);
     block::open(device_id, OpenFlags::ReadOnly).unwrap();
     let mut data = [0; 1024];
-    block::read(device_id, &mut data, 1024).unwrap();
+    block::read(device_id, &mut data, 0).unwrap();
     unsafe {
         crate::printk::printk_dump(&data as *const u8, 1024);
     }
+
+
+    vfs::mount(None, "/mnt", "ext2", Some(DeviceID(0, 0)), 0)?;
+
+    /*
+    use crate::misc::cache::Cache;
+    #[derive(Debug)]
+    struct SpecialNumber(pub usize);
+
+    let mut cache: Cache<SpecialNumber> = Cache::new(2);
+    let thing1: Result<_, KernelError> = cache.get(|item| item.0 == 1, || Ok(SpecialNumber(1)));
+    {
+        let thing2: Result<_, KernelError> = cache.get(|item| item.0 == 2, || Ok(SpecialNumber(2)));
+        cache.print();
+    }
+    let thing3: Result<_, KernelError> = cache.get(|item| item.0 == 3, || Ok(SpecialNumber(3)));
+    cache.print();
+    let thing1: Result<_, KernelError> = cache.get(|item| item.0 == 1, || Ok(SpecialNumber(1)));
+    cache.print();
+    */
 
 
     //SystemTimer::init();

@@ -12,7 +12,7 @@ use crate::misc::cache::CacheArc;
 pub mod bufcache;
 pub mod partition;
 
-use self::bufcache::{BlockNum, Buf, BufCache};
+pub use self::bufcache::{BlockNum, Buf, BufCache};
 
 
 pub trait BlockOperations: Sync + Send {
@@ -93,17 +93,24 @@ pub fn write(device_id: DeviceID, buffer: &[u8], offset: u64) -> Result<usize, K
 }
 
 
+pub fn get_buf(device_id: DeviceID, block_num: BlockNum) -> Result<CacheArc<Buf>, KernelError> {
+    let device = get_device(device_id)?;
+    let buf = device.cache.lock().get_block(&mut *device.dev.lock(), block_num)?;
+    Ok(buf)
+}
+
 pub fn get_buf_size(device_id: DeviceID) -> Result<usize, KernelError> {
     let device = get_device(device_id)?;
     let size = device.cache.lock().block_size();
     Ok(size)
 }
 
-pub fn get_buf(device_id: DeviceID, block_num: BlockNum) -> Result<CacheArc<Buf>, KernelError> {
+pub fn set_buf_size(device_id: DeviceID, size: usize) -> Result<(), KernelError> {
     let device = get_device(device_id)?;
-    let buf = device.cache.lock().get_block(&mut *device.dev.lock(), block_num)?;
-    Ok(buf)
+    let result = device.cache.lock().set_block_size(size);
+    result
 }
+
 
 
 fn get_device(device_id: DeviceID) -> Result<BlockDeviceEntry, KernelError> {
