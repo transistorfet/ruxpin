@@ -145,7 +145,7 @@ impl Ext2SuperBlock {
             return Err(KernelError::InvalidSuperblock);
         }
 
-        let inode_size = if u32::from(data.major_version) > 1 { u16::from(data.extended.inode_size) as usize } else { 128 };
+        let inode_size = if u32::from(data.major_version) >= 1 { u16::from(data.extended.inode_size) as usize } else { 128 };
         let total_blocks = data.total_blocks.into();
         let blocks_per_group = data.blocks_per_group.into();
         let total_block_groups = ceiling_div(total_blocks as usize, blocks_per_group as usize);
@@ -182,9 +182,13 @@ impl Ext2SuperBlock {
         Ok(superblock)
     }
 
-    pub(super) fn get_inode_location(&self, inode_num: Ext2InodeNum) -> Result<(BlockNum, usize), KernelError> {
-        let group = (inode_num / self.inodes_per_group) as usize;
-        let group_inode = inode_num % self.inodes_per_group;
+    pub(super) fn get_block_size(&self) -> usize {
+        self.block_size
+    }
+
+    pub(super) fn get_inode_entry_location(&self, inode_num: Ext2InodeNum) -> Result<(BlockNum, usize), KernelError> {
+        let group = ((inode_num - 1) / self.inodes_per_group) as usize;
+        let group_inode = (inode_num - 1) % self.inodes_per_group;
 
         if group_inode >= self.total_inodes || group >= self.groups.len() {
             return Err(KernelError::InvalidInode);
@@ -192,7 +196,19 @@ impl Ext2SuperBlock {
 
         let block = (self.blocks_per_group * group as u32) + self.groups[group].inode_table + (group_inode / self.inodes_per_block as u32);
 
-        Ok((block, (group_inode as usize % self.inodes_per_block)))
+        Ok((block, (group_inode as usize % self.inodes_per_block) * self.inode_size))
+    }
+
+    pub(super) fn get_inode_bitmap_location(&self, inode_num: Ext2InodeNum) -> Result<(BlockNum, usize), KernelError> {
+        let group = ((inode_num - 1) / self.inodes_per_group) as usize;
+        let group_inode = (inode_num - 1) % self.inodes_per_group;
+
+        if group_inode >= self.total_inodes || group >= self.groups.len() {
+            return Err(KernelError::InvalidInode);
+        }
+
+        let bitmap = (self.blocks_per_group * group as u32) + self.groups[group].inode_bitmap;
+        Ok((bitmap, group_inode as usize))
     }
 }
 

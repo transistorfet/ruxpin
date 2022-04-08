@@ -12,24 +12,18 @@ use crate::misc::cache::Cache;
 use super::types::{Filesystem, Mount, MountOperations, Vnode, VnodeOperations, FileAttributes, FilePointer, DirEntry};
 
 mod inodes;
+mod files;
+mod directories;
+mod mount;
 mod superblock;
 
 use self::inodes::{Ext2Vnode, Ext2InodeNum};
-use self::superblock::Ext2SuperBlock;
+use self::mount::Ext2Mount;
 
 
 pub struct Ext2Filesystem {
     /* Nothing For The Moment */
 }
-
-pub struct Ext2Mount {
-    device_id: DeviceID,
-    root_node: Option<Vnode>,
-    mounted_on: Option<Vnode>,
-    superblock: Ext2SuperBlock,
-    vnode_cache: Cache<Vnode>,
-}
-
 impl Ext2Filesystem {
     pub fn new() -> Self {
         Self {
@@ -52,39 +46,9 @@ impl Filesystem for Ext2Filesystem {
         let device_id = device_id.ok_or(KernelError::NoSuchDevice)?;
         block::open(device_id, OpenFlags::ReadOnly)?;
 
-        let superblock = Ext2SuperBlock::load(device_id)?;
-
-        let mut mount = Ext2Mount {
-            device_id,
-            root_node: None,
-            mounted_on: parent,
-            superblock,
-            vnode_cache: Cache::new(100),
-        };
-
-        printkln!("superblock: {:#?}", mount.superblock);
-
-        mount.root_node = Some(mount.get_inode(0)?);
+        let mount = Ext2Mount::create_mount(parent, device_id)?;
 
         Ok(Arc::new(Spinlock::new(mount)))
-    }
-}
-
-impl MountOperations for Ext2Mount {
-    fn get_root(&self) -> Result<Vnode, KernelError> {
-        match &self.root_node {
-            Some(node) => Ok(node.clone()),
-            None => Err(KernelError::NotFile),
-        }
-    }
-
-    fn sync(&mut self) -> Result<(), KernelError> {
-        Ok(())
-    }
-
-    fn unmount(&mut self) -> Result<(), KernelError> {
-        block::close(self.device_id)?;
-        Ok(())
     }
 }
 
@@ -135,7 +99,6 @@ impl VnodeOperations for Ext2Vnode {
     //    Ok(&mut self.attrs)
     //}
 
-    /*
     fn open(&mut self, _file: &mut FilePointer, _flags: OpenFlags) -> Result<(), KernelError> {
         Ok(())
     }
@@ -145,12 +108,27 @@ impl VnodeOperations for Ext2Vnode {
     }
 
     fn read(&mut self, file: &mut FilePointer, buffer: &mut [u8]) -> Result<usize, KernelError> {
+        if self.attrs.access.is_dir() {
+            return Err(KernelError::IsADirectory);
+        }
 
+	let mut nbytes = if buffer.len() > self.attrs.size - file.position {
+	    self.attrs.size - file.position
+        } else {
+            buffer.len()
+        };
+
+        let offset = self.read_from_vnode(buffer, nbytes, file.position)?;
+
+	file.position += offset;
+	Ok(offset)
     }
 
+    /*
     fn write(&mut self, file: &mut FilePointer, buffer: &[u8]) -> Result<usize, KernelError> {
 
     }
+    */
 
     fn seek(&mut self, file: &mut FilePointer, offset: usize, whence: Seek) -> Result<usize, KernelError> {
         let position = match whence {
@@ -168,8 +146,19 @@ impl VnodeOperations for Ext2Vnode {
     }
 
     fn readdir(&mut self, file: &mut FilePointer) -> Result<Option<DirEntry>, KernelError> {
+        if !self.attrs.access.is_dir() {
+            return Err(KernelError::NotADirectory);
+        }
 
+        if file.position >= self.attrs.size {
+            Ok(None)
+        } else {
+            let mut dirent = DirEntry::new();
+            let offset = self.read_directory_from_vnode(&mut dirent, file.position)?;
+
+            file.position += offset;
+            Ok(Some(dirent))
+        }
     }
-    */
 }
 

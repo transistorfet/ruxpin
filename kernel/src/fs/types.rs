@@ -167,3 +167,12 @@ impl Default for FileAttributes {
     }
 }
 
+impl DirEntry {
+    pub fn new() -> Self {
+        Self {
+            inode: 0,
+            name: StrArray::new(),
+        }
+    }
+}
+

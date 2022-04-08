@@ -32,6 +32,14 @@ impl<const LENGTH: usize> StrArray<LENGTH> {
             str::from_utf8_unchecked(&self.array[..self.len])
         }
     }
+
+    pub fn as_mut(&mut self) -> &mut [u8] {
+        &mut self.array
+    }
+
+    pub unsafe fn set_len(&mut self, length: usize) {
+        self.len = length;
+    }
 }
 
 impl<const LENGTH: usize> TryInto<StrArray<LENGTH>> for &str {
