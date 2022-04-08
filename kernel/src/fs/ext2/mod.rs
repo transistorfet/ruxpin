@@ -47,6 +47,7 @@ impl Filesystem for Ext2Filesystem {
         block::open(device_id, OpenFlags::ReadOnly)?;
 
         let mount = Ext2Mount::create_mount(parent, device_id)?;
+        printkln!("superblock: {:#?}", mount.superblock);
 
         Ok(Arc::new(Spinlock::new(mount)))
     }
@@ -66,13 +67,23 @@ impl VnodeOperations for Ext2Vnode {
 
         Ok(vnode)
     }
+    */
 
     fn lookup(&mut self, filename: &str) -> Result<Vnode, KernelError> {
         if !self.attrs.access.is_dir() {
-            return Err(KernelError::OperationNotPermitted);
+            return Err(KernelError::NotADirectory);
         }
 
-
+        let mut position = 0;
+        let mut dirent = DirEntry::new();
+        while position < self.attrs.size {
+            position += self.read_directory_from_vnode(&mut dirent, position)?;
+            printkln!("found {:?} at inode {}", dirent.name.as_str(), dirent.inode);
+            if dirent.name.as_str() == filename {
+                printkln!("a winner: inode {}", dirent.inode);
+                return self.get_inode(dirent.inode);
+            }
+        }
         Err(KernelError::FileNotFound)
     }
 
@@ -80,6 +91,7 @@ impl VnodeOperations for Ext2Vnode {
     // TODO add unlink
     // TODO add rename
 
+    /*
     fn truncate(&mut self) -> Result<(), KernelError> {
         if self.attrs.access.is_file() {
 

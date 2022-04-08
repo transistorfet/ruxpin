@@ -44,8 +44,6 @@ impl Ext2Vnode {
                     dirent.name.set_len(entry_on_disk.name_len as usize);
                 }
 
-                crate::printkln!("final result {} {}", dirent.inode, dirent.name.as_str());
-
                 return Ok(entry_len);
             }
 

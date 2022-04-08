@@ -52,6 +52,7 @@ pub fn register_devices() -> Result<(), KernelError> {
 
 
     vfs::mount(None, "/mnt", "ext2", Some(DeviceID(0, 0)), 0)?;
+    let vnode = vfs::open(None, "/mnt/testapp", OpenFlags::ReadOnly, FileAccess::DefaultFile, 0)?;
 
     /*
     use crate::misc::cache::Cache;

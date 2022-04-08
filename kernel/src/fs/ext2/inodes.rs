@@ -99,6 +99,10 @@ impl Ext2Vnode {
             panic!("Not implemented");
         }
     }
+
+    pub fn get_inode(&mut self, inode_num: Ext2InodeNum) -> Result<Vnode, KernelError> {
+        get_mount(self.mount_ptr).get_inode(inode_num)
+    }
 }
 
 

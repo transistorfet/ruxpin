@@ -21,7 +21,7 @@ pub(super) trait Filesystem: Sync + Send {
 }
 
 pub(super) trait MountOperations: Sync + Send {
-    fn get_root(&self) -> Result<Vnode, KernelError>;
+    fn get_root(&mut self) -> Result<Vnode, KernelError>;
     fn sync(&mut self) -> Result<(), KernelError>;
     fn unmount(&mut self) -> Result<(), KernelError>;
 }

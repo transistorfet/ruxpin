@@ -74,7 +74,7 @@ impl DevFilesystem {
 }
 
 impl MountOperations for DevMount {
-    fn get_root(&self) -> Result<Vnode, KernelError> {
+    fn get_root(&mut self) -> Result<Vnode, KernelError> {
         Ok(self.root_node.clone())
     }
 
