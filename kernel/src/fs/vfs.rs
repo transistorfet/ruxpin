@@ -27,17 +27,17 @@ pub fn initialize() -> Result<(), KernelError> {
     // TODO this is a temporary test
     mount(None, "/", "tmpfs", None, 0).unwrap();
     let mut file = open(None, "/dev", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
-    close(&mut file).unwrap();
+    close(file).unwrap();
     let mut file = open(None, "/mnt", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
-    close(&mut file).unwrap();
+    close(file).unwrap();
     mount(None, "/dev", "devfs", None, 0).unwrap();
 
     open(None, "test", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
     let mut file = open(None, "test/file.txt", OpenFlags::Create, FileAccess::DefaultFile, 0).unwrap();
-    write(&mut file, b"This is a test").unwrap();
-    seek(&mut file, 0, Seek::FromStart).unwrap();
+    write(file.clone(), b"This is a test").unwrap();
+    seek(file.clone(), 0, Seek::FromStart).unwrap();
     let mut buffer = [0; 100];
-    let n = read(&mut file, &mut buffer).unwrap();
+    let n = read(file.clone(), &mut buffer).unwrap();
     crate::printkln!("Read file {}: {}", n, core::str::from_utf8(&buffer).unwrap());
 
     Ok(())
@@ -110,35 +110,35 @@ pub fn open(cwd: Option<Vnode>, path: &str, flags: OpenFlags, access: FileAccess
     Ok(Arc::new(Spinlock::new(file)))
 }
 
-pub fn close(file: &mut File) -> Result<(), KernelError> {
+pub fn close(file: File) -> Result<(), KernelError> {
     let mut fptr = file.lock();
     let vnode = fptr.vnode.clone();
     vnode.lock().close(&mut *fptr)?;
     Ok(())
 }
 
-pub fn read(file: &mut File, buffer: &mut [u8]) -> Result<usize, KernelError> {
+pub fn read(file: File, buffer: &mut [u8]) -> Result<usize, KernelError> {
     let mut fptr = file.lock();
     let vnode = fptr.vnode.clone();
     let result = vnode.lock().read(&mut *fptr, buffer)?;
     Ok(result)
 }
 
-pub fn write(file: &mut File, buffer: &[u8]) -> Result<usize, KernelError> {
+pub fn write(file: File, buffer: &[u8]) -> Result<usize, KernelError> {
     let mut fptr = file.lock();
     let vnode = fptr.vnode.clone();
     let result = vnode.lock().write(&mut *fptr, buffer)?;
     Ok(result)
 }
 
-pub fn seek(file: &mut File, offset: usize, whence: Seek) -> Result<usize, KernelError> {
+pub fn seek(file: File, offset: usize, whence: Seek) -> Result<usize, KernelError> {
     let mut fptr = file.lock();
     let vnode = fptr.vnode.clone();
     let result = vnode.lock().seek(&mut *fptr, offset, whence)?;
     Ok(result)
 }
 
-pub fn readdir(file: &mut File) -> Result<Option<DirEntry>, KernelError> {
+pub fn readdir(file: File) -> Result<Option<DirEntry>, KernelError> {
     let mut fptr = file.lock();
     let vnode = fptr.vnode.clone();
     let result = vnode.lock().readdir(&mut *fptr)?;

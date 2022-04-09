@@ -29,30 +29,30 @@ impl FileDescriptors {
     }
 
     pub fn close(&mut self, file_num: FileNum) -> Result<(), KernelError> {
-        let mut file = self.get(file_num)?;
-        vfs::close(&mut file)?;
+        let file = self.get(file_num)?;
+        vfs::close(file)?;
         self.0[file_num as usize] = None;
         Ok(())
     }
 
     pub fn read(&mut self, file_num: FileNum, buffer: &mut [u8]) -> Result<usize, KernelError> {
-        let mut file = self.get(file_num)?;
-        vfs::read(&mut file, buffer)
+        let file = self.get(file_num)?;
+        vfs::read(file, buffer)
     }
 
     pub fn write(&mut self, file_num: FileNum, buffer: &[u8]) -> Result<usize, KernelError> {
-        let mut file = self.get(file_num)?;
-        vfs::write(&mut file, buffer)
+        let file = self.get(file_num)?;
+        vfs::write(file, buffer)
     }
 
     pub fn seek(&mut self, file_num: FileNum, offset: usize, whence: Seek) -> Result<usize, KernelError> {
-        let mut file = self.get(file_num)?;
-        vfs::seek(&mut file, offset, whence)
+        let file = self.get(file_num)?;
+        vfs::seek(file, offset, whence)
     }
 
     pub fn readdir(&mut self, file_num: FileNum) -> Result<Option<DirEntry>, KernelError> {
-        let mut file = self.get(file_num)?;
-        vfs::readdir(&mut file)
+        let file = self.get(file_num)?;
+        vfs::readdir(file)
     }
 
     fn find_first(&mut self) -> Result<FileNum, KernelError> {
