@@ -15,6 +15,11 @@ use crate::misc::byteorder::{leu16, leu32};
 use super::Ext2InodeNum;
 
 
+const EXT_INCOMPAT_FILE_TYPE_IN_DIRS: u32       = 0x00002;
+const EXT_INCOMPAT_FS_NEEDS_RECOVERY: u32       = 0x00004;
+const EXT_INCOMPAT_FLEX_BLOCK_GROUP: u32        = 0x00200;
+const EXT_INCOMPAT_SUPPORTED: u32               = EXT_INCOMPAT_FILE_TYPE_IN_DIRS;
+
 #[repr(C)]
 struct Ext2SuperBlockOnDisk {
     total_inodes: leu32,
@@ -52,11 +57,14 @@ struct Ext2SuperBlockOnDisk {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 struct Ext2ExtendedSuperBlockOnDisk {
-    first_reserved_inode: leu32,
+    first_non_reserved_inode: leu32,
     inode_size: leu16,
-    blockgroup_of_super: leu32,
-    optional_features: leu32,
+    blockgroup_of_super: leu16,
+    compat_features: leu32,
+    incompat_features: leu32,
+    ro_compat_features: leu32,
 }
 
 #[repr(C)]
@@ -143,6 +151,12 @@ impl Ext2SuperBlock {
         if block_size != fragment_size {
             printkln!("ext2: block size and fragment size don't match");
             return Err(KernelError::InvalidSuperblock);
+        }
+
+        let incompat_features = u32::from(data.extended.incompat_features);
+        if (incompat_features & !EXT_INCOMPAT_SUPPORTED) != 0 {
+            printkln!("ext2: this filesystem has incompatible features than aren't supported: {:x}", incompat_features & !EXT_INCOMPAT_SUPPORTED);
+            return Err(KernelError::IncompatibleFeatures);
         }
 
         let inode_size = if u32::from(data.major_version) >= 1 { u16::from(data.extended.inode_size) as usize } else { 128 };

@@ -26,5 +26,6 @@ pub enum KernelError {
     TooManyFilesOpen,
     InvalidSuperblock,
     InvalidInode,
+    IncompatibleFeatures,
 }
 

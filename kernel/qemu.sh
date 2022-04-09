@@ -3,12 +3,15 @@
 #KERNEL=target/aarch64-unknown-none/release/ruxpin
 KERNEL=ruxpin.img
 
+#MMC_IMAGE=../ext2-disk-image.img
+MMC_IMAGE=../sd-card-image.bin
+
 qemu-system-aarch64 \
 	-machine raspi3b -m 1024 \
 	-kernel "$KERNEL" \
 	-no-reboot -gdb tcp::1234 \
 	-d "int" \
-	-drive format=raw,if=sd,file=../ext2-disk-image.img \
+	-drive format=raw,if=sd,file=$MMC_IMAGE \
 	-serial stdio
 	#-serial stdio -monitor tcp:localhost:1235 -S
 	#-chardev stdio,mux=on,id=char0 -monitor chardev:char0 -S

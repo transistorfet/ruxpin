@@ -3,6 +3,7 @@ use alloc::boxed::Box;
 
 use crate::block;
 use crate::printkln;
+use crate::misc::ceiling_div;
 use crate::errors::KernelError;
 use crate::block::BlockOperations;
 use crate::arch::types::KernelVirtualAddress;
@@ -76,6 +77,7 @@ impl BlockOperations for EmmcDevice {
 
 const MMC_RESP_COMMAND_COMPLETE: u32     = 1 << 31;
 
+#[allow(dead_code)]
 #[derive(Debug)]
 enum Command {
     GoIdle,             // CMD0
@@ -85,6 +87,7 @@ enum Command {
     SendIfCond,         // CMD8
     StopTransmission,   // CMD12
     ReadSingle,         // CMD17
+    ReadMultiple,       // CMD18
     SendOpCond,         // ACMD41
     AppCommand,         // CMD55
 }
@@ -108,16 +111,23 @@ impl EmmcDevice {
         let card = EmmcHost::send_command(Command::SendRelAddr, 0)?;
         EmmcHost::send_command(Command::CardSelect, card)?;
 
+        EmmcHost::finish_init()?;
+
         Ok(())
     }
 
+/*
     pub fn read_data(buffer: &mut [u8], offset: u64) -> Result<usize, KernelError> {
         let blocksize = 512;
+        let numblocks = ceiling_div(buffer.len(), blocksize);
+
+        printkln!("mmc: reading {} blocks of {} each at offset {:x}", numblocks, blocksize, offset);
+        EmmcHost::setup_data_transfer(Command::ReadMultiple, offset / blocksize as u64, numblocks, blocksize)?;
+
         let mut i = 0;
         let mut len = buffer.len();
-
         while len > 0 {
-            EmmcDevice::read_segment(offset + i as u64, &mut buffer[i..(i + blocksize)])?;
+            EmmcHost::read_data(&mut buffer[i..(i + blocksize)])?;
             len -= blocksize;
             i += blocksize;
         }
@@ -126,14 +136,21 @@ impl EmmcDevice {
 
         Ok(i)
     }
+*/
 
-    fn read_segment(offset: u64, buffer: &mut [u8]) -> Result<(), KernelError> {
-        EmmcHost::setup_data_transfer(1, buffer.len())?;
-        EmmcHost::send_command(Command::ReadSingle, offset as u32)?;
+    pub fn read_data(buffer: &mut [u8], offset: u64) -> Result<usize, KernelError> {
+        let blocksize = 512;
+        let mut i = 0;
+        let mut len = buffer.len();
 
-        EmmcHost::read_data(buffer)?;
+        while len > 0 {
+            EmmcHost::setup_data_transfer(Command::ReadSingle, (offset + i as u64) / blocksize as u64, 1, blocksize)?;
+            EmmcHost::read_data(&mut buffer[i..(i + blocksize)])?;
+            len -= blocksize;
+            i += blocksize;
+        }
 
-        Ok(())
+        Ok(i)
     }
 }
 
@@ -141,6 +158,7 @@ impl EmmcDevice {
 const EMMC1: DeviceRegisters<u32> = DeviceRegisters::new(KernelVirtualAddress::new(0x3F30_0000));
 
 mod registers {
+    pub const ARG2: usize               = 0x00;
     pub const BLOCK_COUNT_SIZE: usize   = 0x04;
     pub const ARG1: usize               = 0x08;
     pub const COMMAND: usize            = 0x0C;
@@ -184,8 +202,7 @@ impl EmmcHost {
             while (EMMC1.get(registers::HOST_CONTROL1) & EMMC1_HC1_RESET_HOST) != 0 { }
 
             // Configure the clock
-            EMMC1.set(registers::HOST_CONTROL1, 0x000E_6805);
-            wait_until_set(registers::HOST_CONTROL1, EMMC1_HC1_CLOCK_STABLE).unwrap();
+            Self::set_clock(400_000)?;
 
             EMMC1.set(registers::INTERRUPT_ENABLE, 0xffff_ffff);
             EMMC1.set(registers::INTERRUPT_MASK, 0xffff_ffff);
@@ -194,11 +211,26 @@ impl EmmcHost {
         Ok(())
     }
 
+    fn finish_init() -> Result<(), KernelError> {
+        EmmcHost::set_clock(20_000_000)?;
+        Ok(())
+    }
+
+    fn set_clock(frequency: u32) -> Result<(), KernelError> {
+        let divider = 41_666_666 / frequency;
+        unsafe {
+            // Configure the clock
+            EMMC1.set(registers::HOST_CONTROL1, (0xE << 16) | ((divider & 0xFF) << 8) | ((divider & 0x300) >> 2) | 0x5);
+            wait_until_set(registers::HOST_CONTROL1, EMMC1_HC1_CLOCK_STABLE).unwrap();
+        }
+        Ok(())
+    }
+
     fn send_command(cmd: Command, arg1: u32) -> Result<u32, KernelError> {
         unsafe {
             wait_until_clear(registers::STATUS, EMMC1_STA_COMMAND_INHIBIT)?;
 
-            // TODO the initialization times out if this isn't present, but I'm not sure what it does
+            // In order to reset the interrupt flags, they must be set to 1 (not 0), so writing it to itself will do that
             EMMC1.set(registers::INTERRUPT_FLAGS, EMMC1.get(registers::INTERRUPT_FLAGS));
 
             printkln!("mmc: sending command {:?} {:x}", cmd, arg1);
@@ -223,13 +255,29 @@ impl EmmcHost {
         }
     }
 
-    fn setup_data_transfer(numblocks: usize, blocksize: usize) -> Result<(), KernelError> {
+    fn setup_data_transfer(cmd: Command, offset: u64, numblocks: usize, blocksize: usize) -> Result<(), KernelError> {
         wait_until_clear(registers::STATUS, EMMC1_STA_DATA_INHIBIT)?;
 
         unsafe {
             EMMC1.set(registers::BLOCK_COUNT_SIZE, ((numblocks << 16) | blocksize) as u32);
+
+            // In order to reset the interrupt flags, they must be set to 1 (not 0), so writing it to itself will do that
+            EMMC1.set(registers::INTERRUPT_FLAGS, EMMC1.get(registers::INTERRUPT_FLAGS));
+
+            printkln!("mmc: sending command {:?} {:x}", cmd, offset);
+            EMMC1.set(registers::ARG1, offset as u32);
+            EMMC1.set(registers::ARG2, (offset >> 32) as u32);
+            EMMC1.set(registers::COMMAND, command_code(cmd));
+            wait_until_set(registers::INTERRUPT_FLAGS, EMMC1_INT_READ_READY | EMMC1_INT_ANY_ERROR)?;
+
+            let flags = EMMC1.get(registers::INTERRUPT_FLAGS);
+            if flags & EMMC1_INT_ANY_ERROR != 0 {
+                printkln!("mmc: error occurred: {:x}", flags);
+                Err(KernelError::IOError)
+            } else {
+                Ok(())
+            }
         }
-        Ok(())
     }
 
     fn read_data(data: &mut [u8]) -> Result<(), KernelError> {
@@ -244,6 +292,14 @@ impl EmmcHost {
             }
         }
 
+        unsafe {
+
+            // TODO this is now causing an immediate timeout
+            //EMMC1.set(registers::INTERRUPT_FLAGS, EMMC1.get(registers::INTERRUPT_FLAGS));
+
+        }
+
+
         Ok(())
     }
 }
@@ -255,6 +311,7 @@ const fn command_code(cmd: Command) -> u32 {
         Command::StopTransmission   => 0x0C030000,
         Command::SendOpCond         => 0x29020000,
         Command::ReadSingle         => 0x11220010,
+        Command::ReadMultiple       => 0x12220032,
         Command::AppCommand         => 0x37000000,
         Command::SendCID            => 0x02010000,
         Command::SendRelAddr        => 0x03020000,
