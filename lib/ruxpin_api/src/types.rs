@@ -109,6 +109,10 @@ impl FileAccess {
         (self.0 & FileAccess::FileTypeMask.0) == FileAccess::Regular.0
     }
 
+    pub fn is_zero(self) -> bool {
+        self.0 == 0
+    }
+
     pub fn file_type(self) -> FileAccess {
         FileAccess(self.0 & FileAccess::FileTypeMask.0)
     }

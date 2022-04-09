@@ -11,23 +11,24 @@ use crate::printkln;
 use crate::misc::linkedlist::{UnownedLinkedList, UnownedLinkedListNode};
 
 
-pub struct Cache<T> {
+pub struct Cache<K, T> {
     max_size: usize,
-    items: Vec<UnownedLinkedListNode<CacheArcInner<T>>>,
-    order: UnownedLinkedList<CacheArcInner<T>>,
+    items: Vec<UnownedLinkedListNode<CacheArcInner<K, T>>>,
+    order: UnownedLinkedList<CacheArcInner<K, T>>,
 }
 
-pub struct CacheArc<T> {
-    ptr: NonNull<CacheArcInner<T>>,
+pub struct CacheArc<K, T> {
+    ptr: NonNull<CacheArcInner<K, T>>,
     _marker: PhantomData<T>,
 }
 
-pub struct CacheArcInner<T> {
+pub struct CacheArcInner<K, T> {
     refcount: AtomicUsize,
+    key: K,
     data: T,
 }
 
-impl<T> Cache<T> {
+impl<K: Copy + PartialEq, T> Cache<K, T> {
     pub fn new(max_size: usize) -> Self {
         Self {
             max_size,
@@ -47,16 +48,16 @@ impl<T> Cache<T> {
         Ok(())
     }
 
-    pub fn get<C, F, E>(&mut self, compare: C, fetch: F) -> Result<CacheArc<T>, E>
+    pub fn get<F, E>(&mut self, key: K, fetch: F) -> Result<CacheArc<K, T>, E>
     where
-        C: Fn(&T) -> bool,
         F: FnOnce() -> Result<T, E>
     {
         // Search the list for the matching object
         let mut iter = self.order.iter();
         while let Some(ptr) = iter.next() {
             let item = unsafe { &mut (*ptr.as_ptr()) };
-            if compare(&item.data) {
+            //if compare(&item.data) {
+            if item.key == key {
                 unsafe {
                     self.order.remove_node(ptr);
                     self.order.insert_head(ptr);
@@ -68,7 +69,7 @@ impl<T> Cache<T> {
 
         // If not every cache entry is in use, then allocate a new one and fetch the object
         if self.items.len() < self.max_size {
-            self.items.push(UnownedLinkedListNode::new(CacheArcInner::new(fetch()?)));
+            self.items.push(UnownedLinkedListNode::new(CacheArcInner::new(key, fetch()?)));
             let i = self.items.len() - 1;
             unsafe {
                 self.order.insert_head(self.items[i].wrap_non_null());
@@ -96,7 +97,7 @@ impl<T> Cache<T> {
     }
 }
 
-impl<T: Debug> Cache<T> {
+impl<K, T: Debug> Cache<K, T> {
     pub fn print(&mut self) {
         let mut i = 0;
         let mut iter = self.order.iter();
@@ -110,8 +111,8 @@ impl<T: Debug> Cache<T> {
 }
 
 
-impl<T> CacheArc<T> {
-    fn from_inner(inner: NonNull<CacheArcInner<T>>) -> Self {
+impl<K, T> CacheArc<K, T> {
+    fn from_inner(inner: NonNull<CacheArcInner<K, T>>) -> Self {
         let inner_data = unsafe { inner.as_ref() };
         let count = inner_data.refcount.fetch_add(1, Ordering::Relaxed);
 
@@ -126,13 +127,13 @@ impl<T> CacheArc<T> {
     }
 }
 
-impl<T> Clone for CacheArc<T> {
+impl<K, T> Clone for CacheArc<K, T> {
     fn clone(&self) -> Self {
         CacheArc::from_inner(self.ptr)
     }
 }
 
-impl<T> Deref for CacheArc<T> {
+impl<K, T> Deref for CacheArc<K, T> {
     type Target = T;
 
     fn deref(&self) -> &T {
@@ -141,7 +142,7 @@ impl<T> Deref for CacheArc<T> {
     }
 }
 
-impl<T> Drop for CacheArc<T> {
+impl<K, T> Drop for CacheArc<K, T> {
     fn drop(&mut self) {
         let inner = unsafe { self.ptr.as_ref() };
         // TODO I have no idea if this is right.  I don't want to decrement the count if it's already 0
@@ -153,24 +154,25 @@ impl<T> Drop for CacheArc<T> {
     }
 }
 
-unsafe impl<T: Sync + Send> Send for CacheArc<T> {}
-unsafe impl<T: Sync + Send> Sync for CacheArc<T> {}
+unsafe impl<K: Sync + Send, T: Sync + Send> Send for CacheArc<K, T> {}
+unsafe impl<K: Sync + Send, T: Sync + Send> Sync for CacheArc<K, T> {}
 
 
-impl<T> CacheArcInner<T> {
-    fn new(data: T) -> Self {
+impl<K, T> CacheArcInner<K, T> {
+    fn new(key: K, data: T) -> Self {
         Self {
             refcount: AtomicUsize::new(0),
+            key,
             data,
         }
     }
 
-    fn wrap_inner(&mut self) -> CacheArc<T> {
+    fn wrap_inner(&mut self) -> CacheArc<K, T> {
         CacheArc::from_inner(NonNull::new(self.as_ptr()).unwrap())
     }
 
-    fn as_ptr(&mut self) -> *mut CacheArcInner<T> {
-        self as *mut CacheArcInner<T>
+    fn as_ptr(&mut self) -> *mut CacheArcInner<K, T> {
+        self as *mut CacheArcInner<K, T>
     }
 }
 

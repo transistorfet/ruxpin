@@ -93,7 +93,7 @@ pub fn write(device_id: DeviceID, buffer: &[u8], offset: u64) -> Result<usize, K
 }
 
 
-pub fn get_buf(device_id: DeviceID, block_num: BlockNum) -> Result<CacheArc<Buf>, KernelError> {
+pub fn get_buf(device_id: DeviceID, block_num: BlockNum) -> Result<CacheArc<BlockNum, Buf>, KernelError> {
     let device = get_device(device_id)?;
     let buf = device.cache.lock().get_block(&mut *device.dev.lock(), block_num)?;
     Ok(buf)

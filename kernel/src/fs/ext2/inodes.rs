@@ -132,7 +132,7 @@ impl Ext2Mount {
 
     pub fn get_inode(&mut self, inode_num: Ext2InodeNum) -> Result<Vnode, KernelError> {
         let mount_ptr = self.as_ptr();
-        let vnode = self.vnode_cache.get(|node| node.lock().attributes().unwrap().inode == inode_num, || {
+        let vnode = self.vnode_cache.get(inode_num, || {
             let mut vnode = Ext2Vnode::new(mount_ptr);
             get_mount(mount_ptr).load_inode(&mut vnode, inode_num)?;
             Ok(Arc::new(Spinlock::new(vnode)))

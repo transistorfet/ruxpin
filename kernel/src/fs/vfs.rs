@@ -228,7 +228,7 @@ fn find_filesystem(fstype: &str) -> Result<Arc<Spinlock<dyn Filesystem>>, Kernel
 }
 
 fn verify_file_access(current_uid: UserID, require_access: FileAccess, file_attributes: &FileAttributes) -> bool {
-    if file_attributes.access.file_type() != require_access.file_type() {
+    if !require_access.file_type().is_zero() && file_attributes.access.file_type() != require_access.file_type() {
         return false;
     }
 

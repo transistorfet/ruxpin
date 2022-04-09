@@ -1,9 +1,7 @@
 
-use core::mem::MaybeUninit;
-
 use crate::errors::KernelError;
 use crate::fs::types::DirEntry;
-use crate::misc::copy_struct;
+use crate::misc::memory::read_struct;
 use crate::misc::byteorder::{leu16, leu32};
 
 use super::inodes::Ext2Vnode;
@@ -27,7 +25,9 @@ impl Ext2Vnode {
             }
 
             // Copy the data into a struct to read it
-            let entry_on_disk = copy_to_dir_entry_header(&data);
+            let entry_on_disk: Ext2DirEntryHeader = unsafe {
+                read_struct(&data)
+            };
             let entry_len = u16::from(entry_on_disk.entry_len) as usize;
 
             // If the inode of the not 0, then it's valid, otherwise skip it
@@ -49,14 +49,6 @@ impl Ext2Vnode {
 
             position += entry_len;
         }
-    }
-}
-
-fn copy_to_dir_entry_header(data: &[u8]) -> Ext2DirEntryHeader {
-    let mut entry_on_disk: MaybeUninit<Ext2DirEntryHeader> = MaybeUninit::uninit();
-    unsafe {
-        copy_struct(entry_on_disk.assume_init_mut(), data);
-        entry_on_disk.assume_init()
     }
 }
 

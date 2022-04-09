@@ -78,7 +78,9 @@ impl VnodeOperations for Ext2Vnode {
         let mut dirent = DirEntry::new();
         while position < self.attrs.size {
             position += self.read_directory_from_vnode(&mut dirent, position)?;
+            printkln!("found {:?} at inode {}", dirent.name.as_str(), dirent.inode);
             if dirent.name.as_str() == filename {
+                printkln!("a winner: inode {}", dirent.inode);
                 return self.get_inode(dirent.inode);
             }
         }

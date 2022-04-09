@@ -11,13 +11,12 @@ use super::BlockOperations;
 pub type BlockNum = u32;
 
 pub struct Buf {
-    pub num: BlockNum,
     pub block: Spinlock<Box<[u8]>>,
 }
 
 pub struct BufCache {
     block_size: usize,
-    cache: Cache<Buf>,
+    cache: Cache<BlockNum, Buf>,
 }
 
 impl BufCache {
@@ -63,9 +62,9 @@ impl BufCache {
         Err(KernelError::OperationNotPermitted)
     }
 
-    pub fn get_block(&mut self, dev: &mut Box<dyn BlockOperations>, num: BlockNum) -> Result<CacheArc<Buf>, KernelError> {
-        self.cache.get(|entry| entry.num == num, || {
-            let entry = Buf::new(num, self.block_size);
+    pub fn get_block(&mut self, dev: &mut Box<dyn BlockOperations>, num: BlockNum) -> Result<CacheArc<BlockNum, Buf>, KernelError> {
+        self.cache.get(num, || {
+            let entry = Buf::new(self.block_size);
             dev.read(&mut *entry.block.lock(), (num as usize * self.block_size) as u64)?;
             Ok(entry)
         })
@@ -73,9 +72,8 @@ impl BufCache {
 }
 
 impl Buf {
-    pub fn new(num: BlockNum, block_size: usize) -> Self {
+    pub fn new(block_size: usize) -> Self {
         Self {
-            num,
             block: Spinlock::new(vec![0; 1024].into_boxed_slice()),
         }
     }
