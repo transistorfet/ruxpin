@@ -201,28 +201,27 @@ impl Ext2SuperBlock {
     }
 
     pub(super) fn get_inode_entry_location(&self, inode_num: Ext2InodeNum) -> Result<(BlockNum, usize), KernelError> {
-        let group = ((inode_num - 1) / self.inodes_per_group) as usize;
-        let group_inode = (inode_num - 1) % self.inodes_per_group;
+        let(group, group_inode) = self.get_inode_group_and_offset(inode_num)?;
 
-        if group_inode >= self.total_inodes || group >= self.groups.len() {
-            return Err(KernelError::InvalidInode);
-        }
-
-        let block = (self.blocks_per_group * group as u32) + self.groups[group].inode_table + (group_inode / self.inodes_per_block as u32);
-
+        let block = self.groups[group].inode_table + (group_inode / self.inodes_per_block as u32);
         Ok((block, (group_inode as usize % self.inodes_per_block) * self.inode_size))
     }
 
     pub(super) fn get_inode_bitmap_location(&self, inode_num: Ext2InodeNum) -> Result<(BlockNum, usize), KernelError> {
+        let(group, group_inode) = self.get_inode_group_and_offset(inode_num)?;
+
+        let bitmap = self.groups[group].inode_bitmap;
+        Ok((bitmap, group_inode as usize))
+    }
+
+    fn get_inode_group_and_offset(&self, inode_num: Ext2InodeNum) -> Result<(usize, Ext2InodeNum), KernelError> {
         let group = ((inode_num - 1) / self.inodes_per_group) as usize;
         let group_inode = (inode_num - 1) % self.inodes_per_group;
 
-        if group_inode >= self.total_inodes || group >= self.groups.len() {
+        if inode_num >= self.total_inodes || group >= self.groups.len() {
             return Err(KernelError::InvalidInode);
         }
-
-        let bitmap = (self.blocks_per_group * group as u32) + self.groups[group].inode_bitmap;
-        Ok((bitmap, group_inode as usize))
+        Ok((group, group_inode))
     }
 }
 

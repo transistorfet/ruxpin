@@ -28,9 +28,14 @@ impl<T> Spinlock<T> {
 
 impl<T: ?Sized> Spinlock<T> {
     pub fn lock(&self) -> SpinlockGuard<'_, T> {
+        let mut count = 0;
         while self.lock.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed).is_err() {
             // TODO delay
             spin_loop();
+            count += 1;
+            if count == 1_000_000_000 {
+                panic!("Spinlock timed out");
+            }
         }
         SpinlockGuard { spinlock: self }
     }

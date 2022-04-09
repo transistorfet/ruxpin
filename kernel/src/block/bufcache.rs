@@ -65,7 +65,15 @@ impl BufCache {
     pub fn get_block(&mut self, dev: &mut Box<dyn BlockOperations>, num: BlockNum) -> Result<CacheArc<BlockNum, Buf>, KernelError> {
         self.cache.get(num, || {
             let entry = Buf::new(self.block_size);
-            dev.read(&mut *entry.block.lock(), (num as usize * self.block_size) as u64)?;
+            let nbytes = dev.read(&mut *entry.block.lock(), (num as usize * self.block_size) as u64)?;
+            if nbytes != self.block_size {
+                return Err(KernelError::IOError);
+            }
+
+            // TODO this is for debugging
+            //crate::printkln!("buf {}", num);
+            //unsafe { crate::printk::printk_dump((&**entry.block.lock()).as_ptr(), self.block_size); }
+
             Ok(entry)
         })
     }
@@ -74,7 +82,7 @@ impl BufCache {
 impl Buf {
     pub fn new(block_size: usize) -> Self {
         Self {
-            block: Spinlock::new(vec![0; 1024].into_boxed_slice()),
+            block: Spinlock::new(vec![0; block_size].into_boxed_slice()),
         }
     }
 }

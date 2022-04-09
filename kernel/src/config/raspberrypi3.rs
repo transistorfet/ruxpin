@@ -57,7 +57,8 @@ pub fn register_devices() -> Result<(), KernelError> {
     vfs::mount(None, "/mnt", "ext2", Some(DeviceID(0, 2)), 0)?;
     let vnode = vfs::open(None, "/mnt/testapp", OpenFlags::ReadOnly, FileAccess::DefaultFile, 0)?;
     let mut data = [0; 1024];
-    vfs::read(&mut file, &mut data)?;
+    let nbytes = vfs::read(&mut file, &mut data)?;
+    printkln!("read in {} bytes", nbytes);
     unsafe { crate::printk::printk_dump(&data as *const u8, 1024); }
 
     /*
