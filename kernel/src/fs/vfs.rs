@@ -26,13 +26,13 @@ pub fn initialize() -> Result<(), KernelError> {
 
     // TODO this is a temporary test
     mount(None, "/", "tmpfs", None, 0).unwrap();
-    let mut file = open(None, "/dev", OpenFlags::Create, FileAccess::Directory.and(FileAccess::DefaultDir), 0).unwrap();
+    let mut file = open(None, "/dev", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
     close(&mut file).unwrap();
-    let mut file = open(None, "/mnt", OpenFlags::Create, FileAccess::Directory.and(FileAccess::DefaultDir), 0).unwrap();
+    let mut file = open(None, "/mnt", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
     close(&mut file).unwrap();
     mount(None, "/dev", "devfs", None, 0).unwrap();
 
-    open(None, "test", OpenFlags::Create, FileAccess::Directory.and(FileAccess::DefaultDir), 0).unwrap();
+    open(None, "test", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
     let mut file = open(None, "test/file.txt", OpenFlags::Create, FileAccess::DefaultFile, 0).unwrap();
     write(&mut file, b"This is a test").unwrap();
     seek(&mut file, 0, Seek::FromStart).unwrap();
@@ -228,6 +228,10 @@ fn find_filesystem(fstype: &str) -> Result<Arc<Spinlock<dyn Filesystem>>, Kernel
 }
 
 fn verify_file_access(current_uid: UserID, require_access: FileAccess, file_attributes: &FileAttributes) -> bool {
+    if file_attributes.access.file_type() != require_access.file_type() {
+        return false;
+    }
+
     if current_uid == 0 || current_uid == file_attributes.uid {
         file_attributes.access.require_owner(require_access)
     } else {

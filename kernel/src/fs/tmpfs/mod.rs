@@ -104,18 +104,25 @@ impl VnodeOperations for TmpVnodeDirectory {
     }
 
 
-    // TODO add link
-    // TODO add unlink
-    // TODO add rename
+    //fn link(&mut self, _newparent: Vnode, _filename: &str) -> Result<Vnode, KernelError> {
+    //    Err(KernelError::OperationNotPermitted)
+    //}
+
+    //fn unlink(&mut self, _target: Vnode, _filename: &str) -> Result<Vnode, KernelError> {
+    //    Err(KernelError::OperationNotPermitted)
+    //}
+
+    //fn rename(&mut self, _filename: &str) -> Result<Vnode, KernelError> {
+    //    Err(KernelError::OperationNotPermitted)
+    //}
 
 
     fn attributes<'a>(&'a mut self) -> Result<&'a FileAttributes, KernelError> {
         Ok(&mut self.attrs)
     }
 
-    //fn attributes_mut<'a>(&'a mut self) -> Result<&'a mut FileAttributes, KernelError> {
-    //    // TODO this isn't right because you need to update
-    //    Ok(&mut self.attrs)
+    //fn attributes_mut(&mut self, f: &mut dyn FnMut(&mut FileAttributes)) -> Result<(), KernelError> {
+    //    Err(KernelError::OperationNotPermitted)
     //}
 
     fn open(&mut self, _file: &mut FilePointer, _flags: OpenFlags) -> Result<(), KernelError> {

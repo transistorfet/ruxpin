@@ -94,8 +94,10 @@ impl Ext2Vnode {
         if linear_block_num < EXT2_INODE_DIRECT_BLOCKS {
             Ok(self.blocks[linear_block_num])
         } else {
-            //let buf = block::get_buf(device_id, self.blocks[EXT2_INODE_INDIRECT_BLOCKS - 1])?;
-
+            //lookup_indirect_block(self.get_device_id(), self.blocks[EXT2_INODE_INDIRECT_BLOCKS - 1], linear_block_num - EXT2_INODE_DIRECT_BLOCKS)
+            //fn lookup_indirect_block(device_id: DeviceID, block_table: BlockNum, offset: usize) -> Result<BlockNum, KernelError> {
+                //let buf = block::get_buf(device_id, block_table)?;
+            //}
             panic!("Not implemented");
         }
     }
@@ -104,7 +106,6 @@ impl Ext2Vnode {
         get_mount(self.mount_ptr).get_inode(inode_num)
     }
 }
-
 
 fn get_mount(mount_ptr: NonNull<Ext2Mount>) -> &'static mut Ext2Mount {
     unsafe {

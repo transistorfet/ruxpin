@@ -143,9 +143,8 @@ impl VnodeOperations for DevVnodeRootDirectory {
         Ok(&mut self.attrs)
     }
 
-    //fn attributes_mut<'a>(&'a mut self) -> Result<&'a mut FileAttributes, KernelError> {
-    //    // TODO this isn't right because you need to update
-    //    Ok(&mut self.attrs)
+    //fn attributes_mut(&mut self, f: &mut dyn FnMut(&mut FileAttributes)) -> Result<(), KernelError> {
+    //    Err(KernelError::OperationNotPermitted)
     //}
 
     fn open(&mut self, _file: &mut FilePointer, _flags: OpenFlags) -> Result<(), KernelError> {

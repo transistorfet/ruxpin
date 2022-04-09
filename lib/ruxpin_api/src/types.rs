@@ -34,7 +34,7 @@ impl OpenFlags {
     pub const Append: OpenFlags     = OpenFlags(0o2000);
     pub const NonBlock: OpenFlags   = OpenFlags(0o4000);
 
-    pub fn and(self, flag: Self) -> Self {
+    pub fn plus(self, flag: Self) -> Self {
         OpenFlags(self.0 | flag.0)
     }
 
@@ -46,14 +46,14 @@ impl OpenFlags {
         match OpenFlags(0o3 & self.0) {
             OpenFlags::ReadOnly => FileAccess::Read,
             OpenFlags::WriteOnly => FileAccess::Write,
-            OpenFlags::ReadWrite => FileAccess::Read.and(FileAccess::Write),
+            OpenFlags::ReadWrite => FileAccess::Read.plus(FileAccess::Write),
             _ => FileAccess::Read,
         }
     }
 }
 
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct FileAccess(u16);
 
 #[allow(dead_code)]
@@ -93,7 +93,7 @@ impl FileAccess {
     pub const DefaultFile: FileAccess   = FileAccess(0o000644);
     pub const DefaultDir: FileAccess    = FileAccess(0o040755);
 
-    pub fn and(self, flag: Self) -> Self {
+    pub fn plus(self, flag: Self) -> Self {
         FileAccess(self.0 | flag.0)
     }
 
@@ -107,6 +107,10 @@ impl FileAccess {
 
     pub fn is_file(self) -> bool {
         (self.0 & FileAccess::FileTypeMask.0) == FileAccess::Regular.0
+    }
+
+    pub fn file_type(self) -> FileAccess {
+        FileAccess(self.0 & FileAccess::FileTypeMask.0)
     }
 
     pub fn require_owner(self, required_access: Self) -> bool {

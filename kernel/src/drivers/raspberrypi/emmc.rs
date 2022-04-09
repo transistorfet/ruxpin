@@ -292,14 +292,6 @@ impl EmmcHost {
             }
         }
 
-        unsafe {
-
-            // TODO this is now causing an immediate timeout
-            //EMMC1.set(registers::INTERRUPT_FLAGS, EMMC1.get(registers::INTERRUPT_FLAGS));
-
-        }
-
-
         Ok(())
     }
 }

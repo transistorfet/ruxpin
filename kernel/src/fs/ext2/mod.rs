@@ -7,9 +7,8 @@ use crate::block;
 use crate::printkln;
 use crate::sync::Spinlock;
 use crate::errors::KernelError;
-use crate::misc::cache::Cache;
 
-use super::types::{Filesystem, Mount, MountOperations, Vnode, VnodeOperations, FileAttributes, FilePointer, DirEntry};
+use super::types::{Filesystem, Mount, Vnode, VnodeOperations, FileAttributes, FilePointer, DirEntry};
 
 mod inodes;
 mod files;
@@ -24,6 +23,7 @@ use self::mount::Ext2Mount;
 pub struct Ext2Filesystem {
     /* Nothing For The Moment */
 }
+
 impl Ext2Filesystem {
     pub fn new() -> Self {
         Self {
@@ -78,18 +78,24 @@ impl VnodeOperations for Ext2Vnode {
         let mut dirent = DirEntry::new();
         while position < self.attrs.size {
             position += self.read_directory_from_vnode(&mut dirent, position)?;
-            printkln!("found {:?} at inode {}", dirent.name.as_str(), dirent.inode);
             if dirent.name.as_str() == filename {
-                printkln!("a winner: inode {}", dirent.inode);
                 return self.get_inode(dirent.inode);
             }
         }
         Err(KernelError::FileNotFound)
     }
 
-    // TODO add link
-    // TODO add unlink
-    // TODO add rename
+    //fn link(&mut self, _newparent: Vnode, _filename: &str) -> Result<Vnode, KernelError> {
+    //    Err(KernelError::OperationNotPermitted)
+    //}
+
+    //fn unlink(&mut self, _target: Vnode, _filename: &str) -> Result<Vnode, KernelError> {
+    //    Err(KernelError::OperationNotPermitted)
+    //}
+
+    //fn rename(&mut self, _filename: &str) -> Result<Vnode, KernelError> {
+    //    Err(KernelError::OperationNotPermitted)
+    //}
 
     /*
     fn truncate(&mut self) -> Result<(), KernelError> {
@@ -106,9 +112,8 @@ impl VnodeOperations for Ext2Vnode {
         Ok(&mut self.attrs)
     }
 
-    //fn attributes_mut<'a>(&'a mut self) -> Result<&'a mut FileAttributes, KernelError> {
-    //    // TODO this isn't right because you need to update
-    //    Ok(&mut self.attrs)
+    //fn attributes_mut(&mut self, f: &mut dyn FnMut(&mut FileAttributes)) -> Result<(), KernelError> {
+    //    Err(KernelError::OperationNotPermitted)
     //}
 
     fn open(&mut self, _file: &mut FilePointer, _flags: OpenFlags) -> Result<(), KernelError> {
@@ -124,7 +129,7 @@ impl VnodeOperations for Ext2Vnode {
             return Err(KernelError::IsADirectory);
         }
 
-	let mut nbytes = if buffer.len() > self.attrs.size - file.position {
+	let nbytes = if buffer.len() > self.attrs.size - file.position {
 	    self.attrs.size - file.position
         } else {
             buffer.len()

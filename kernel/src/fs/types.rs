@@ -63,9 +63,9 @@ pub trait VnodeOperations: Sync + Send {
         Err(KernelError::OperationNotPermitted)
     }
 
-    // TODO how can you update this, such that the fs can update the inode on disk afterwards??
-    //      could use a closure passed in, or a special struct like RefMut?
-    //fn attributes_mut<'a>(&'a mut self) -> Result<&'a mut FileAttributes, KernelError>;
+    fn attributes_mut(&mut self, f: &mut dyn FnMut(&mut FileAttributes)) -> Result<(), KernelError> {
+        Err(KernelError::OperationNotPermitted)
+    }
 
     fn open(&mut self, _file: &mut FilePointer, _flags: OpenFlags) -> Result<(), KernelError> {
         Err(KernelError::OperationNotPermitted)

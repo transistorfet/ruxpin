@@ -2,11 +2,10 @@
 use ruxpin_api::types::DeviceID;
 
 use crate::block;
-use crate::printkln;
 use crate::errors::KernelError;
 use crate::misc::cache::Cache;
 
-use crate::fs::types::{MountOperations, Vnode, FilePointer};
+use crate::fs::types::{MountOperations, Vnode};
 
 use super::superblock::Ext2SuperBlock;
 
@@ -21,7 +20,7 @@ impl Ext2Mount {
     pub(super) fn create_mount(parent: Option<Vnode>, device_id: DeviceID) -> Result<Ext2Mount, KernelError> {
         let superblock = Ext2SuperBlock::load(device_id)?;
 
-        let mut mount = Ext2Mount {
+        let mount = Ext2Mount {
             device_id,
             mounted_on: parent,
             superblock,
