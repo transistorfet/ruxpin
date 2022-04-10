@@ -36,7 +36,7 @@ pub fn load_binary(proc: Process, path: &str) -> Result<(), KernelError> {
     }
 
     const MAX_PROGRAM_SEGMENTS: usize = 12;
-    if header.e_phnum > MAX_PROGRAM_SEGMENTS {
+    if header.e_phnum as usize > MAX_PROGRAM_SEGMENTS {
         return Err(KernelError::OutOfMemory);
     }
 

@@ -1,3 +1,14 @@
-target
-.*.sw?
+
+# Build Files
+target/
 ruxpin.img
+ruxpin-ext2-image.bin
+kernel/Cargo.lock
+
+# Editor Files
+.*.sw?
+session.vim
+
+# Misc
+junk/
+

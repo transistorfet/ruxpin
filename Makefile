@@ -5,8 +5,9 @@ TARGET = aarch64-unknown-none/release
 MOUNTPOINT = build
 IMAGE = ruxpin-ext2-image.bin
 BLOCKSIZE = 4096
-BLOCKS = 1073741824		# 4GB
+IMAGE_BLOCKS = 1048576		# 4GiB
 PARTITION_OFFSET = 272629760	# Partition 2: 0x8200 * 512
+PARTITION_BLOCKS = 982016
 LOOPBACK = /dev/loop8
 
 
@@ -14,14 +15,14 @@ all: build-kernel
 
 
 create-image:
-	dd if=/dev/zero of=$(IMAGE) bs=4K count=$(BLOCKS)
-	sudo losetup $(LOOPBACK) $(IMAGE)
-	sudo mkfs.ext2 -b $(BLOCKSIZE) $(LOOPBACK) $(BLOCKS)
+	dd if=/dev/zero of=$(IMAGE) bs=4K count=$(IMAGE_BLOCKS)
+	sudo losetup --offset $(PARTITION_OFFSET) $(LOOPBACK) $(IMAGE)
+	sudo mkfs.ext2 -b $(BLOCKSIZE) $(LOOPBACK) $(PARTITION_BLOCKS)
 	sudo losetup -d $(LOOPBACK)
 
 mount-image:
-	sudo losetup $(LOOPBACK) $(IMAGE)
-	sudo mount -t ext2 -o offset=$(PARTITION_OFFSET) $(LOOPBACK) $(MOUNTPOINT)
+	sudo losetup --offset $(PARTITION_OFFSET) $(LOOPBACK) $(IMAGE)
+	sudo mount -t ext2 $(LOOPBACK) $(MOUNTPOINT)
 
 umount-image:
 	- sudo umount $(MOUNTPOINT)
