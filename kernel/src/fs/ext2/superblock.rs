@@ -15,10 +15,10 @@ use crate::misc::byteorder::{leu16, leu32};
 use super::Ext2InodeNum;
 
 
-const EXT_INCOMPAT_FILE_TYPE_IN_DIRS: u32       = 0x00002;
-const EXT_INCOMPAT_FS_NEEDS_RECOVERY: u32       = 0x00004;
-const EXT_INCOMPAT_FLEX_BLOCK_GROUP: u32        = 0x00200;
-const EXT_INCOMPAT_SUPPORTED: u32               = EXT_INCOMPAT_FILE_TYPE_IN_DIRS;
+const EXT2_INCOMPAT_FILE_TYPE_IN_DIRS: u32       = 0x00002;
+const EXT2_INCOMPAT_FS_NEEDS_RECOVERY: u32       = 0x00004;
+const EXT2_INCOMPAT_FLEX_BLOCK_GROUP: u32        = 0x00200;
+const EXT2_INCOMPAT_SUPPORTED: u32               = EXT2_INCOMPAT_FILE_TYPE_IN_DIRS;
 
 #[repr(C)]
 struct Ext2SuperBlockOnDisk {
@@ -154,8 +154,8 @@ impl Ext2SuperBlock {
         }
 
         let incompat_features = u32::from(data.extended.incompat_features);
-        if (incompat_features & !EXT_INCOMPAT_SUPPORTED) != 0 {
-            printkln!("ext2: this filesystem has incompatible features than aren't supported: {:x}", incompat_features & !EXT_INCOMPAT_SUPPORTED);
+        if (incompat_features & !EXT2_INCOMPAT_SUPPORTED) != 0 {
+            printkln!("ext2: this filesystem has incompatible features than aren't supported: {:x}", incompat_features & !EXT2_INCOMPAT_SUPPORTED);
             return Err(KernelError::IncompatibleFeatures);
         }
 

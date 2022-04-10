@@ -13,7 +13,7 @@ pub unsafe fn read_struct<T>(source: &[u8]) -> T {
     let mut dest: MaybeUninit<T> = MaybeUninit::uninit();
     let data_len = mem::size_of::<T>();
     let buffer = slice::from_raw_parts_mut(dest.assume_init_mut() as *mut T as *mut u8, data_len);
-    buffer.copy_from_slice(&source[..data_len]);
+    buffer.copy_from_slice(&source[0..data_len]);
     dest.assume_init()
 }
 

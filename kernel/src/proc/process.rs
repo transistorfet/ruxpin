@@ -1,6 +1,4 @@
 
-use core::ptr;
-
 use alloc::vec::Vec;
 
 use ruxpin_api::types::UserID;
@@ -18,9 +16,9 @@ pub type Pid = i32;
 pub struct Process {
     pid: Pid,
     uid: UserID,
-    context: Context,
     space: VirtualAddressSpace,
     files: FileDescriptors,
+    context: Context,
 }
 
 struct ProcessManager {
@@ -31,10 +29,6 @@ struct ProcessManager {
 static NEXT_PID: Spinlock<Pid> = Spinlock::new(1);
 static PROCESS_MANAGER: Spinlock<ProcessManager> = Spinlock::new(ProcessManager::new());
 
-// TODO need to move this
-#[no_mangle]
-pub static mut CURRENT_CONTEXT: *mut Context = ptr::null_mut();
-
 
 pub fn init_processes() {
     //let idle = PROCESS_MANAGER.lock().create_process();
@@ -42,6 +36,7 @@ pub fn init_processes() {
 
     create_test_process();
 
+    // NOTE this ensures the context is set before we start multitasking
     PROCESS_MANAGER.lock().schedule();
 }
 
@@ -59,13 +54,15 @@ impl ProcessManager {
         self.processes.push(Process {
             pid,
             uid: 0,
-            context: Default::default(),
             space: VirtualAddressSpace::new_user_space(),
             files: FileDescriptors::new(),
+            context: Default::default(),
         });
 
         self.current = self.processes.len() - 1;
         let proc = &mut self.processes[self.current];
+
+
         // Allocate text segment
         let entry = proc.space.alloc_mapped(MemoryPermissions::ReadExecute, VirtualAddress::from(0x77777000), 4096);
         // Allocate stack segment
@@ -90,10 +87,7 @@ impl ProcessManager {
             self.current = 0;
         }
 
-        let proc = &mut self.processes[self.current];
-        unsafe {
-            CURRENT_CONTEXT = &mut proc.context as *mut Context;
-        }
+        Context::switch_current_context(&mut self.processes[self.current].context);
     }
 
     fn page_fault(&mut self, far: u64) {

@@ -2,6 +2,7 @@
 use alloc::vec::Vec;
 
 use crate::mm::pages;
+use crate::mm::segments::Segment;
 use crate::mm::{MemoryType, MemoryPermissions};
 use crate::arch::mmu::{self, TranslationTable};
 use crate::arch::types::{VirtualAddress, PhysicalAddress};
@@ -12,12 +13,6 @@ const MAX_SEGMENTS: usize = 6;
 
 pub fn init_virtual_memory(start: PhysicalAddress, end: PhysicalAddress) {
     pages::init_pages_area(start, end);
-}
-
-pub struct Segment {
-    start: VirtualAddress,
-    end: VirtualAddress,
-    //ops for getting pages
 }
 
 pub struct VirtualAddressSpace {
@@ -78,7 +73,7 @@ impl VirtualAddressSpace {
         let pages = pages::get_page_area();
         self.table.unmap_addr(start, len, pages, &|pages, vaddr, paddr| {
             for segment in &self.segments {
-                if vaddr >= segment.start && vaddr <= segment.end {
+                if segment.match_range(vaddr) {
                     // TODO this would normally call the segment operations to determine what to do
                     pages.free_page(paddr);
                 }
@@ -92,7 +87,7 @@ impl VirtualAddressSpace {
 
     pub(crate) fn load_page(&mut self, far: VirtualAddress) {
         //for segment in &self.segments {
-        //    if far >= segment.start && far <= segment.end {
+        //    if segment.match_range(far) {
                 let pages = pages::get_page_area();
                 let page = pages.alloc_page_zeroed();
                 self.table.update_mapping(far, page, mmu::page_size()).unwrap();

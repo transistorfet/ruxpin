@@ -56,13 +56,12 @@ impl<K: Copy + PartialEq, T> Cache<K, T> {
         let mut iter = self.order.iter();
         while let Some(ptr) = iter.next() {
             let item = unsafe { &mut (*ptr.as_ptr()) };
-            //if compare(&item.data) {
             if item.key == key {
                 unsafe {
                     self.order.remove_node(ptr);
                     self.order.insert_head(ptr);
                 }
-                printkln!("cache: returning existing");
+                //printkln!("cache: returning existing");
                 return Ok(item.wrap_inner());
             }
         }
@@ -74,7 +73,7 @@ impl<K: Copy + PartialEq, T> Cache<K, T> {
             unsafe {
                 self.order.insert_head(self.items[i].wrap_non_null());
             }
-                printkln!("cache: returning new");
+            //printkln!("cache: returning new");
             return Ok(self.items[i].wrap_inner());
         }
 
@@ -88,7 +87,7 @@ impl<K: Copy + PartialEq, T> Cache<K, T> {
                     self.order.remove_node(ptr);
                     self.order.insert_head(ptr);
                 }
-                printkln!("cache: recycling old");
+                //printkln!("cache: recycling old");
                 return Ok(item.wrap_inner());
             }
         }

@@ -1,7 +1,7 @@
 
 use alloc::sync::Arc;
 
-use ruxpin_api::types::{OpenFlags, FileAccess, Seek, UserID, DeviceID};
+use ruxpin_api::types::{OpenFlags, Seek, DeviceID};
 
 use crate::block;
 use crate::printkln;
@@ -25,10 +25,10 @@ pub struct Ext2Filesystem {
 }
 
 impl Ext2Filesystem {
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> Arc<Spinlock<dyn Filesystem>> {
+        Arc::new(Spinlock::new(Self {
 
-        }
+        }))
     }
 }
 

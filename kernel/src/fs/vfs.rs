@@ -4,6 +4,7 @@ use alloc::sync::Arc;
 
 use ruxpin_api::types::{OpenFlags, FileAccess, Seek, UserID, DeviceID};
 
+use crate::printkln;
 use crate::sync::Spinlock;
 use crate::errors::KernelError;
 
@@ -16,30 +17,13 @@ static ROOT_NODE: Spinlock<Option<Vnode>> = Spinlock::new(None);
 
 
 pub fn initialize() -> Result<(), KernelError> {
-    // TODO this is temporary
-    use super::tmpfs::TmpFilesystem;
-    FILESYSTEMS.lock().push(Arc::new(Spinlock::new(TmpFilesystem::new())));
-    use super::devfs::DevFilesystem;
-    FILESYSTEMS.lock().push(Arc::new(Spinlock::new(DevFilesystem::new())));
-    use super::ext2::Ext2Filesystem;
-    FILESYSTEMS.lock().push(Arc::new(Spinlock::new(Ext2Filesystem::new())));
+    Ok(())
+}
 
-    // TODO this is a temporary test
-    mount(None, "/", "tmpfs", None, 0).unwrap();
-    let mut file = open(None, "/dev", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
-    close(file).unwrap();
-    let mut file = open(None, "/mnt", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
-    close(file).unwrap();
-    mount(None, "/dev", "devfs", None, 0).unwrap();
-
-    open(None, "test", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
-    let mut file = open(None, "test/file.txt", OpenFlags::Create, FileAccess::DefaultFile, 0).unwrap();
-    write(file.clone(), b"This is a test").unwrap();
-    seek(file.clone(), 0, Seek::FromStart).unwrap();
-    let mut buffer = [0; 100];
-    let n = read(file.clone(), &mut buffer).unwrap();
-    crate::printkln!("Read file {}: {}", n, core::str::from_utf8(&buffer).unwrap());
-
+pub fn register_filesystem(fs: Arc<Spinlock<dyn Filesystem>>) -> Result<(), KernelError> {
+    printkln!("fs: registering filesystem {}", fs.lock().fstype());
+    FILESYSTEMS.lock().push(fs.clone());
+    fs.lock().init()?;
     Ok(())
 }
 

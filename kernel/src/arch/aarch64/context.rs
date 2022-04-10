@@ -1,4 +1,6 @@
 
+use core::ptr;
+
 use super::types::VirtualAddress;
 
 extern "C" {
@@ -6,6 +8,9 @@ extern "C" {
     fn _create_context(context: &mut Context, sp: u64, entry: u64);
     pub fn _start_multitasking() -> !;
 }
+
+#[no_mangle]
+pub static mut CURRENT_CONTEXT: *mut Context = ptr::null_mut();
 
 #[repr(C)]
 pub struct Context {
@@ -33,6 +38,12 @@ impl Context {
         self.ttbr = ttbr;
         unsafe {
             _create_context(self, u64::from(sp), u64::from(entry));
+        }
+    }
+
+    pub fn switch_current_context(new_context: &mut Context) {
+        unsafe {
+            CURRENT_CONTEXT = new_context as *mut Context;
         }
     }
 }

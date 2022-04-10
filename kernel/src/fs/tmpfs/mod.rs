@@ -61,10 +61,10 @@ impl Filesystem for TmpFilesystem {
 }
 
 impl TmpFilesystem {
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> Arc<Spinlock<dyn Filesystem>> {
+        Arc::new(Spinlock::new(Self {
 
-        }
+        }))
     }
 }
 

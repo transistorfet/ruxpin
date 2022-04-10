@@ -29,6 +29,10 @@ impl<T> UnownedLinkedList<T> {
     }
 
     pub unsafe fn insert_head(&mut self, node: NonNull<UnownedLinkedListNode<T>>) {
+        if (*node.as_ptr()).next.is_some() || (*node.as_ptr()).prev.is_some() {
+            panic!("attempting to re-add a node");
+        }
+
         if self.head.is_some() {
             (*self.head.as_mut().unwrap().as_ptr()).prev = Some(node);
         } else {
@@ -50,6 +54,9 @@ impl<T> UnownedLinkedList<T> {
         } else {
             self.head = (*node.as_ptr()).next;
         }
+
+        (*node.as_ptr()).next = None;
+        (*node.as_ptr()).prev = None;
     }
 
     pub fn iter(&self) -> UnownedLinkedListIter<T> {

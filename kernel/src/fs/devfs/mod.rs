@@ -66,10 +66,10 @@ impl Filesystem for DevFilesystem {
 }
 
 impl DevFilesystem {
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> Arc<Spinlock<dyn Filesystem>> {
+        Arc::new(Spinlock::new(Self {
 
-        }
+        }))
     }
 }
 
