@@ -65,6 +65,10 @@ impl TranslationTable {
     where
         F: Fn(&mut PagePool, VirtualAddress, usize) -> Option<PhysicalAddress>
     {
+        if usize::from(vaddr) & (page_size() - 1) != 0 {
+            return Err(KernelError::AddressMisaligned);
+        }
+
         let flags = memory_type_flags(mtype) | memory_permissions_flags(access);
         map_level(TL0_ADDR_BITS, self.as_slice(), &mut len, &mut vaddr, flags, pages, map_block)
     }
@@ -73,15 +77,18 @@ impl TranslationTable {
     where
         F: Fn(&mut PagePool, VirtualAddress, PhysicalAddress)
     {
+        if usize::from(vaddr) & (page_size() - 1) != 0 {
+            return Err(KernelError::AddressMisaligned);
+        }
+
         unmap_level(TL0_ADDR_BITS, self.as_slice(), &mut len, &mut vaddr, pages, unmap_block)
     }
 
-    pub fn translate_addr(&mut self, vaddr: VirtualAddress) -> Result<PhysicalAddress, KernelError> {
-        let (descriptor, granuale_size) = lookup_level(TL0_ADDR_BITS, self.as_slice(), vaddr)?;
-        Ok(PhysicalAddress::from(*descriptor & TT_BLOCK_MASK).add(usize::from(vaddr) & (granuale_size - 1)))
-    }
-
     pub fn update_mapping(&mut self, vaddr: VirtualAddress, paddr: PhysicalAddress, expected_size: usize) -> Result<(), KernelError> {
+        if usize::from(vaddr) & (page_size() - 1) != 0 {
+            return Err(KernelError::AddressMisaligned);
+        }
+
         let (descriptor, granuale_size) = lookup_level(TL0_ADDR_BITS, self.as_slice(), vaddr)?;
         if granuale_size == expected_size {
             *descriptor &= !TT_BLOCK_MASK;
@@ -90,6 +97,11 @@ impl TranslationTable {
         } else {
             Err(KernelError::UnexpectedGranualeSize)
         }
+    }
+
+    pub fn translate_addr(&mut self, vaddr: VirtualAddress) -> Result<PhysicalAddress, KernelError> {
+        let (descriptor, granuale_size) = lookup_level(TL0_ADDR_BITS, self.as_slice(), vaddr.align_down(page_size()))?;
+        Ok(PhysicalAddress::from(*descriptor & TT_BLOCK_MASK).add(vaddr.align_offset(granuale_size)))
     }
 
     pub(crate) fn get_ttbr(&self) -> u64 {

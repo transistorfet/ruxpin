@@ -1,5 +1,6 @@
 
 use alloc::vec::Vec;
+use alloc::sync::Arc;
 
 use ruxpin_api::types::UserID;
 
@@ -13,16 +14,20 @@ use crate::fs::filedesc::FileDescriptors;
 
 pub type Pid = i32;
 
-pub struct Process {
-    pid: Pid,
-    uid: UserID,
-    space: VirtualAddressSpace,
-    files: FileDescriptors,
-    context: Context,
+pub struct ProcessRecord {
+    // TODO I don't like that these are all pub... I might need to either isolate this more or change how things interact with processes
+    pub pid: Pid,
+    pub current_uid: UserID,
+    pub space: VirtualAddressSpace,
+    pub files: FileDescriptors,
+    pub context: Context,
 }
+
+pub type Process = Arc<Spinlock<ProcessRecord>>;
 
 struct ProcessManager {
     processes: Vec<Process>,
+    //schedule: UnownedLinkedList<Process>,
     current: usize,
 }
 
@@ -48,38 +53,47 @@ impl ProcessManager {
         }
     }
 
-    fn create_process(&mut self) -> *mut u8 {
+    pub fn create_process(&mut self) -> Process {
         let pid = next_pid();
 
-        self.processes.push(Process {
+        self.processes.push(Arc::new(Spinlock::new(ProcessRecord {
             pid,
-            uid: 0,
+            current_uid: 0,
             space: VirtualAddressSpace::new_user_space(),
             files: FileDescriptors::new(),
             context: Default::default(),
-        });
+        })));
 
         self.current = self.processes.len() - 1;
-        let proc = &mut self.processes[self.current];
 
-
-        // Allocate text segment
-        let entry = proc.space.alloc_mapped(MemoryPermissions::ReadExecute, VirtualAddress::from(0x77777000), 4096);
-        // Allocate stack segment
-        //proc.space.alloc_mapped(MemoryPermissions::ReadWrite, VirtualAddress::from(0xFF000000), 4096 * 4096);
-        proc.space.map_on_demand(MemoryPermissions::ReadWrite, VirtualAddress::from(0xFF000000), 4096 * 4096);
-        Context::init(&mut proc.context, VirtualAddress::from(0x1_0000_0000), VirtualAddress::from(0x77777000), proc.space.get_ttbr());
-
-        unsafe {
-            entry.to_kernel_addr().as_mut()
-        }
+        self.processes[self.current].clone()
     }
 
+    fn create_test_process(&mut self) -> Process {
+        let proc = self.create_process();
+
+        {
+            let mut locked_proc = proc.lock();
+
+            // Allocate text segment
+            let entry = locked_proc.space.alloc_mapped(MemoryPermissions::ReadExecute, VirtualAddress::from(0x77777000), 4096);
+            // Allocate stack segment
+            //proc.space.alloc_mapped(MemoryPermissions::ReadWrite, VirtualAddress::from(0xFF000000), 4096 * 4096);
+            locked_proc.space.map_on_demand(MemoryPermissions::ReadWrite, VirtualAddress::from(0xFF000000), 4096 * 4096);
+            let ttrb = locked_proc.space.get_ttbr();
+            locked_proc.context.init(VirtualAddress::from(0x77777000), VirtualAddress::from(0x1_0000_0000), ttrb);
+        }
+
+        proc
+    }
+
+    /*
     // TODO this is temporary to suppress unused warnings
     #[allow(dead_code)]
-    fn destroy_process(&mut self, proc: &mut Process) {
+    fn destroy_process(&mut self, proc: &mut ProcessRecord) {
         proc.space.unmap_range(VirtualAddress::from(0), usize::MAX);
     }
+    */
 
     fn schedule(&mut self) {
         self.current += 1;
@@ -87,11 +101,11 @@ impl ProcessManager {
             self.current = 0;
         }
 
-        Context::switch_current_context(&mut self.processes[self.current].context);
+        Context::switch_current_context(&mut self.processes[self.current].lock().context);
     }
 
     fn page_fault(&mut self, far: u64) {
-        self.processes[self.current].space.load_page(VirtualAddress::from(far));
+        self.processes[self.current].lock().space.load_page(VirtualAddress::from(far));
     }
 }
 
@@ -105,7 +119,8 @@ fn next_pid() -> Pid {
 const TEST_PROC1: &[u32] = &[0xd40000e1, 0xd503205f, 0x17ffffff];
 const TEST_PROC2: &[u32] = &[0xd10043ff, 0xf90003e0, 0xf90007e1, 0x14000001, 0xd4000021, 0x17ffffff];
 
-pub unsafe fn load_code(code: *mut u32, instructions: &[u32]) {
+pub unsafe fn load_code(proc: Process, instructions: &[u32]) {
+    let code: *mut u32 = proc.lock().space.translate_addr(VirtualAddress::from(0x77777000)).unwrap().to_kernel_addr().as_mut();
     for i in 0..instructions.len() {
         *code.add(i) = instructions[i];
     }
@@ -113,12 +128,17 @@ pub unsafe fn load_code(code: *mut u32, instructions: &[u32]) {
 
 pub fn create_test_process() {
     unsafe {
-        let ptr = PROCESS_MANAGER.lock().create_process();
-        load_code(ptr.cast(), TEST_PROC1);
+        let ptr = PROCESS_MANAGER.lock().create_test_process();
+        load_code(ptr, TEST_PROC1);
 
-        let ptr = PROCESS_MANAGER.lock().create_process();
-        load_code(ptr.cast(), TEST_PROC2);
+        //let ptr = PROCESS_MANAGER.lock().create_test_process();
+        //load_code(ptr, TEST_PROC2);
     }
+}
+
+
+pub fn create_process() -> Process {
+    PROCESS_MANAGER.lock().create_process()
 }
 
 pub(crate) fn schedule() {

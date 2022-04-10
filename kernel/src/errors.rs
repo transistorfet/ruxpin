@@ -5,6 +5,7 @@ pub enum KernelError {
     // Memory Errors
     AddressAlreadyMapped,
     AddressUnmapped,
+    AddressMisaligned,
     UnexpectedGranualeSize,
     CorruptTranslationTable,
     OutOfMemory,
@@ -27,5 +28,7 @@ pub enum KernelError {
     InvalidSuperblock,
     InvalidInode,
     IncompatibleFeatures,
+
+    NotExecutable,
 }
 

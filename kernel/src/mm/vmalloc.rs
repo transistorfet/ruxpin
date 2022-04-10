@@ -6,6 +6,7 @@ use crate::mm::segments::Segment;
 use crate::mm::{MemoryType, MemoryPermissions};
 use crate::arch::mmu::{self, TranslationTable};
 use crate::arch::types::{VirtualAddress, PhysicalAddress};
+use crate::errors::KernelError;
 
 
 const MAX_SEGMENTS: usize = 6;
@@ -79,6 +80,10 @@ impl VirtualAddressSpace {
                 }
             }
         }).unwrap();
+    }
+
+    pub fn translate_addr(&mut self, vaddr: VirtualAddress) -> Result<PhysicalAddress, KernelError> {
+        self.table.translate_addr(vaddr)
     }
 
     pub(crate) fn get_ttbr(&self) -> u64 {

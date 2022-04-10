@@ -34,7 +34,7 @@ impl Default for Context {
 }
 
 impl Context {
-    pub fn init(&mut self, sp: VirtualAddress, entry: VirtualAddress, ttbr: u64) {
+    pub fn init(&mut self, entry: VirtualAddress, sp: VirtualAddress, ttbr: u64) {
         self.ttbr = ttbr;
         unsafe {
             _create_context(self, u64::from(sp), u64::from(entry));
