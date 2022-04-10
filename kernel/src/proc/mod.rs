@@ -1,4 +1,4 @@
  
 pub mod process;
-//pub mod binaries;
+pub mod binaries;
 

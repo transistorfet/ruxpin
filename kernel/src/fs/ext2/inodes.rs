@@ -157,7 +157,7 @@ impl Ext2Mount {
         vnode.attrs = (*data).into();
         vnode.attrs.inode = inode_num;
 
-        //crate::printkln!("loading inode {}: {:#?}", inode_num, (*data));
+        //crate::printkln!("loading inode {}: {:#?} {:#?}", inode_num, (*data), vnode.attrs);
         Ok(())
     }
 

@@ -84,13 +84,17 @@ pub fn register_devices() -> Result<(), KernelError> {
 
     vfs::mount(None, "/mnt", "ext2", Some(DeviceID(0, 2)), 0)?;
 
-    let file = vfs::open(None, "/mnt/testapp", OpenFlags::ReadOnly, FileAccess::DefaultFile, 0)?;
+    let file = vfs::open(None, "/mnt/bin/testapp", OpenFlags::ReadOnly, FileAccess::DefaultFile, 0)?;
     let mut data = [0; 1024];
     let nbytes = vfs::read(file.clone(), &mut data)?;
     printkln!("read in {} bytes", nbytes);
     unsafe { crate::printk::printk_dump(&data as *const u8, 1024); }
     vfs::close(file)?;
 
+    use crate::proc::process::create_process;
+    use crate::proc::binaries::elf::loader;
+    let proc = create_process();
+    loader::load_binary(proc, "/mnt/bin/testapp").unwrap();
 
     /*
     use crate::misc::cache::Cache;
@@ -110,8 +114,8 @@ pub fn register_devices() -> Result<(), KernelError> {
     */
 
 
-    //SystemTimer::init();
-    //GenericInterruptController::init();
+    SystemTimer::init();
+    GenericInterruptController::init();
 
     printkln!("kernel initialization complete");
 

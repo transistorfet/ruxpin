@@ -4,7 +4,7 @@
 KERNEL=ruxpin.img
 
 #MMC_IMAGE=../ext2-disk-image.img
-MMC_IMAGE=../sd-card-image.bin
+MMC_IMAGE=../ruxpin-ext2-image.bin
 
 qemu-system-aarch64 \
 	-machine raspi3b -m 1024 \

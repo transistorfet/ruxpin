@@ -9,7 +9,7 @@ pub extern "C" fn _start(_argc: isize, _argv: *const *const u8) -> isize {
     loop {
         unsafe {
             asm!(
-                "svc   #7"
+                "svc   #137"
             );
         }
     }
