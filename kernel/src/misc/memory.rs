@@ -17,3 +17,11 @@ pub unsafe fn read_struct<T>(source: &[u8]) -> T {
     dest.assume_init()
 }
 
+pub unsafe fn cast_to_slice<T>(source: &[u8]) -> &[T] {
+    slice::from_raw_parts(source.as_ptr() as *const T, source.len() / mem::size_of::<T>())
+}
+
+pub unsafe fn cast_to_slice_mut<T>(source: &mut [u8]) -> &mut [T] {
+    slice::from_raw_parts_mut(source.as_mut_ptr() as *mut T, source.len() / mem::size_of::<T>())
+}
+

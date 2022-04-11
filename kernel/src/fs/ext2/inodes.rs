@@ -1,4 +1,5 @@
 
+use core::mem;
 use core::ptr::NonNull;
 
 use alloc::sync::Arc;
@@ -9,6 +10,7 @@ use crate::block;
 use crate::block::BlockNum;
 use crate::sync::Spinlock;
 use crate::errors::KernelError;
+use crate::misc::memory::cast_to_slice;
 use crate::misc::byteorder::{leu16, leu32};
 use crate::fs::types::{Vnode, FileAttributes};
 
@@ -90,20 +92,50 @@ impl Ext2Vnode {
         get_mount(self.mount_ptr).device_id
     }
 
+    pub fn get_inode(&mut self, inode_num: Ext2InodeNum) -> Result<Vnode, KernelError> {
+        get_mount(self.mount_ptr).get_inode(inode_num)
+    }
+
     pub fn get_file_block_num(&self, linear_block_num: usize) -> Result<BlockNum, KernelError> {
         if linear_block_num < EXT2_INODE_DIRECT_BLOCKS {
             Ok(self.blocks[linear_block_num])
         } else {
-            //lookup_indirect_block(self.get_device_id(), self.blocks[EXT2_INODE_INDIRECT_BLOCKS - 1], linear_block_num - EXT2_INODE_DIRECT_BLOCKS)
-            //fn lookup_indirect_block(device_id: DeviceID, block_table: BlockNum, offset: usize) -> Result<BlockNum, KernelError> {
-                //let buf = block::get_buf(device_id, block_table)?;
-            //}
-            panic!("Not implemented");
+            let remaining_offset = linear_block_num - EXT2_INODE_DIRECT_BLOCKS;
+            let tiers = self.get_number_of_tiers(remaining_offset)?;
+
+            self.get_block_in_tier(self.get_device_id(), tiers, self.blocks[EXT2_INODE_INDIRECT_BLOCKS + tiers - 1], remaining_offset)
         }
     }
 
-    pub fn get_inode(&mut self, inode_num: Ext2InodeNum) -> Result<Vnode, KernelError> {
-        get_mount(self.mount_ptr).get_inode(inode_num)
+    fn get_number_of_tiers(&self, remaining_offset: usize) -> Result<usize, KernelError> {
+        let entries_per_block = self.get_block_size() / mem::size_of::<Ext2BlockNumber>();
+
+        if remaining_offset < entries_per_block {
+            Ok(1)
+        } else if remaining_offset < entries_per_block * entries_per_block {
+            Ok(2)
+        } else if remaining_offset < entries_per_block * entries_per_block * entries_per_block {
+            Ok(3)
+        } else {
+            Err(KernelError::FileSizeTooLarge)
+        }
+    }
+
+    fn get_block_in_tier(&self, device_id: DeviceID, tiers: usize, table: BlockNum, offset: usize) -> Result<BlockNum, KernelError> {
+        let entries_per_block = self.get_block_size() / mem::size_of::<Ext2BlockNumber>();
+        let buf = block::get_buf(device_id, table)?;
+        let locked_buf = &*buf.block.lock();
+
+        let table_data = unsafe { cast_to_slice(locked_buf) };
+        let index = offset / entries_per_block.pow(tiers as u32);
+        let found_block = table_data[index];
+
+        if tiers <= 1 {
+            Ok(found_block)
+        } else {
+            let remain = offset % entries_per_block.pow(tiers as u32);
+            self.get_block_in_tier(device_id, tiers - 1, found_block, remain)
+        }
     }
 }
 

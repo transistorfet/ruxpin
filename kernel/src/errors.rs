@@ -29,6 +29,7 @@ pub enum KernelError {
     InvalidSuperblock,
     InvalidInode,
     IncompatibleFeatures,
+    FileSizeTooLarge,
 
     NotExecutable,
 }

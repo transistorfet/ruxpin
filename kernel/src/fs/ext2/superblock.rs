@@ -10,6 +10,7 @@ use crate::printkln;
 use crate::block::BlockNum;
 use crate::misc::ceiling_div;
 use crate::errors::KernelError;
+use crate::misc::memory::cast_to_slice;
 use crate::misc::byteorder::{leu16, leu32};
 
 use super::Ext2InodeNum;
@@ -229,9 +230,10 @@ impl Ext2SuperBlock {
 impl Ext2BlockGroup {
     pub fn read_into(device_id: DeviceID, block_num: BlockNum, groups: &mut Vec<Ext2BlockGroup>, total_block_groups: usize) -> Result<(), KernelError> {
         let buf = block::get_buf(device_id, block_num)?;
+        let locked_buf = &*buf.block.lock();
 
-        let data = unsafe {
-            slice::from_raw_parts((buf.block.lock()).as_ptr() as *mut Ext2GroupDescriptorOnDisk, total_block_groups)
+        let data: &[Ext2GroupDescriptorOnDisk] = unsafe {
+            cast_to_slice(locked_buf)
         };
 
         for i in 0..total_block_groups {

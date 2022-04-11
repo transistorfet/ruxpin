@@ -1,5 +1,5 @@
 
-use core::slice;
+use crate::misc::memory::cast_to_slice;
 
 pub struct Partition {
     pub base: u32,
@@ -27,8 +27,8 @@ struct MbrPartitionEntry {
 impl Partition {
     pub fn read_mbr_partition_table_iter<'a>(buffer: &'a [u8]) -> Option<PartitionIter<'a>> {
         if buffer[0x1FE] == 0x55 && buffer[0x1FF] == 0xAA {
-            let table = unsafe {
-                slice::from_raw_parts(&buffer[0x1BE] as *const u8 as *const MbrPartitionEntry, 4)
+            let table: &[MbrPartitionEntry] = unsafe {
+                cast_to_slice(&buffer[0x1BE..0x1FE])
             };
 
             Some(PartitionIter {

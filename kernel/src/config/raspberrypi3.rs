@@ -86,9 +86,14 @@ pub fn register_devices() -> Result<(), KernelError> {
 
     let file = vfs::open(None, "/mnt/bin/testapp", OpenFlags::ReadOnly, FileAccess::DefaultFile, 0)?;
     let mut data = [0; 1024];
-    let nbytes = vfs::read(file.clone(), &mut data)?;
-    printkln!("read in {} bytes", nbytes);
-    unsafe { crate::printk::printk_dump(&data as *const u8, 1024); }
+    loop {
+        let nbytes = vfs::read(file.clone(), &mut data)?;
+        printkln!("read in {} bytes", nbytes);
+        unsafe { crate::printk::printk_dump(&data as *const u8, 1024); }
+        if nbytes != 1024 {
+            break;
+        }
+    }
     vfs::close(file)?;
 
     use crate::proc::process::create_process;
