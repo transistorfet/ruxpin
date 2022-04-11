@@ -6,3 +6,4 @@ edition = "2021"
 
 [dependencies]
 ruxpin_api = { path = "../../lib/ruxpin_api" }
+ruxpin_app = { path = "../../lib/ruxpin_app" }
