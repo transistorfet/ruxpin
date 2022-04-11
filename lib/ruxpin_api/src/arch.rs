@@ -21,6 +21,7 @@ pub fn execute_syscall(syscall: &mut SyscallRequest) {
             in("x3") syscall.args[3],
             in("x4") syscall.args[4],
             in("x5") syscall.args[5],
+            in("x6") syscall.function as usize,
         );
         syscall.result = result;
         syscall.error = error != 0;

@@ -1,7 +1,7 @@
 
 use core::ptr;
 
-use ruxpin_api::syscalls::SyscallRequest;
+use ruxpin_api::syscalls::{SyscallRequest, SyscallFunction};
 
 use super::types::VirtualAddress;
 
@@ -70,7 +70,7 @@ impl Context {
 impl From<&Context> for SyscallRequest {
     fn from(context: &Context) -> SyscallRequest {
         SyscallRequest {
-            function: context.x_registers[8] as usize,
+            function: unsafe { *(&context.x_registers[6] as *const u64 as *const SyscallFunction) },
             args: [
                 context.x_registers[0] as usize,
                 context.x_registers[1] as usize,

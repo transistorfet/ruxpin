@@ -1,12 +1,13 @@
 
 #[repr(usize)]
+#[derive(Copy, Clone)]
 pub enum SyscallFunction {
-    Null,
+    None,
     Write,
 }
 
 pub struct SyscallRequest {
-    pub function: usize,
+    pub function: SyscallFunction,
     pub args: [usize; 6],
     pub result: usize,
     pub error: bool,
@@ -15,7 +16,7 @@ pub struct SyscallRequest {
 impl Default for SyscallRequest {
     fn default() -> Self {
         Self {
-            function: 0,
+            function: SyscallFunction::None,
             args: [0; 6],
             result: 0,
             error: false,

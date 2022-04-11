@@ -94,7 +94,8 @@ pub fn register_devices() -> Result<(), KernelError> {
     use crate::proc::process::create_process;
     use crate::proc::binaries::elf::loader;
     let proc = create_process();
-    loader::load_binary(proc, "/mnt/bin/testapp").unwrap();
+    loader::load_binary(proc.clone(), "/mnt/bin/testapp").unwrap();
+    proc.lock().files.open(None, "/dev/console0", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0).unwrap();
 
     /*
     use crate::misc::cache::Cache;
