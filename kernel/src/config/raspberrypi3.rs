@@ -34,11 +34,11 @@ pub fn register_devices() -> Result<(), KernelError> {
     vfs::initialize()?;
 
     use crate::fs::tmpfs::TmpFilesystem;
-    vfs::register_filesystem(TmpFilesystem::new());
+    vfs::register_filesystem(TmpFilesystem::new())?;
     use crate::fs::devfs::DevFilesystem;
-    vfs::register_filesystem(DevFilesystem::new());
+    vfs::register_filesystem(DevFilesystem::new())?;
     use crate::fs::ext2::Ext2Filesystem;
-    vfs::register_filesystem(Ext2Filesystem::new());
+    vfs::register_filesystem(Ext2Filesystem::new())?;
 
     init_processes();
 

@@ -1,6 +1,8 @@
 
 use core::ptr;
 
+use ruxpin_api::syscalls::SyscallRequest;
+
 use super::types::VirtualAddress;
 
 extern "C" {
@@ -46,7 +48,43 @@ impl Context {
             CURRENT_CONTEXT = new_context as *mut Context;
         }
     }
+
+    pub fn syscall_from_current_context() -> SyscallRequest {
+        unsafe {
+            (&*CURRENT_CONTEXT).into()
+        }
+    }
+
+    pub fn write_syscall_result_to_current_context(syscall: &SyscallRequest) {
+        unsafe {
+            (&mut *CURRENT_CONTEXT).write_result(syscall);
+        }
+    }
+
+    pub fn write_result(&mut self, syscall: &SyscallRequest) {
+        self.x_registers[0] = syscall.result as u64;
+        self.x_registers[1] = syscall.error as u64;
+    }
 }
+
+impl From<&Context> for SyscallRequest {
+    fn from(context: &Context) -> SyscallRequest {
+        SyscallRequest {
+            function: context.x_registers[8] as usize,
+            args: [
+                context.x_registers[0] as usize,
+                context.x_registers[1] as usize,
+                context.x_registers[2] as usize,
+                context.x_registers[3] as usize,
+                context.x_registers[4] as usize,
+                context.x_registers[5] as usize,
+            ],
+            result: 0,
+            error: false,
+        }
+    }
+}
+
 
 pub fn start_multitasking() -> ! {
     unsafe {

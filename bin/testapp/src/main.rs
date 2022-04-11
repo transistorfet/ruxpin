@@ -1,17 +1,15 @@
 #![no_std]
 #![no_main]
 
-use core::arch::asm;
 use core::panic::PanicInfo;
+
+use ruxpin_api::api::write;
+use ruxpin_api::types::FileDesc;
 
 #[no_mangle]
 pub extern "C" fn _start(_argc: isize, _argv: *const *const u8) -> isize {
     loop {
-        unsafe {
-            asm!(
-                "svc   #137"
-            );
-        }
+        write(FileDesc(0), b"a really cool message that I'd like to see").unwrap();
     }
 }
 

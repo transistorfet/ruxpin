@@ -1,4 +1,5 @@
 
+#[repr(usize)]
 #[allow(dead_code)]
 #[derive(Debug)]
 pub enum KernelError {

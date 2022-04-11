@@ -3,6 +3,9 @@ use core::arch::asm;
 
 use crate::printkln;
 
+use super::context::Context;
+
+
 pub type IrqFlags = u64;
 
 pub unsafe fn enable_irq(flags: IrqFlags) {
@@ -59,6 +62,10 @@ extern "C" fn handle_exception(_context: u64, elr: u64, esr: u64, far: u64, sp: 
         0b010101 => {
             printkln!("A SYSCALL!");
             //crate::proc::process::schedule();
+            use crate::api::handle_syscall;
+            let mut syscall = Context::syscall_from_current_context();
+            handle_syscall(&mut syscall);
+            Context::write_syscall_result_to_current_context(&syscall);
         },
 
         // Instruction or Data Abort from lower EL

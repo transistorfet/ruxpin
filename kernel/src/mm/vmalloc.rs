@@ -95,7 +95,7 @@ impl VirtualAddressSpace {
         //    if segment.match_range(far) {
                 let pages = pages::get_page_area();
                 let page = pages.alloc_page_zeroed();
-                self.table.update_mapping(far, page, mmu::page_size()).unwrap();
+                self.table.update_mapping(far.align_down(mmu::page_size()), page, mmu::page_size()).unwrap();
         //        break;
         //    }
         //}

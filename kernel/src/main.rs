@@ -2,17 +2,18 @@
 #![no_main]
 #![feature(alloc_error_handler)]
 
+pub mod api;
 pub mod arch;
-pub mod fs;
-pub mod mm;
-pub mod proc;
-pub mod tty;
 pub mod block;
-pub mod misc;
-pub mod sync;
-pub mod errors;
-pub mod printk;
 pub mod config;
+pub mod errors;
+pub mod fs;
+pub mod misc;
+pub mod mm;
+pub mod printk;
+pub mod proc;
+pub mod sync;
+pub mod tty;
 
 extern crate alloc;
 

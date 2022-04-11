@@ -1,7 +1,6 @@
 
 pub type UserID = u16;
 pub type GroupID = u16;
-pub type FileNum = usize;
 pub type InodeNum = u32;
 
 
@@ -140,5 +139,20 @@ impl Into<Timestamp> for u32 {
     fn into(self) -> Timestamp {
         Timestamp(self as u64)
     }
+}
+
+
+#[derive(Copy, Clone)]
+pub struct FileDesc(pub usize);
+
+impl FileDesc {
+    pub fn as_usize(&self) -> usize {
+        self.0
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum ApiError {
+    SomethingWentWrong,
 }
 

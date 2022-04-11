@@ -95,6 +95,10 @@ impl ProcessManager {
     }
     */
 
+    pub fn get_current_proc(&self) -> Process {
+        self.processes[self.current].clone()
+    }
+
     fn schedule(&mut self) {
         self.current += 1;
         if self.current >= self.processes.len() {
@@ -116,8 +120,9 @@ fn next_pid() -> Pid {
     pid
 }
 
-const TEST_PROC1: &[u32] = &[0xd40000e1, 0xd503205f, 0x17ffffff];
-const TEST_PROC2: &[u32] = &[0xd10043ff, 0xf90003e0, 0xf90007e1, 0x14000001, 0xd4000021, 0x17ffffff];
+const TEST_PROC1: &[u32] = &[0xd503205f, 0x17ffffff];
+//const TEST_PROC1: &[u32] = &[0xd40000e1, 0xd503205f, 0x17ffffff];
+//const TEST_PROC2: &[u32] = &[0xd10043ff, 0xf90003e0, 0xf90007e1, 0x14000001, 0xd4000021, 0x17ffffff];
 
 pub unsafe fn load_code(proc: Process, instructions: &[u32]) {
     let code: *mut u32 = proc.lock().space.translate_addr(VirtualAddress::from(0x77777000)).unwrap().to_kernel_addr().as_mut();
@@ -139,6 +144,10 @@ pub fn create_test_process() {
 
 pub fn create_process() -> Process {
     PROCESS_MANAGER.lock().create_process()
+}
+
+pub fn get_current_proc() -> Process {
+    PROCESS_MANAGER.lock().get_current_proc()
 }
 
 pub(crate) fn schedule() {
