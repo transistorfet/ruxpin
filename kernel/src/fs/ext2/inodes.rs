@@ -123,7 +123,7 @@ impl Ext2Vnode {
     fn get_block_in_tier(&self, device_id: DeviceID, tiers: usize, table: BlockNum, offset: usize) -> Result<BlockNum, KernelError> {
         let entries_per_block = self.get_block_size() / mem::size_of::<Ext2BlockNumber>();
         let buf = block::get_buf(device_id, table)?;
-        let locked_buf = &*buf.block.lock();
+        let locked_buf = &*buf.lock();
 
         let table_data = unsafe { cast_to_slice(locked_buf) };
         let index = offset / entries_per_block.pow(tiers as u32);
@@ -171,6 +171,9 @@ impl Ext2Mount {
             let mut vnode = Ext2Vnode::new(mount_ptr);
             get_mount(mount_ptr).load_inode(&mut vnode, inode_num)?;
             Ok(Arc::new(Spinlock::new(vnode)))
+        }, |key, buf| {
+            // TODO this is temporary because we don't yet allow writing, so inodes will never be dirty and need a writeback
+            Ok(())
         })?;
 
         Ok((*vnode).clone())
@@ -182,7 +185,7 @@ impl Ext2Mount {
         let buf = block::get_buf(self.device_id, block_num)?;
 
         let data = unsafe {
-            &*((buf.block.lock()).as_ptr().add(byte_offset) as *mut Ext2InodeOnDisk)
+            &*(buf.lock().as_ptr().add(byte_offset) as *mut Ext2InodeOnDisk)
         };
 
         for i in 0..vnode.blocks.len() {
@@ -199,9 +202,8 @@ impl Ext2Mount {
     pub(super) fn check_inode_allocated(&self, inode_num: Ext2InodeNum) -> Result<(), KernelError> {
         let (bitmap, index) = self.superblock.get_inode_bitmap_location(inode_num)?;
         let buf = block::get_buf(self.device_id, bitmap)?;
-        let data = buf.block.lock();
 
-        if data[index / 8] & (1 << (index % 8)) != 0 {
+        if buf.lock()[index / 8] & (1 << (index % 8)) != 0 {
             Ok(())
         } else {
             Err(KernelError::InvalidInode)

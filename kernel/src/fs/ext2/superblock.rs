@@ -1,6 +1,4 @@
 
-use core::slice;
-
 use alloc::vec::Vec;
 
 use ruxpin_api::types::DeviceID;
@@ -14,6 +12,7 @@ use crate::misc::memory::cast_to_slice;
 use crate::misc::byteorder::{leu16, leu32};
 
 use super::Ext2InodeNum;
+use super::Ext2BlockNumber;
 
 
 const EXT2_INCOMPAT_FILE_TYPE_IN_DIRS: u32       = 0x00002;
@@ -108,6 +107,7 @@ pub struct Ext2SuperBlock {
     inode_size: usize,
     pub(super) inodes_per_block: usize,
 
+    device_id: DeviceID,
     total_block_groups: usize,
     groups: Vec<Ext2BlockGroup>,
 }
@@ -138,7 +138,7 @@ impl Ext2SuperBlock {
         let buf = block::get_buf(device_id, 1)?;
 
         let data = unsafe {
-            &*((buf.block.lock()).as_ptr() as *mut Ext2SuperBlockOnDisk)
+            &*(buf.lock().as_ptr() as *mut Ext2SuperBlockOnDisk)
         };
 
         if u16::from(data.magic) != 0xEF53 {
@@ -187,6 +187,7 @@ impl Ext2SuperBlock {
             magic: data.magic.into(),
             state: data.state.into(),
 
+            device_id,
             inode_size,
             inodes_per_block: block_size / inode_size,
 
@@ -230,7 +231,7 @@ impl Ext2SuperBlock {
 impl Ext2BlockGroup {
     pub fn read_into(device_id: DeviceID, block_num: BlockNum, groups: &mut Vec<Ext2BlockGroup>, total_block_groups: usize) -> Result<(), KernelError> {
         let buf = block::get_buf(device_id, block_num)?;
-        let locked_buf = &*buf.block.lock();
+        let locked_buf = &*buf.lock();
 
         let data: &[Ext2GroupDescriptorOnDisk] = unsafe {
             cast_to_slice(locked_buf)

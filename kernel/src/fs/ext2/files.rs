@@ -20,7 +20,7 @@ impl Ext2Vnode {
 
             let zlen = if block_size - zpos <= nbytes { block_size - zpos } else { nbytes };
             let subslice = &mut buffer[offset..offset + zlen];
-            subslice.copy_from_slice(&buf.block.lock()[zpos..zpos + zlen]);
+            subslice.copy_from_slice(&buf.lock()[zpos..zpos + zlen]);
 
             offset += zlen;
             nbytes -= zlen;

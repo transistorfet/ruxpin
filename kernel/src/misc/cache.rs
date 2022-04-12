@@ -37,20 +37,36 @@ impl<K: Copy + PartialEq, T> Cache<K, T> {
         }
     }
 
-    pub fn clear(&mut self) -> Result<(), ()> {
+    pub fn clear<S, E>(&mut self, store: S) -> Result<(), E>
+    where
+        S: Fn(K, &T) -> Result<(), E>
+    {
         for i in 0..self.items.len() {
             if self.items[i].refcount.load(Ordering::Relaxed) != 0 {
-                return Err(());
+                //return Err(());
+                panic!("cache: attempting to clear a cache with items still borrowed");
             }
+            store(self.items[i].key, &self.items[i].data)?;
         }
 
         *self = Cache::new(self.max_size);
         Ok(())
     }
 
-    pub fn get<F, E>(&mut self, key: K, fetch: F) -> Result<CacheArc<K, T>, E>
+    pub fn commit<S, E>(&mut self, store: S) -> Result<(), E>
     where
-        F: FnOnce() -> Result<T, E>
+        S: Fn(K, &T) -> Result<(), E>
+    {
+        for i in 0..self.items.len() {
+            store(self.items[i].key, &self.items[i].data)?;
+        }
+        Ok(())
+    }
+
+    pub fn get<L, S, E>(&mut self, key: K, load: L, store: S) -> Result<CacheArc<K, T>, E>
+    where
+        L: FnOnce() -> Result<T, E>,
+        S: Fn(K, &T) -> Result<(), E>
     {
         // Search the list for the matching object
         let mut iter = self.order.iter();
@@ -68,7 +84,7 @@ impl<K: Copy + PartialEq, T> Cache<K, T> {
 
         // If not every cache entry is in use, then allocate a new one and fetch the object
         if self.items.len() < self.max_size {
-            self.items.push(UnownedLinkedListNode::new(CacheArcInner::new(key, fetch()?)));
+            self.items.push(UnownedLinkedListNode::new(CacheArcInner::new(key, load()?)));
             let i = self.items.len() - 1;
             unsafe {
                 self.order.insert_head(self.items[i].wrap_non_null());
@@ -82,7 +98,8 @@ impl<K: Copy + PartialEq, T> Cache<K, T> {
         while let Some(ptr) = iter.next() {
             let item = unsafe { &mut (*ptr.as_ptr()) };
             if item.refcount.load(Ordering::Relaxed) == 0 {
-                item.data = fetch()?;
+                store(key, &mut item.data)?;
+                item.data = load()?;
                 unsafe {
                     self.order.remove_node(ptr);
                     self.order.insert_head(ptr);

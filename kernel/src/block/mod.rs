@@ -50,7 +50,7 @@ pub fn register_block_driver(prefix: &'static str) -> Result<DriverID, KernelErr
 pub fn register_block_device(driver_id: DriverID, dev: Box<dyn BlockOperations>) -> Result<SubDeviceID, KernelError> {
     let mut drivers_list = BLOCK_DRIVERS.lock();
     let driver = drivers_list.get_mut(driver_id as usize).ok_or(KernelError::NoSuchDevice)?;
-    driver.add_device(dev)
+    driver.add_device(driver_id, dev)
 }
 
 pub fn lookup_device(name: &str) -> Result<DeviceID, KernelError> {
@@ -81,7 +81,7 @@ pub fn close(device_id: DeviceID) -> Result<(), KernelError> {
 
 pub fn read(device_id: DeviceID, buffer: &mut [u8], offset: u64) -> Result<usize, KernelError> {
     let device = get_device(device_id)?;
-    let result = buffered_read(&mut device.cache.lock(), &mut *device.dev.lock(), buffer, offset);
+    let result = buffered_read(&mut device.cache.lock(), buffer, offset);
     result
 }
 
@@ -92,15 +92,21 @@ pub fn write(device_id: DeviceID, buffer: &[u8], offset: u64) -> Result<usize, K
 }
 
 
-pub fn get_buf(device_id: DeviceID, block_num: BlockNum) -> Result<CacheArc<BlockNum, Buf>, KernelError> {
+pub fn get_buf<'a>(device_id: DeviceID, block_num: BlockNum) -> Result<CacheArc<BlockNum, Buf>, KernelError> {
     let device = get_device(device_id)?;
-    let buf = device.cache.lock().get_block(&mut *device.dev.lock(), block_num)?;
+    let buf = device.cache.lock().get_block(block_num)?;
     Ok(buf)
 }
 
 pub fn commit_buf(device_id: DeviceID, block_num: BlockNum) -> Result<(), KernelError> {
     let device = get_device(device_id)?;
-    device.cache.lock().write_block(&mut *device.dev.lock(), block_num)?;
+    device.cache.lock().write_block(block_num)?;
+    Ok(())
+}
+
+pub fn commit_all(device_id: DeviceID) -> Result<(), KernelError> {
+    let device = get_device(device_id)?;
+    device.cache.lock().commit()?;
     Ok(())
 }
 
@@ -135,24 +141,24 @@ impl BlockDriver {
         }
     }
 
-    pub fn add_device(&mut self, dev: Box<dyn BlockOperations>) -> Result<SubDeviceID, KernelError> {
+    pub fn add_device(&mut self, driver_id: DriverID, dev: Box<dyn BlockOperations>) -> Result<SubDeviceID, KernelError> {
         let device_id = self.devices.len() as SubDeviceID;
-        self.devices.push(Arc::new(BlockDevice::new(dev)));
+        self.devices.push(Arc::new(BlockDevice::new(DeviceID(driver_id, device_id), dev)));
         Ok(device_id)
     }
 }
 
 impl BlockDevice {
-    pub fn new(dev: Box<dyn BlockOperations>) -> Self {
+    pub fn new(device_id: DeviceID, dev: Box<dyn BlockOperations>) -> Self {
         Self {
             dev: Spinlock::new(dev),
-            cache: Spinlock::new(BufCache::new(1024)),
+            cache: Spinlock::new(BufCache::new(device_id, 1024)),
         }
     }
 }
 
 
-pub(super) fn buffered_read(cache: &mut BufCache, dev: &mut Box<dyn BlockOperations>, buffer: &mut [u8], offset: u64) -> Result<usize, KernelError> {
+pub(super) fn buffered_read(cache: &mut BufCache, buffer: &mut [u8], offset: u64) -> Result<usize, KernelError> {
     let block_size = cache.block_size() as u64;
 
     let mut buffer_start = 0;
@@ -161,8 +167,8 @@ pub(super) fn buffered_read(cache: &mut BufCache, dev: &mut Box<dyn BlockOperati
     let mut block_start = offset % block_size;
     while buffer_remain > 0 {
         let block_end = if buffer_remain > block_size - block_start { block_size } else { buffer_remain };
-        let entry = cache.get_block(dev, block_num)?;
-        buffer[buffer_start..].copy_from_slice(&entry.block.lock()[block_start as usize..block_end as usize]);
+        let entry = cache.get_block(block_num)?;
+        buffer[buffer_start..].copy_from_slice(&entry.lock()[block_start as usize..block_end as usize]);
 
         buffer_remain = buffer_remain.saturating_sub(block_size - block_start);
         buffer_start += (block_size - block_start) as usize;
