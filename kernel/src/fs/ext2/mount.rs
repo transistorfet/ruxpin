@@ -7,7 +7,7 @@ use crate::misc::cache::Cache;
 
 use crate::fs::types::{MountOperations, Vnode};
 
-use super::inodes::Ext2InodeNum;
+use super::Ext2InodeNum;
 use super::superblock::Ext2SuperBlock;
 
 pub struct Ext2Mount {

@@ -81,6 +81,16 @@ pub fn register_devices() -> Result<(), KernelError> {
     */
 
 
+    /*
+    let device_id = DeviceID(0, 0);
+    let buf = block::get_buf(device_id, 4096).unwrap();
+    unsafe {
+        crate::printk::printk_dump(&*buf.block.lock().as_ptr(), 1024);
+    }
+    (&mut *buf.block.lock())[0..16].copy_from_slice(b"a secret message");
+    block::commit_buf(device_id, 4096).unwrap();
+    */
+
 
     vfs::mount(None, "/mnt", "ext2", Some(DeviceID(0, 2)), 0)?;
 
@@ -90,9 +100,9 @@ pub fn register_devices() -> Result<(), KernelError> {
         let nbytes = vfs::read(file.clone(), &mut data)?;
         printkln!("read in {} bytes", nbytes);
         unsafe { crate::printk::printk_dump(&data as *const u8, 1024); }
-        if nbytes != 1024 {
+        //if nbytes != 1024 {
             break;
-        }
+        //}
     }
     vfs::close(file)?;
 

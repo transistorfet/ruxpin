@@ -14,11 +14,10 @@ use crate::misc::memory::cast_to_slice;
 use crate::misc::byteorder::{leu16, leu32};
 use crate::fs::types::{Vnode, FileAttributes};
 
+use super::Ext2InodeNum;
+use super::Ext2BlockNumber;
 use super::mount::Ext2Mount;
 
-
-pub(super) type Ext2InodeNum = u32;
-pub(super) type Ext2BlockNumber = u32;
 
 const EXT2_INODE_DIRECT_BLOCKS: usize           = 12;
 const EXT2_INODE_INDIRECT_BLOCKS: usize         = EXT2_INODE_DIRECT_BLOCKS + 1;
@@ -161,6 +160,10 @@ impl Ext2Mount {
     pub fn as_ptr(&mut self) -> NonNull<Self> {
         NonNull::new(self as *mut Self).unwrap()
     }
+
+    //pub fn alloc_inode(&mut self) -> Result<Vnode, KernelError> {
+
+    //}
 
     pub fn get_inode(&mut self, inode_num: Ext2InodeNum) -> Result<Vnode, KernelError> {
         let mount_ptr = self.as_ptr();

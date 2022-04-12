@@ -30,6 +30,7 @@ pub enum KernelError {
     InvalidInode,
     IncompatibleFeatures,
     FileSizeTooLarge,
+    OutOfDiskSpace,
 
     NotExecutable,
 }

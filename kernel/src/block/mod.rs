@@ -81,8 +81,7 @@ pub fn close(device_id: DeviceID) -> Result<(), KernelError> {
 
 pub fn read(device_id: DeviceID, buffer: &mut [u8], offset: u64) -> Result<usize, KernelError> {
     let device = get_device(device_id)?;
-    //let result = device.lock().dev.read(buffer, offset);
-    let result = device.cache.lock().read(&mut *device.dev.lock(), buffer, offset);
+    let result = buffered_read(&mut device.cache.lock(), &mut *device.dev.lock(), buffer, offset);
     result
 }
 
@@ -97,6 +96,12 @@ pub fn get_buf(device_id: DeviceID, block_num: BlockNum) -> Result<CacheArc<Bloc
     let device = get_device(device_id)?;
     let buf = device.cache.lock().get_block(&mut *device.dev.lock(), block_num)?;
     Ok(buf)
+}
+
+pub fn commit_buf(device_id: DeviceID, block_num: BlockNum) -> Result<(), KernelError> {
+    let device = get_device(device_id)?;
+    device.cache.lock().write_block(&mut *device.dev.lock(), block_num)?;
+    Ok(())
 }
 
 pub fn get_buf_size(device_id: DeviceID) -> Result<usize, KernelError> {
@@ -144,5 +149,38 @@ impl BlockDevice {
             cache: Spinlock::new(BufCache::new(1024)),
         }
     }
+}
+
+
+pub(super) fn buffered_read(cache: &mut BufCache, dev: &mut Box<dyn BlockOperations>, buffer: &mut [u8], offset: u64) -> Result<usize, KernelError> {
+    let block_size = cache.block_size() as u64;
+
+    let mut buffer_start = 0;
+    let mut buffer_remain = buffer.len() as u64;
+    let mut block_num = (offset / block_size) as BlockNum;
+    let mut block_start = offset % block_size;
+    while buffer_remain > 0 {
+        let block_end = if buffer_remain > block_size - block_start { block_size } else { buffer_remain };
+        let entry = cache.get_block(dev, block_num)?;
+        buffer[buffer_start..].copy_from_slice(&entry.block.lock()[block_start as usize..block_end as usize]);
+
+        buffer_remain = buffer_remain.saturating_sub(block_size - block_start);
+        buffer_start += (block_size - block_start) as usize;
+        block_num += 1;
+        block_start = 0;
+    }
+    Ok(0)
+}
+
+pub(super) fn raw_read(device_id: DeviceID, buffer: &mut [u8], offset: u64) -> Result<usize, KernelError> {
+    let device = get_device(device_id)?;
+    let result = device.dev.lock().read(buffer, offset);
+    result
+}
+
+pub(super) fn raw_write(device_id: DeviceID, buffer: &[u8], offset: u64) -> Result<usize, KernelError> {
+    let device = get_device(device_id)?;
+    let result = device.dev.lock().write(buffer, offset);
+    result
 }
 

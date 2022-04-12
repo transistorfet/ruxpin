@@ -22,6 +22,12 @@ pub struct EmmcDevice {
     size: u64,
 }
 
+#[derive(Copy, Clone, PartialEq)]
+enum ReadWrite {
+    Read,
+    Write,
+}
+
 impl EmmcDevice {
     pub fn register() -> Result<(), KernelError> {
         let driver_id = block::register_block_driver(EMMC_DRIVER_NAME)?;
@@ -70,8 +76,14 @@ impl BlockOperations for EmmcDevice {
         EmmcDevice::read_data(buffer, self.base + offset)
     }
 
-    fn write(&mut self, _buffer: &[u8], _offset: u64) -> Result<usize, KernelError> {
-        Err(KernelError::OperationNotPermitted)
+    fn write(&mut self, mut buffer: &[u8], offset: u64) -> Result<usize, KernelError> {
+        if self.size != 0 && offset + buffer.len() as u64 > self.size {
+            buffer = &buffer[..(self.size - offset as u64) as usize];
+        }
+    unsafe {
+        crate::printk::printk_dump(buffer.as_ptr(), buffer.len());
+    }
+        EmmcDevice::write_data(buffer, self.base + offset)
     }
 }
 
@@ -88,6 +100,8 @@ enum Command {
     StopTransmission,   // CMD12
     ReadSingle,         // CMD17
     ReadMultiple,       // CMD18
+    WriteSingle,        // CMD24
+    WriteMultiple,      // CMD25
     SendOpCond,         // ACMD41
     AppCommand,         // CMD55
 }
@@ -144,8 +158,23 @@ impl EmmcDevice {
         let mut len = buffer.len();
 
         while len > 0 {
-            EmmcHost::setup_data_transfer(Command::ReadSingle, (offset + i as u64) / blocksize as u64, 1, blocksize)?;
+            EmmcHost::setup_data_transfer(Command::ReadSingle, ReadWrite::Read, (offset + i as u64) / blocksize as u64, 1, blocksize)?;
             EmmcHost::read_data(&mut buffer[i..(i + blocksize)])?;
+            len -= blocksize;
+            i += blocksize;
+        }
+
+        Ok(i)
+    }
+
+    pub fn write_data(buffer: &[u8], offset: u64) -> Result<usize, KernelError> {
+        let blocksize = 512;
+        let mut i = 0;
+        let mut len = buffer.len();
+
+        while len > 0 {
+            EmmcHost::setup_data_transfer(Command::WriteSingle, ReadWrite::Write, (offset + i as u64) / blocksize as u64, 1, blocksize)?;
+            EmmcHost::write_data(&buffer[i..(i + blocksize)])?;
             len -= blocksize;
             i += blocksize;
         }
@@ -180,9 +209,12 @@ const EMMC1_HC1_RESET_HOST: u32         = 1 << 24;
 
 const EMMC1_STA_COMMAND_INHIBIT: u32    = 1 << 0;
 const EMMC1_STA_DATA_INHIBIT: u32       = 1 << 1;
+const EMMC1_STA_WRITE_TRANSFER: u32     = 1 << 8;
+const EMMC1_STA_READ_TRANSFER: u32      = 1 << 9;
 
 const EMMC1_INT_COMMAND_DONE: u32       = 1 << 0;
-const EMMC1_INT_DATA_DONE: u32          = 1 << 1;
+//const EMMC1_INT_DATA_DONE: u32          = 1 << 1;
+const EMMC1_INT_WRITE_READY: u32        = 1 << 4;
 const EMMC1_INT_READ_READY: u32         = 1 << 5;
 const EMMC1_INT_ANY_ERROR: u32          = 0x17F8000;
 
@@ -255,8 +287,9 @@ impl EmmcHost {
         }
     }
 
-    fn setup_data_transfer(cmd: Command, offset: u64, numblocks: usize, blocksize: usize) -> Result<(), KernelError> {
-        wait_until_clear(registers::STATUS, EMMC1_STA_DATA_INHIBIT)?;
+    fn setup_data_transfer(cmd: Command, readwrite: ReadWrite, offset: u64, numblocks: usize, blocksize: usize) -> Result<(), KernelError> {
+        let rw_flag = if readwrite == ReadWrite::Read { EMMC1_STA_READ_TRANSFER } else { EMMC1_STA_WRITE_TRANSFER };
+        wait_until_clear(registers::STATUS, EMMC1_STA_DATA_INHIBIT | rw_flag)?;
 
         unsafe {
             EMMC1.set(registers::BLOCK_COUNT_SIZE, ((numblocks << 16) | blocksize) as u32);
@@ -268,7 +301,8 @@ impl EmmcHost {
             EMMC1.set(registers::ARG1, offset as u32);
             EMMC1.set(registers::ARG2, (offset >> 32) as u32);
             EMMC1.set(registers::COMMAND, command_code(cmd));
-            wait_until_set(registers::INTERRUPT_FLAGS, EMMC1_INT_READ_READY | EMMC1_INT_ANY_ERROR)?;
+            let rw_flag = if readwrite == ReadWrite::Read { EMMC1_INT_READ_READY } else { EMMC1_INT_WRITE_READY };
+            wait_until_set(registers::INTERRUPT_FLAGS, rw_flag | EMMC1_INT_ANY_ERROR)?;
 
             let flags = EMMC1.get(registers::INTERRUPT_FLAGS);
             if flags & EMMC1_INT_ANY_ERROR != 0 {
@@ -294,6 +328,22 @@ impl EmmcHost {
 
         Ok(())
     }
+
+    fn write_data(data: &[u8]) -> Result<(), KernelError> {
+        wait_until_set(registers::INTERRUPT_FLAGS, EMMC1_INT_WRITE_READY)?;
+
+        for i in (0..data.len()).step_by(4) {
+            let mut value = 0;
+            let bytes = if data.len() - i < 4 { data.len() - i } else { 4 };
+            for j in 0..bytes {
+                value |= (data[i + j] as u32) << (j * 8);
+            }
+
+            unsafe { EMMC1.set(registers::DATA, value) };
+        }
+
+        Ok(())
+    }
 }
 
 const fn command_code(cmd: Command) -> u32 {
@@ -304,6 +354,8 @@ const fn command_code(cmd: Command) -> u32 {
         Command::SendOpCond         => 0x29020000,
         Command::ReadSingle         => 0x11220010,
         Command::ReadMultiple       => 0x12220032,
+        Command::WriteSingle        => 0x18220000,
+        Command::WriteMultiple      => 0x19220022,
         Command::AppCommand         => 0x37000000,
         Command::SendCID            => 0x02010000,
         Command::SendRelAddr        => 0x03020000,

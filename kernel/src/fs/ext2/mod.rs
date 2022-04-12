@@ -10,14 +10,18 @@ use crate::errors::KernelError;
 
 use super::types::{Filesystem, Mount, Vnode, VnodeOperations, FileAttributes, FilePointer, DirEntry};
 
-mod inodes;
-mod files;
+mod bitmaps;
 mod directories;
+mod files;
+mod inodes;
 mod mount;
 mod superblock;
 
-use self::inodes::{Ext2Vnode, Ext2InodeNum};
+pub(self) type Ext2InodeNum = u32;
+pub(self) type Ext2BlockNumber = u32;
+
 use self::mount::Ext2Mount;
+use self::inodes::Ext2Vnode;
 
 
 pub struct Ext2Filesystem {
