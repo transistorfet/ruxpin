@@ -16,6 +16,7 @@ all: build-kernel
 
 create-image:
 	dd if=/dev/zero of=$(IMAGE) bs=4K count=$(IMAGE_BLOCKS)
+	dd if=partition-table.bin of=ruxpin-ext2-image.bin bs=512 count=1 conv=notrunc
 	sudo losetup --offset $(PARTITION_OFFSET) $(LOOPBACK) $(IMAGE)
 	sudo mkfs.ext2 -b $(BLOCKSIZE) $(LOOPBACK) $(PARTITION_BLOCKS)
 	sudo losetup -d $(LOOPBACK)
