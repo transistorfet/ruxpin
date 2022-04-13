@@ -3,7 +3,6 @@ use alloc::boxed::Box;
 
 use crate::block;
 use crate::printkln;
-use crate::misc::ceiling_div;
 use crate::errors::KernelError;
 use crate::block::BlockOperations;
 use crate::arch::types::KernelVirtualAddress;

@@ -52,7 +52,7 @@ impl OpenFlags {
 }
 
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct FileAccess(u16);
 
 #[allow(dead_code)]

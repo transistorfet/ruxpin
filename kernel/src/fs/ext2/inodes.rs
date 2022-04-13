@@ -123,9 +123,9 @@ impl Ext2Mount {
         NonNull::new(self as *mut Self).unwrap()
     }
 
-    pub(super) fn alloc_inode(&mut self, access: FileAccess, uid: UserID, gid: GroupID) -> Result<(Ext2InodeNum, Vnode), KernelError> {
+    pub(super) fn alloc_inode(&mut self, start_from: Ext2InodeNum, access: FileAccess, uid: UserID, gid: GroupID) -> Result<(Ext2InodeNum, Vnode), KernelError> {
         let mount_ptr = self.as_ptr();
-        let inode_num = self.superblock.alloc_inode(0)?;
+        let inode_num = self.superblock.alloc_inode(start_from)?;
         let mut vnode = Ext2Vnode::new(mount_ptr, access, uid, gid);
         vnode.attrs.inode = inode_num;
         self.store_inode(&vnode, inode_num)?;

@@ -71,8 +71,8 @@ impl VnodeOperations for Ext2Vnode {
             return Err(KernelError::OperationNotPermitted);
         }
 
-        let (inode_num, vnode) = self.get_mount().alloc_inode(access, uid, gid)?;
-        //self.add_directory_to_vnode(filename, inode_num)?;
+        let (inode_num, vnode) = self.get_mount().alloc_inode(self.attrs.inode, access, uid, gid)?;
+        self.add_directory_to_vnode(access, filename, inode_num)?;
 
         Ok(vnode)
     }
@@ -85,7 +85,7 @@ impl VnodeOperations for Ext2Vnode {
         let mut position = 0;
         let mut dirent = DirEntry::new();
         while position < self.attrs.size {
-            position += self.read_directory_from_vnode(&mut dirent, position)?;
+            position += self.read_next_dirent_from_vnode(&mut dirent, position)?;
             printkln!("found {:?} at inode {}", dirent.name.as_str(), dirent.inode);
             if dirent.name.as_str() == filename {
                 printkln!("a winner: inode {}", dirent.inode);
@@ -192,7 +192,7 @@ impl VnodeOperations for Ext2Vnode {
             Ok(None)
         } else {
             let mut dirent = DirEntry::new();
-            let offset = self.read_directory_from_vnode(&mut dirent, file.position)?;
+            let offset = self.read_next_dirent_from_vnode(&mut dirent, file.position)?;
 
             file.position += offset;
             Ok(Some(dirent))

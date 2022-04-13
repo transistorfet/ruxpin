@@ -122,6 +122,11 @@ pub fn register_devices() -> Result<(), KernelError> {
     unsafe { crate::printk::printk_dump(&data as *const u8, 128); }
     vfs::close(file)?;
 
+    let file = vfs::open(None, "/mnt", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0)?;
+    while let Some(dirent) = vfs::readdir(file.clone())? {
+        printkln!("reading dir {} with inode {}", dirent.name.as_str(), dirent.inode);
+    }
+
     /*
     use crate::misc::cache::Cache;
     #[derive(Debug)]

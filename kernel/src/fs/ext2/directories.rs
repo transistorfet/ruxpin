@@ -1,54 +1,162 @@
 
+use core::str;
+
+use ruxpin_api::types::FileAccess;
+
+use crate::block;
+use crate::misc::align_up;
+use crate::block::BlockNum;
 use crate::errors::KernelError;
 use crate::fs::types::DirEntry;
-use crate::misc::memory::read_struct;
+use crate::misc::memory::{cast_to_ref, cast_to_ref_mut};
 use crate::misc::byteorder::{leu16, leu32};
 
+use super::Ext2InodeNum;
 use super::inodes::Ext2Vnode;
+use super::blocks::GetFileBlockOp;
+
+
+#[allow(dead_code)] const EXT2_FT_UNKNOWN: u8	= 0;
+#[allow(dead_code)] const EXT2_FT_REG_FILE: u8	= 1;
+#[allow(dead_code)] const EXT2_FT_DIR: u8	= 2;
+#[allow(dead_code)] const EXT2_FT_CHRDEV: u8	= 3;
+#[allow(dead_code)] const EXT2_FT_BLKDEV: u8	= 4;
+#[allow(dead_code)] const EXT2_FT_FIFO: u8	= 5;
+#[allow(dead_code)] const EXT2_FT_SOCK: u8	= 6;
+#[allow(dead_code)] const EXT2_FT_SYMLINK: u8   = 7;
 
 #[repr(C)]
 struct Ext2DirEntryHeader {
     inode: leu32,
     entry_len: leu16,
     name_len: u8,
-    entry_type: u8,
+    file_type: u8,
 }
 
 impl Ext2Vnode {
-    pub(super) fn read_directory_from_vnode(&mut self, dirent: &mut DirEntry, mut position: usize) -> Result<usize, KernelError> {
-        loop {
-            // Read the first 8 bytes containing the entry length
-            let mut data = [0; 8];
-            let nbytes = self.read_from_vnode(&mut data, 8, position)?;
-            if nbytes != 8 {
-                return Err(KernelError::IOError);
-            }
+    pub(super) fn read_next_dirent_from_vnode(&mut self, dirent: &mut DirEntry, position: usize) -> Result<usize, KernelError> {
+        let block_size = self.get_block_size();
+        let device_id = self.get_device_id();
 
-            // Copy the data into a struct to read it
-            let entry_on_disk: Ext2DirEntryHeader = unsafe {
-                read_struct(&data)
-            };
-            let entry_len = u16::from(entry_on_disk.entry_len) as usize;
-
-            // If the inode of the not 0, then it's valid, otherwise skip it
-            let inode = entry_on_disk.inode.into();
-            if inode != 0 {
-                dirent.inode = inode;
-
-                // Read the name length bytes into the string buffer
-                let nbytes = self.read_from_vnode(dirent.name.as_mut(), entry_on_disk.name_len as usize, position + 8)?;
-                if nbytes != entry_on_disk.name_len as usize {
-                    return Err(KernelError::IOError);
-                }
-                unsafe {
-                    dirent.name.set_len(entry_on_disk.name_len as usize);
-                }
-
-                return Ok(entry_len);
-            }
-
-            position += entry_len;
+        // Find the block number that corresponds to the current position and return if we're at the end of the directory
+        let znum = position / block_size;
+        if znum * block_size > self.attrs.size {
+            return Err(KernelError::FileNotFound);
         }
+
+        let block_num = self.get_file_block_num(znum, GetFileBlockOp::Lookup)?;
+        let buf = block::get_buf(device_id, block_num)?;
+        let locked_buf = &*buf.lock();
+
+        // Get the directory entry's position in the block
+        let offset = position % block_size;
+        let entry_on_disk: &Ext2DirEntryHeader = unsafe {
+            cast_to_ref(&locked_buf[offset..])
+        };
+
+        let entry_len = u16::from(entry_on_disk.entry_len) as usize;
+        let name_len = entry_on_disk.name_len as usize;
+
+        // Copy data into the directory entry pointer we were given
+        dirent.inode = u32::from(entry_on_disk.inode);
+        dirent.name.as_mut()[..name_len].copy_from_slice(&locked_buf[(offset + 8)..(offset + 8 + name_len)]);
+        unsafe {
+            dirent.name.set_len(entry_on_disk.name_len as usize);
+        }
+
+        // return the length of the entry (which added to the position we were given gives the next entry)
+        Ok(entry_len)
+    }
+
+    pub(super) fn add_directory_to_vnode(&mut self, access: FileAccess, filename: &str, inode: Ext2InodeNum) -> Result<(), KernelError> {
+        let device_id = self.get_device_id();
+        let name_len = filename.len();
+        let min_entry_len = align_up(name_len + 8, 4);
+
+        let (block_num, mut offset) = self.find_directory_space(min_entry_len)?;
+        let buf = block::get_buf(device_id, block_num)?;
+        let locked_buf = &mut *buf.lock_mut();
+
+        let mut entry_on_disk: &mut Ext2DirEntryHeader = unsafe {
+            cast_to_ref_mut(&mut locked_buf[offset..])
+        };
+
+        // Split the entry if needed
+        if u32::from(entry_on_disk.inode) != 0 {
+            let entry_min_len = align_up(entry_on_disk.name_len as usize + 8, 4);
+            let entry_len = u16::from(entry_on_disk.entry_len);
+            entry_on_disk.entry_len = (entry_min_len as u16).into();
+
+            offset += entry_min_len;
+            entry_on_disk = unsafe {
+                cast_to_ref_mut(&mut locked_buf[offset..])
+            };
+            entry_on_disk.entry_len = (entry_len - entry_min_len as u16).into();
+        }
+
+        entry_on_disk.inode = inode.into();
+        entry_on_disk.name_len = name_len as u8;
+        entry_on_disk.file_type = to_file_type(access);
+        offset += 8;
+        locked_buf[offset..offset + name_len].copy_from_slice(filename.as_bytes());
+        Ok(())
+    }
+
+    fn find_directory_space(&mut self, min_entry_len: usize) -> Result<(BlockNum, usize), KernelError> {
+        let block_size = self.get_block_size();
+        let device_id = self.get_device_id();
+
+        let mut znum = 0;
+        while znum * block_size <= self.attrs.size {
+            let block_num = self.get_file_block_num(znum, GetFileBlockOp::Lookup)?;
+            let buf = block::get_buf(device_id, block_num)?;
+            let locked_buf = &*buf.lock();
+
+            let mut position = 0;
+            while position < block_size {
+                let entry_on_disk: &Ext2DirEntryHeader = unsafe {
+                    cast_to_ref(&locked_buf[position..])
+                };
+
+                let entry_len = u16::from(entry_on_disk.entry_len) as usize;
+                let entry_min_len = align_up(entry_on_disk.name_len as usize + 8, 4);
+
+                if entry_len > entry_min_len + min_entry_len {
+                    return Ok((block_num, position));
+                }
+
+                position += entry_len;
+            }
+
+            znum += 1;
+        }
+
+        // No existing entries can be split, so we add a new block
+        let block_num = self.get_file_block_num(znum, GetFileBlockOp::Allocate)?;
+        let buf = block::get_buf(device_id, block_num)?;
+        let locked_buf = &mut *buf.lock_mut();
+
+        let entry_on_disk: &mut Ext2DirEntryHeader = unsafe {
+            cast_to_ref_mut(locked_buf)
+        };
+
+        // Initialize the entry before returning, in case it contains non-zero data
+        entry_on_disk.inode = 0.into();
+        entry_on_disk.entry_len = (block_size as u16).into();
+        Ok((block_num, 0))
+    }
+}
+
+fn to_file_type(access: FileAccess) -> u8 {
+    match access.file_type() {
+        FileAccess::Regular             => EXT2_FT_REG_FILE,
+        FileAccess::Directory           => EXT2_FT_DIR,
+        FileAccess::CharDevice          => EXT2_FT_CHRDEV,
+        FileAccess::BlockDevice         => EXT2_FT_BLKDEV,
+        FileAccess::Fifo                => EXT2_FT_FIFO,
+        FileAccess::Socket              => EXT2_FT_SOCK,
+        FileAccess::SymbolicLink        => EXT2_FT_SYMLINK,
+        _                               => EXT2_FT_UNKNOWN,
     }
 }
 

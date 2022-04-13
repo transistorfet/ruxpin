@@ -15,3 +15,7 @@ pub fn ceiling_div(size: usize, units: usize) -> usize {
     (size / units) + (size % units != 0) as usize
 }
 
+pub fn align_up(length: usize, alignment: usize) -> usize {
+    ceiling_div(length, alignment) * alignment
+}
+
