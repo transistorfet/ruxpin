@@ -2,11 +2,11 @@
 use core::mem;
 use core::slice;
 
-use ruxpin_api::types::{OpenFlags, FileAccess, Seek, UserID};
+use ruxpin_api::types::{OpenFlags, FileAccess, Seek};
 
 use crate::printkln;
 use crate::fs::vfs;
-use crate::fs::types::{File, Vnode};
+use crate::fs::types::File;
 use crate::errors::KernelError;
 use crate::misc::memory::read_struct;
 use crate::proc::process::Process;

@@ -1,14 +1,12 @@
  
 use crate::printkln;
 use crate::errors::KernelError;
-use crate::block::BlockOperations;
 use crate::arch::types::PhysicalAddress;
 
 use crate::proc::process::init_processes;
 use crate::mm::kmalloc::init_kernel_heap;
 use crate::mm::vmalloc::init_virtual_memory;
 use crate::fs::vfs;
-use crate::block;
 
 use ruxpin_api::types::{OpenFlags, FileAccess, Seek, DeviceID};
 
@@ -112,6 +110,18 @@ pub fn register_devices() -> Result<(), KernelError> {
     loader::load_binary(proc.clone(), "/mnt/bin/testapp").unwrap();
     proc.lock().files.open(None, "/dev/console0", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0).unwrap();
 
+
+
+    let file = vfs::open(None, "/mnt/test2", OpenFlags::ReadWrite.plus(OpenFlags::Create), FileAccess::DefaultFile, 0)?;
+    vfs::write(file.clone(), b"this is some test data")?;
+    vfs::close(file)?;
+
+    let file = vfs::open(None, "/mnt/test", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0)?;
+    let mut data = [0; 128];
+    vfs::read(file.clone(), &mut data)?;
+    unsafe { crate::printk::printk_dump(&data as *const u8, 128); }
+    vfs::close(file)?;
+
     /*
     use crate::misc::cache::Cache;
     #[derive(Debug)]
@@ -130,8 +140,8 @@ pub fn register_devices() -> Result<(), KernelError> {
     */
 
 
-    SystemTimer::init();
-    GenericInterruptController::init();
+    //SystemTimer::init();
+    //GenericInterruptController::init();
 
     printkln!("kernel initialization complete");
 

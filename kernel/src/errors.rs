@@ -31,6 +31,7 @@ pub enum KernelError {
     IncompatibleFeatures,
     FileSizeTooLarge,
     OutOfDiskSpace,
+    ReadOnlyFilesystem,
 
     NotExecutable,
 }

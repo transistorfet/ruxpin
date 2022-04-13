@@ -27,18 +27,18 @@ mod arch {
     use super::{reverse_u16, reverse_u32, reverse_u64};
 
     #[inline(always)]
-    pub fn from_little_u16(source: u16) -> u16 { source }
+    pub fn convert_little_u16(source: u16) -> u16 { source }
     #[inline(always)]
-    pub fn from_little_u32(source: u32) -> u32 { source }
+    pub fn convert_little_u32(source: u32) -> u32 { source }
     #[inline(always)]
-    pub fn from_little_u64(source: u64) -> u64 { source }
+    pub fn convert_little_u64(source: u64) -> u64 { source }
 
     #[inline(always)]
-    pub fn from_big_u16(source: u16) -> u16 { reverse_u16(source) }
+    pub fn convert_big_u16(source: u16) -> u16 { reverse_u16(source) }
     #[inline(always)]
-    pub fn from_big_u32(source: u32) -> u32 { reverse_u32(source) }
+    pub fn convert_big_u32(source: u32) -> u32 { reverse_u32(source) }
     #[inline(always)]
-    pub fn from_big_u64(source: u64) -> u64 { reverse_u64(source) }
+    pub fn convert_big_u64(source: u64) -> u64 { reverse_u64(source) }
 }
 
 #[cfg(target_endian = "big")]
@@ -46,18 +46,18 @@ mod arch {
     use super::{reverse_u16, reverse_u32, reverse_u64};
 
     #[inline(always)]
-    pub fn from_little_u16(source: u16) -> u16 { reverse_u16(source) }
+    pub fn convert_little_u16(source: u16) -> u16 { reverse_u16(source) }
     #[inline(always)]
-    pub fn from_little_u32(source: u32) -> u32 { reverse_u32(source) }
+    pub fn convert_little_u32(source: u32) -> u32 { reverse_u32(source) }
     #[inline(always)]
-    pub fn from_little_u64(source: u64) -> u64 { reverse_u64(source) }
+    pub fn convert_little_u64(source: u64) -> u64 { reverse_u64(source) }
 
     #[inline(always)]
-    pub fn from_big_u16(source: u16) -> u16 { source }
+    pub fn convert_big_u16(source: u16) -> u16 { source }
     #[inline(always)]
-    pub fn from_big_u32(source: u32) -> u32 { source }
+    pub fn convert_big_u32(source: u32) -> u32 { source }
     #[inline(always)]
-    pub fn from_big_u64(source: u64) -> u64 { source }
+    pub fn convert_big_u64(source: u64) -> u64 { source }
 }
 
 
@@ -68,7 +68,13 @@ pub struct leu16(u16);
 
 impl From<leu16> for u16 {
     fn from(source: leu16) -> u16 {
-        arch::from_little_u16(source.0)
+        arch::convert_little_u16(source.0)
+    }
+}
+
+impl From<u16> for leu16 {
+    fn from(source: u16) -> leu16 {
+        leu16(arch::convert_little_u16(source))
     }
 }
 
@@ -78,7 +84,13 @@ pub struct leu32(u32);
 
 impl From<leu32> for u32 {
     fn from(source: leu32) -> u32 {
-        arch::from_little_u32(source.0)
+        arch::convert_little_u32(source.0)
+    }
+}
+
+impl From<u32> for leu32 {
+    fn from(source: u32) -> leu32 {
+        leu32(arch::convert_little_u32(source))
     }
 }
 
@@ -88,7 +100,13 @@ pub struct leu64(u64);
 
 impl From<leu64> for u64 {
     fn from(source: leu64) -> u64 {
-        arch::from_little_u64(source.0)
+        arch::convert_little_u64(source.0)
+    }
+}
+
+impl From<u64> for leu64 {
+    fn from(source: u64) -> leu64 {
+        leu64(arch::convert_little_u64(source))
     }
 }
 
@@ -99,7 +117,13 @@ pub struct beu16(u16);
 
 impl From<beu16> for u16 {
     fn from(source: beu16) -> u16 {
-        arch::from_big_u16(source.0)
+        arch::convert_big_u16(source.0)
+    }
+}
+
+impl From<u16> for beu16 {
+    fn from(source: u16) -> beu16 {
+        beu16(arch::convert_big_u16(source))
     }
 }
 
@@ -109,7 +133,13 @@ pub struct beu32(u32);
 
 impl From<beu32> for u32 {
     fn from(source: beu32) -> u32 {
-        arch::from_big_u32(source.0)
+        arch::convert_big_u32(source.0)
+    }
+}
+
+impl From<u32> for beu32 {
+    fn from(source: u32) -> beu32 {
+        beu32(arch::convert_big_u32(source))
     }
 }
 
@@ -119,7 +149,13 @@ pub struct beu64(u64);
 
 impl From<beu64> for u64 {
     fn from(source: beu64) -> u64 {
-        arch::from_big_u64(source.0)
+        arch::convert_big_u64(source.0)
+    }
+}
+
+impl From<u64> for beu64 {
+    fn from(source: u64) -> beu64 {
+        beu64(arch::convert_big_u64(source))
     }
 }
 

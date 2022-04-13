@@ -87,8 +87,8 @@ impl VnodeOperations for TmpVnodeDirectory {
         Ok(&mut self.mounted_vnode)
     }
 
-    fn create(&mut self, filename: &str, access: FileAccess, current_uid: UserID) -> Result<Vnode, KernelError> {
-        let entry = TmpDirEntry::new(filename, access, current_uid);
+    fn create(&mut self, filename: &str, access: FileAccess, uid: UserID, gid: GroupID) -> Result<Vnode, KernelError> {
+        let entry = TmpDirEntry::new(filename, access, uid, gid);
         let vnode = entry.vnode.clone();
         self.contents.push(entry);
         Ok(vnode)
@@ -215,11 +215,11 @@ impl VnodeOperations for TmpVnodeFile {
 }
 
 impl TmpDirEntry {
-    pub fn new(name: &str, access: FileAccess, uid: UserID) -> Self {
+    pub fn new(name: &str, access: FileAccess, uid: UserID, gid: GroupID) -> Self {
         let vnode: Vnode = if access.is_dir() {
-            Arc::new(Spinlock::new(TmpVnodeDirectory::new(access, uid, 0)))
+            Arc::new(Spinlock::new(TmpVnodeDirectory::new(access, uid, gid)))
         } else {
-            Arc::new(Spinlock::new(TmpVnodeFile::new(access, uid, 0)))
+            Arc::new(Spinlock::new(TmpVnodeFile::new(access, uid, gid)))
         };
 
         Self {

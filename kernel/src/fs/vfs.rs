@@ -139,7 +139,8 @@ pub(super) fn create(cwd: Option<Vnode>, path: &str, access: FileAccess, current
         return Err(KernelError::OperationNotPermitted);
     }
 
-    let newvnode = vnode.lock().create(filename, access, 0)?;
+    // TODO need to add groupid here
+    let newvnode = vnode.lock().create(filename, access, current_uid, 0)?;
     Ok(newvnode)
 }
 

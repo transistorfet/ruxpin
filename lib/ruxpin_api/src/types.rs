@@ -125,9 +125,15 @@ impl FileAccess {
     }
 }
 
-impl Into<FileAccess> for u16 {
-    fn into(self) -> FileAccess {
-        FileAccess(self)
+impl From<FileAccess> for u16 {
+    fn from(source: FileAccess) -> Self {
+        source.0
+    }
+}
+
+impl From<u16> for FileAccess {
+    fn from(source: u16) -> Self {
+        FileAccess(source)
     }
 }
 
@@ -135,9 +141,21 @@ impl Into<FileAccess> for u16 {
 #[derive(Copy, Clone, Debug)]
 pub struct Timestamp(pub u64);
 
-impl Into<Timestamp> for u32 {
-    fn into(self) -> Timestamp {
-        Timestamp(self as u64)
+impl From<Timestamp> for u64 {
+    fn from(source: Timestamp) -> Self {
+        source.0
+    }
+}
+
+impl From<Timestamp> for u32 {
+    fn from(source: Timestamp) -> Self {
+        source.0 as u32
+    }
+}
+
+impl From<u32> for Timestamp {
+    fn from(source: u32) -> Self {
+        Timestamp(source as u64)
     }
 }
 

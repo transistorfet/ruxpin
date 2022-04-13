@@ -42,9 +42,9 @@ impl MountOperations for Ext2Mount {
     }
 
     fn unmount(&mut self) -> Result<(), KernelError> {
+        self.superblock.store()?;
         block::close(self.device_id)?;
         Ok(())
     }
 }
-
 

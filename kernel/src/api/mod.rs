@@ -1,7 +1,5 @@
 
-use core::slice;
-
-use ruxpin_api::types::{OpenFlags, FileAccess, FileDesc};
+use ruxpin_api::types::{FileDesc};
 use ruxpin_api::syscall_decode;
 use ruxpin_api::syscalls::{SyscallRequest, SyscallFunction};
 

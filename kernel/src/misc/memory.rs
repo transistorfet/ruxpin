@@ -25,3 +25,11 @@ pub unsafe fn cast_to_slice_mut<T>(source: &mut [u8]) -> &mut [T] {
     slice::from_raw_parts_mut(source.as_mut_ptr() as *mut T, source.len() / mem::size_of::<T>())
 }
 
+pub unsafe fn cast_to_ref<T>(source: &[u8]) -> &T {
+    &*(source.as_ptr() as *const T)
+}
+
+pub unsafe fn cast_to_ref_mut<T>(source: &mut [u8]) -> &mut T {
+    &mut *(source.as_mut_ptr() as *mut T)
+}
+

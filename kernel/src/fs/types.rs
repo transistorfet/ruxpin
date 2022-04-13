@@ -31,11 +31,15 @@ pub trait VnodeOperations: Sync + Send {
         Err(KernelError::OperationNotPermitted)
     }
 
-    fn create(&mut self, _filename: &str, _access: FileAccess, _uid: UserID) -> Result<Vnode, KernelError> {
+    fn commit(&mut self) -> Result<(), KernelError> {
         Err(KernelError::OperationNotPermitted)
     }
 
-    fn mknod(&mut self, _filename: &str, _access: FileAccess, _device: DeviceID, _uid: UserID) -> Result<Vnode, KernelError> {
+    fn create(&mut self, _filename: &str, _access: FileAccess, _uid: UserID, _gid: GroupID) -> Result<Vnode, KernelError> {
+        Err(KernelError::OperationNotPermitted)
+    }
+
+    fn mknod(&mut self, _filename: &str, _access: FileAccess, _device: DeviceID, _uid: UserID, _gid: GroupID) -> Result<Vnode, KernelError> {
         Err(KernelError::OperationNotPermitted)
     }
 

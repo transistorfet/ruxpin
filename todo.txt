@@ -1,0 +1,49 @@
+
+* I've tested:
+    - superblock alloc_block/free_block
+    - superblock alloc_inode/free_inode
+
+* yet to test:
+    - superblock/block group writing
+    - superblock and group free count being updated correctly
+    - everything to do with blocks.rs/zones
+
+
+
+* there's a lot of inconsistency between Ext2BlockNumber and BlockNum in ext2 which should be resolved somehow
+* it turns out there's a from_le and from_be function for u32 and others, so maybe you can simplify the byteorder stuff using them
+
+
+* the big thing now is how can we automatically write bufcache data back after it's been modified?  Or can/should
+  there be a single commit() that writes everything that's dirty after a bunch of mods?
+
+
+* syscall macros need to be more automatic, the entire marshal/unmarshal should be based only on types
+* need to handle the case of accessing ".." on a mounted vnode.  It must correctly fetch the parent node
+* need a way to maintain a queue for scheduling
+
+* need a way to record memory segment information in the Process/VirtualAddressSpace to distinguish between areas
+  that are mapped to static memory vs areas that are mapped to page data (which would need to be freed)
+
+
+* can you use a weak reference of some kind for the mount link, instead of NonNull?
+* there is an issue with the emmc driver such that when the image used with qemu is below 2GB or less, the Read command gives a byte
+  offset, but when it's 4GB or larger, it gives a sector offset (byte offset / 512).  I'm not sure if this happens with the pi as well
+  since I only have an 8GB card.
+
+
+
+* need a way to configure, including only the drivers needed for a specific platform (eg. raspberry pi).  Is there a way to not compile in
+  driver modules without defining a feature for each one?
+* need a way to configure the GIC and timer in a generic way, for other systems.  Especially the IRQ handler tie-in (directly calls GIC atm)
+
+
+
+* add a proper timer driver (ie. fix the hackish ARM timer driver)
+* implement the GIC driver/module
+* add functions to delay by a set number of microseconds (might need to use the internal counter)
+
+* get the app linker script working better (can you align to 4KB instead of 64KB)
+* can you make an improvement on DeviceRegisters, or should you just use tock-registers
+
+

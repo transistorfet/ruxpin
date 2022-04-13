@@ -1,7 +1,7 @@
 
 use alloc::sync::Arc;
 
-use ruxpin_api::types::{OpenFlags, Seek, DeviceID};
+use ruxpin_api::types::{OpenFlags, FileAccess, Seek, DeviceID, UserID, GroupID};
 
 use crate::block;
 use crate::printkln;
@@ -10,7 +10,7 @@ use crate::errors::KernelError;
 
 use super::types::{Filesystem, Mount, Vnode, VnodeOperations, FileAttributes, FilePointer, DirEntry};
 
-mod bitmaps;
+mod blocks;
 mod directories;
 mod files;
 mod inodes;
@@ -62,16 +62,20 @@ impl VnodeOperations for Ext2Vnode {
         Ok(&mut self.mounted_vnode)
     }
 
-    /*
-    fn create(&mut self, filename: &str, access: FileAccess, uid: UserID) -> Result<Vnode, KernelError> {
+    fn commit(&mut self) -> Result<(), KernelError> {
+        self.writeback()
+    }
+
+    fn create(&mut self, filename: &str, access: FileAccess, uid: UserID, gid: GroupID) -> Result<Vnode, KernelError> {
         if !self.attrs.access.is_dir() {
             return Err(KernelError::OperationNotPermitted);
         }
 
+        let (inode_num, vnode) = self.get_mount().alloc_inode(access, uid, gid)?;
+        //self.add_directory_to_vnode(filename, inode_num)?;
 
         Ok(vnode)
     }
-    */
 
     fn lookup(&mut self, filename: &str) -> Result<Vnode, KernelError> {
         if !self.attrs.access.is_dir() {
@@ -147,11 +151,22 @@ impl VnodeOperations for Ext2Vnode {
 	Ok(offset)
     }
 
-    /*
     fn write(&mut self, file: &mut FilePointer, buffer: &[u8]) -> Result<usize, KernelError> {
+        if self.attrs.access.is_dir() {
+            return Err(KernelError::IsADirectory);
+        }
 
+        crate::printkln!("writing to a file");
+        let offset = self.write_to_vnode(buffer, buffer.len(), file.position)?;
+
+	file.position += offset;
+	if file.position > self.attrs.size {
+	    self.attrs.size = file.position;
+            self.writeback()?;
+	}
+
+	Ok(offset)
     }
-    */
 
     fn seek(&mut self, file: &mut FilePointer, offset: usize, whence: Seek) -> Result<usize, KernelError> {
         let position = match whence {

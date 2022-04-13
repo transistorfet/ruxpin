@@ -88,8 +88,8 @@ impl MountOperations for DevMount {
 }
 
 impl VnodeOperations for DevVnodeDirectory {
-    fn create(&mut self, filename: &str, access: FileAccess, current_uid: UserID) -> Result<Vnode, KernelError> {
-        let entry = DevDirEntry::try_new(filename, access, current_uid)?;
+    fn create(&mut self, filename: &str, access: FileAccess, uid: UserID, _gid: GroupID) -> Result<Vnode, KernelError> {
+        let entry = DevDirEntry::try_new(filename, access, uid)?;
         let vnode = entry.vnode.clone();
         self.contents.push(entry);
         Ok(vnode)
