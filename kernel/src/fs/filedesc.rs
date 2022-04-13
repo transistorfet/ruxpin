@@ -57,7 +57,7 @@ impl FileDescriptors {
 
     fn find_first(&mut self) -> Result<FileDesc, KernelError> {
         let mut i = 0;
-        while i < self.0.len() && self.0[i].is_none() {
+        while i < self.0.len() && self.0[i].is_some() {
             i += 1;
         }
 

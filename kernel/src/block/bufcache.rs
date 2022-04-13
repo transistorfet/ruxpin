@@ -31,7 +31,7 @@ impl BufCache {
         Self {
             device_id,
             block_size,
-            cache: Cache::new(20),
+            cache: Cache::new(50),
         }
     }
 

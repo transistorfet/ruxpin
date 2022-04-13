@@ -145,8 +145,8 @@ pub fn register_devices() -> Result<(), KernelError> {
     */
 
 
-    //SystemTimer::init();
-    //GenericInterruptController::init();
+    SystemTimer::init();
+    GenericInterruptController::init();
 
     printkln!("kernel initialization complete");
 

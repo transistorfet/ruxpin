@@ -20,7 +20,7 @@ pub struct DeviceID(pub DriverID, pub SubDeviceID);
 
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct OpenFlags(u16);
+pub struct OpenFlags(pub u16);
 
 #[allow(dead_code)]
 #[allow(non_upper_case_globals)]
@@ -53,7 +53,7 @@ impl OpenFlags {
 
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct FileAccess(u16);
+pub struct FileAccess(pub u16);
 
 #[allow(dead_code)]
 #[allow(non_upper_case_globals)]

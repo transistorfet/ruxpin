@@ -11,6 +11,7 @@ use crate::arch::Context;
 use crate::sync::Spinlock;
 use crate::arch::types::VirtualAddress;
 use crate::fs::filedesc::FileDescriptors;
+use crate::fs::types::Vnode;
 
 pub type Pid = i32;
 
@@ -19,6 +20,7 @@ pub struct ProcessRecord {
     pub pid: Pid,
     pub current_uid: UserID,
     pub space: VirtualAddressSpace,
+    pub cwd: Option<Vnode>,
     pub files: FileDescriptors,
     pub context: Context,
 }
@@ -60,6 +62,7 @@ impl ProcessManager {
             pid,
             current_uid: 0,
             space: VirtualAddressSpace::new_user_space(),
+            cwd: None,
             files: FileDescriptors::new(),
             context: Default::default(),
         })));

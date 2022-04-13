@@ -1,7 +1,16 @@
 
+* fix block allocation and tiered table lookups
+* add block truncation
+* add removing directory entries
+* add file renaming
+
+
+
 * I've tested:
     - superblock alloc_block/free_block
     - superblock alloc_inode/free_inode
+    - directory reading
+    - directory adding file
 
 * yet to test:
     - superblock/block group writing

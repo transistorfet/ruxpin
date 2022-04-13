@@ -156,14 +156,13 @@ impl VnodeOperations for Ext2Vnode {
             return Err(KernelError::IsADirectory);
         }
 
-        crate::printkln!("writing to a file");
         let offset = self.write_to_vnode(buffer, buffer.len(), file.position)?;
 
 	file.position += offset;
 	if file.position > self.attrs.size {
 	    self.attrs.size = file.position;
-            self.writeback()?;
 	}
+        self.writeback()?;
 
 	Ok(offset)
     }

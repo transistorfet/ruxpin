@@ -1,5 +1,5 @@
 
-use ruxpin_api::types::{FileDesc};
+use ruxpin_api::types::{FileDesc, OpenFlags, FileAccess};
 use ruxpin_api::syscall_decode;
 use ruxpin_api::syscalls::{SyscallRequest, SyscallFunction};
 
@@ -10,6 +10,27 @@ mod file;
 
 pub fn handle_syscall(syscall: &mut SyscallRequest) {
     match syscall.function {
+        SyscallFunction::Open => {
+            let mut i = 0;
+            syscall_decode!(syscall, i, path: &str);
+            syscall_decode!(syscall, i, flags: OpenFlags);
+            syscall_decode!(syscall, i, access: FileAccess);
+            let result = syscall_open(path, flags, access);
+            store_result(syscall, result.map(|ret| ret.0));
+        },
+        SyscallFunction::Close => {
+            let mut i = 0;
+            syscall_decode!(syscall, i, file: FileDesc);
+            let result = syscall_close(file);
+            store_result(syscall, result.map(|_| 0));
+        },
+        SyscallFunction::Read => {
+            let mut i = 0;
+            syscall_decode!(syscall, i, file: FileDesc);
+            syscall_decode!(syscall, i, buffer: &mut [u8]);
+            let result = syscall_read(file, buffer);
+            store_result(syscall, result);
+        },
         SyscallFunction::Write => {
             let mut i = 0;
             syscall_decode!(syscall, i, file: FileDesc);

@@ -130,7 +130,15 @@ impl Ext2Mount {
         vnode.attrs.inode = inode_num;
         self.store_inode(&vnode, inode_num)?;
         crate::printkln!("allocating inode {}: {:#?}", inode_num, vnode.attrs);
-        Ok((inode_num, Arc::new(Spinlock::new(vnode))))
+
+        // Insert the node into the cache
+        let arc_vnode = self.vnode_cache.insert(inode_num, || {
+            Ok(Arc::new(Spinlock::new(vnode)))
+        }, |_, vnode| {
+            vnode.lock().commit()
+        })?;
+
+        Ok((inode_num, (*arc_vnode).clone()))
     }
 
     pub(super) fn free_inode(&mut self, inode_num: Ext2InodeNum) -> Result<(), KernelError> {

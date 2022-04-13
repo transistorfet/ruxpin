@@ -82,6 +82,14 @@ impl<K: Copy + PartialEq, T> Cache<K, T> {
             }
         }
 
+        self.insert(key, load, store)
+    }
+
+    pub fn insert<L, S, E>(&mut self, key: K, load: L, store: S) -> Result<CacheArc<K, T>, E>
+    where
+        L: FnOnce() -> Result<T, E>,
+        S: Fn(K, &T) -> Result<(), E>
+    {
         // If not every cache entry is in use, then allocate a new one and fetch the object
         if self.items.len() < self.max_size {
             self.items.push(UnownedLinkedListNode::new(CacheArcInner::new(key, load()?)));
