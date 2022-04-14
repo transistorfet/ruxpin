@@ -81,17 +81,17 @@ impl FileBackedSegment {
 
 impl SegmentOperations for FileBackedSegment {
     fn load_page_at(&self, segment: &Segment, vaddr: VirtualAddress, page: &mut [u8]) -> Result<(), KernelError> {
-        //crate::printkln!("swapping {:?} for segment from {:?}", vaddr, segment.start);
+        crate::printkln!("swapping {:?} for segment from {:?}", vaddr, segment.start);
 
         let segment_offset = usize::from(vaddr) - usize::from(segment.start);
-        let file_offset = self.file_offset + segment_offset;
+        let file_offset = self.file_offset + segment_offset.saturating_sub(self.mem_offset);
         vfs::seek(self.file.clone(), file_offset, Seek::FromStart)?;
 
         let buffer_start = if segment_offset < page.len() { self.mem_offset } else { 0 };
         let buffer_len = if file_offset + self.file_size < page.len() - buffer_start { file_offset + self.file_size } else { page.len() - buffer_start };
         vfs::read(self.file.clone(), &mut page[buffer_start..(buffer_start + buffer_len)])?;
 
-        //crate::printkln!("file offset: {:x}  segment offset: {:x}  buffer_start: {:x}  buffer_len: {:x}", file_offset, segment_offset, buffer_start, buffer_len);
+        crate::printkln!("file offset: {:x}  segment offset: {:x}  buffer_start: {:x}  buffer_len: {:x}", file_offset, segment_offset, buffer_start, buffer_len);
         Ok(())
     }
 }
