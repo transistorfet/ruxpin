@@ -1,7 +1,11 @@
 
+use core::slice;
+
 use alloc::vec::Vec;
 
 use crate::mm::pages;
+use crate::misc::align_up;
+use crate::fs::types::File;
 use crate::mm::segments::Segment;
 use crate::mm::{MemoryType, MemoryPermissions};
 use crate::arch::mmu::{self, TranslationTable};
@@ -32,9 +36,23 @@ impl VirtualAddressSpace {
         }
     }
 
-    //pub fn make_segment(&mut self, mtype: MemoryType, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) {
-    //    
-    //}
+    pub fn add_memory_segment(&mut self, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) {
+        let segment = Segment::new_memory(vaddr, vaddr.add(len));
+        self.segments.push(segment);
+        self.map_on_demand(permissions, vaddr, align_up(len, mmu::page_size()));
+    }
+
+    pub fn add_file_backed_segment(&mut self, permissions: MemoryPermissions, file: File, file_offset: usize, file_size: usize, vaddr: VirtualAddress, mem_offset: usize, mem_size: usize) {
+        let segment = Segment::new_file_backed(file, file_offset, file_size, mem_offset, vaddr, vaddr.add(mem_size).add(mem_offset));
+        self.segments.push(segment);
+        self.map_on_demand(permissions, vaddr, align_up(mem_size + mem_offset, mmu::page_size()));
+    }
+
+    pub fn add_memory_segment_allocated(&mut self, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) {
+        let segment = Segment::new_memory(vaddr, vaddr.add(len));
+        self.segments.push(segment);
+        self.alloc_mapped(permissions, vaddr, align_up(len, mmu::page_size()));
+    }
 
     pub fn alloc_mapped(&mut self, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) -> PhysicalAddress {
         let pages = pages::get_page_area();
@@ -90,15 +108,27 @@ impl VirtualAddressSpace {
         self.table.get_ttbr()
     }
 
-    pub(crate) fn load_page(&mut self, far: VirtualAddress) {
-        //for segment in &self.segments {
-        //    if segment.match_range(far) {
+    pub(crate) fn alloc_page_at(&mut self, far: VirtualAddress) -> Result<(), KernelError> {
+        for segment in &self.segments {
+            if segment.match_range(far) {
                 let pages = pages::get_page_area();
+
+                // Allocate new page
                 let page = pages.alloc_page_zeroed();
-                self.table.update_mapping(far.align_down(mmu::page_size()), page, mmu::page_size()).unwrap();
-        //        break;
-        //    }
-        //}
+                let page_vaddr = far.align_down(mmu::page_size());
+                self.table.update_mapping(page_vaddr, page, mmu::page_size()).unwrap();
+
+                // Load data into the page if necessary
+                let page_buffer = unsafe {
+                    slice::from_raw_parts_mut(page.to_kernel_addr().as_mut(), mmu::page_size())
+                };
+                segment.ops.load_page_at(segment, page_vaddr, page_buffer).unwrap();
+
+                return Ok(());
+            }
+        }
+
+        Err(KernelError::NoSegmentFound)
     }
 }
 

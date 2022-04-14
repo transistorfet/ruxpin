@@ -104,3 +104,52 @@ macro_rules! syscall_decode {
 }
 
 
+/*
+macro_rules! call_syscall {
+    ($arg1:expr) => {
+
+    }
+}
+
+
+macro_rules! define_syscall {
+    ($name:ident ( $arg1:ident ), $( $body:tt* )* ) => {
+        pub fn $name($arg1: u32) -> Result<(), u32> {
+
+        }
+    }
+}
+
+fn test() {
+    call_syscall!(5);
+}
+
+define_syscall!(api_print_number(num),
+    //nothing much
+);
+
+macro_rules! syscall_args {
+    /*
+    ($syscall:ident, $name0:ident: $type0:ty, $name1:ident: $type1:ty) => {
+        let $name0 = <$type0>::from($syscall.args[0]);
+        let $name1 = <$type1>::from($syscall.args[1]);
+    }
+    */
+
+    ($syscall:ident, $name:ident: $type:ty, $( $remain:tt )*) => {
+        //let $name = <$type>::from($syscall.args[0]);
+        syscall_encode!($syscall, 0, $name: $type);
+        syscall_args!($syscall, $( $remain )*);
+    };
+
+    ($syscall:ident, $name:ident: $type:ty) => {
+        //let $name = <$type>::from($syscall.args[0]);
+        syscall_encode!($syscall, 0, $name: $type);
+    }
+
+    //($syscall:ident, $($remain:tt)*) => {
+    //    syscall_args!($syscall, $($remain)*)
+    //};
+}
+*/
+

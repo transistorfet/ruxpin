@@ -79,10 +79,14 @@ impl ProcessManager {
             let mut locked_proc = proc.lock();
 
             // Allocate text segment
-            locked_proc.space.alloc_mapped(MemoryPermissions::ReadExecute, VirtualAddress::from(0x77777000), 4096);
+            //locked_proc.space.alloc_mapped(MemoryPermissions::ReadExecute, VirtualAddress::from(0x77777000), 4096);
+            locked_proc.space.add_memory_segment_allocated(MemoryPermissions::ReadExecute, VirtualAddress::from(0x77777000), 4096);
+
             // Allocate stack segment
             //proc.space.alloc_mapped(MemoryPermissions::ReadWrite, VirtualAddress::from(0xFF000000), 4096 * 4096);
-            locked_proc.space.map_on_demand(MemoryPermissions::ReadWrite, VirtualAddress::from(0xFF000000), 4096 * 4096);
+            //locked_proc.space.map_on_demand(MemoryPermissions::ReadWrite, VirtualAddress::from(0xFF000000), 4096 * 4096);
+            locked_proc.space.add_memory_segment(MemoryPermissions::ReadWrite, VirtualAddress::from(0xFF000000), 4096 * 4096);
+
             let ttrb = locked_proc.space.get_ttbr();
             locked_proc.context.init(VirtualAddress::from(0x77777000), VirtualAddress::from(0x1_0000_0000), ttrb);
         }
@@ -112,7 +116,7 @@ impl ProcessManager {
     }
 
     fn page_fault(&mut self, far: u64) {
-        self.processes[self.current].lock().space.load_page(VirtualAddress::from(far));
+        self.processes[self.current].lock().space.alloc_page_at(VirtualAddress::from(far)).unwrap();
     }
 }
 

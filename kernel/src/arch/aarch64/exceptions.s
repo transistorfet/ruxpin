@@ -2,7 +2,8 @@
 
 .extern fatal_error
 .extern handle_irq
-.extern handle_exception
+.extern handle_user_exception
+.extern handle_kernel_exception
 
 
 .section .text
@@ -239,12 +240,9 @@ _loop:
 // Handle an exception from EL1 to EL1 (ie. the kernel is already running,
 // save kernel registers on the stack instead of the process context).
 .macro HANDLE_KERNEL_EXCEPTION handler
-	// Print a $ character (for debugging when printing from rust causes exceptions)
-	ldr	x1, =0xFFFF00003F201000
-	mov	w0, #0x24
-	strb	w0, [x1]
-
 	add	sp, sp, #160
+
+	// Integer Registers
 	stp	x0, x1, [sp, 0]
 	stp	x2, x3, [sp, 16]
 	stp	x4, x5, [sp, 32]
@@ -255,27 +253,88 @@ _loop:
 	stp	x14, x15, [sp, 112]
 	stp	x16, x17, [sp, 128]
 	stp	x18, x30, [sp, 144]
+
+	//add	sp, sp, #320
+
+	//// Floating Point Registers
+	//stp	q0, q1, [sp, 0]
+	//stp	q2, q3, [sp, 32]
+	//stp	q4, q5, [sp, 64]
+	//stp	q6, q7, [sp, 96]
+	//stp	q8, q9, [sp, 128]
+	//stp	q10, q11, [sp, 160]
+	//stp	q12, q13, [sp, 192]
+	//stp	q14, q15, [sp, 224]
+	//stp	q16, q17, [sp, 256]
+	//stp	q18, q19, [sp, 288]
+
+	// Print a $ character (for debugging when printing from rust causes exceptions)
+	ldr	x1, =0xFFFF00003F201000
+	mov	w0, #0x24
+	strb	w0, [x1]
+
+	mov	x0, sp
+	bl	_debug_print_number
 
 	mrs	x1, ESR_EL1
 	mrs	x2, ELR_EL1
 	mrs	x3, FAR_EL1
 	bl	\handler
 
-	stp	x18, x30, [sp, 144]
-	stp	x16, x17, [sp, 128]
-	stp	x14, x15, [sp, 112]
-	stp	x12, x13, [sp, 96]
-	stp	x10, x11, [sp, 80]
-	stp	x8, x9, [sp, 64]
-	stp	x6, x7, [sp, 48]
-	stp	x4, x5, [sp, 32]
-	stp	x2, x3, [sp, 16]
-	stp	x0, x1, [sp, 0]
+	// Floating Point Registers
+	//ldp	q18, q19, [sp, 288]
+	//ldp	q16, q17, [sp, 256]
+	//ldp	q14, q15, [sp, 224]
+	//ldp	q12, q13, [sp, 192]
+	//ldp	q10, q11, [sp, 160]
+	//ldp	q8, q9, [sp, 128]
+	//ldp	q6, q7, [sp, 96]
+	//ldp	q4, q5, [sp, 64]
+	//ldp	q2, q3, [sp, 32]
+	//ldp	q0, q1, [sp, 0]
+
+	//sub	sp, sp, #320
+
+	// Integer Registers
+	ldp	x18, x30, [sp, 144]
+	ldp	x16, x17, [sp, 128]
+	ldp	x14, x15, [sp, 112]
+	ldp	x12, x13, [sp, 96]
+	ldp	x10, x11, [sp, 80]
+	ldp	x8, x9, [sp, 64]
+	ldp	x6, x7, [sp, 48]
+	ldp	x4, x5, [sp, 32]
+	ldp	x2, x3, [sp, 16]
+	ldp	x0, x1, [sp, 0]
+
 	sub	sp, sp, #160
 
 	eret
 .endm
 
+
+_debug_print_number:
+	// Print a $ character (for debugging when printing from rust causes exceptions)
+	ldr	x8, =0xFFFF00003F201000
+	mov	x1, #28
+
+    L_debug_loop:
+	mov	x2, x0
+	lsr	x2, x2, x1
+	and	x2, x2, #0x0f
+	add	x2, x2, #0x30
+	cmp	x2, #0x39
+	b.le	L_debug_skip
+	add	x2, x2, #7
+    L_debug_skip:
+
+	strb	w2, [x8]
+
+	sub	x1, x1, #4
+	cmp	x1, xzr
+	b.ne	L_debug_loop
+
+	ret
 
 /*
  * Exceptions Table
@@ -299,6 +358,8 @@ _default_exceptions_table:
 
 // Exceptions where SP_ELx is the stack
 .balign 0x80	// Synchronous
+	// TODO if this is enabled and a page fault occurs, locks up
+	//HANDLE_KERNEL_EXCEPTION handle_kernel_exception
 	b	_exception_fatal
 
 .balign 0x80	// IRQ
@@ -312,7 +373,7 @@ _default_exceptions_table:
 
 // Exceptions from lower EL in AArch64
 .balign 0x80	// Synchronous
-	HANDLE_CONTEXT_SWITCH handle_exception
+	HANDLE_CONTEXT_SWITCH handle_user_exception
 
 .balign 0x80	// IRQ
 	HANDLE_CONTEXT_SWITCH handle_irq

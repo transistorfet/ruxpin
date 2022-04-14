@@ -19,3 +19,7 @@ pub fn align_up(length: usize, alignment: usize) -> usize {
     ceiling_div(length, alignment) * alignment
 }
 
+pub fn align_down(length: usize, alignment: usize) -> usize {
+    length & !(alignment - 1)
+}
+

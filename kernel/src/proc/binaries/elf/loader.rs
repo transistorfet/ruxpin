@@ -54,18 +54,15 @@ pub fn load_binary(proc: Process, path: &str) -> Result<(), KernelError> {
     for i in 0..header.e_phnum as usize {
         let segment = segments[i].as_ref().unwrap();
         if segment.p_type == PT_LOAD {
-            let vaddr = VirtualAddress::from(segment.p_vaddr);
-            let offset = vaddr.align_offset(4096);
+            let vaddr = VirtualAddress::from(segment.p_vaddr).align_down(4096);
+            let offset = VirtualAddress::from(segment.p_vaddr).align_offset(4096);
 
-            // Allocated page data
-            let page = locked_proc.space.alloc_mapped(MemoryPermissions::ReadExecute, vaddr.align_down(4096), 4096);
-            let text_mem = unsafe {
-                slice::from_raw_parts_mut(page.to_kernel_addr().as_mut(), 4096)
-            };
+            let permissions = flags_to_permissions(segment.p_flags)?;
+            locked_proc.space.add_file_backed_segment(permissions, file.clone(), segment.p_offset as usize, segment.p_filesz as usize, vaddr, offset, segment.p_memsz as usize);
 
-            // Load data from the file into allocated page
-            vfs::seek(file.clone(), segment.p_offset as usize, Seek::FromStart)?;
-            vfs::read(file.clone(), &mut text_mem[offset..offset + segment.p_filesz as usize])?;
+            // TODO this is a hack to forcefully load the page because the page fault in kernel space doesn't work
+            locked_proc.space.alloc_page_at(vaddr)?;
+
         } else if segment.p_type == PT_GNU_RELRO {
             //char **data = proc->map.segments[M_TEXT].base + prog_headers[i].p_vaddr;
             //for (int entries = prog_headers[i].p_memsz >> 2; entries; entries--, data++)
@@ -73,7 +70,7 @@ pub fn load_binary(proc: Process, path: &str) -> Result<(), KernelError> {
         }
     }
 
-    locked_proc.space.map_on_demand(MemoryPermissions::ReadWrite, VirtualAddress::from(0xFF000000), 4096 * 4096);
+    locked_proc.space.add_memory_segment(MemoryPermissions::ReadWrite, VirtualAddress::from(0xFF000000), 4096 * 4096);
     let ttrb = locked_proc.space.get_ttbr();
     locked_proc.context.init(VirtualAddress::from(header.e_entry), VirtualAddress::from(0x1_0000_0000), ttrb);
 
@@ -94,5 +91,18 @@ fn read_file_data_into_struct<T>(file: File) -> Result<T, KernelError> {
     };
 
     Ok(result)
+}
+
+fn flags_to_permissions(flags: Elf64Word) -> Result<MemoryPermissions, KernelError> {
+    let rwx_flags = flags & 0x07;
+    if rwx_flags == PF_R | PF_X {
+        Ok(MemoryPermissions::ReadExecute)
+    } else if rwx_flags == PF_R {
+        Ok(MemoryPermissions::ReadOnly)
+    } else if rwx_flags == PF_R | PF_W {
+        Ok(MemoryPermissions::ReadWrite)
+    } else {
+        Err(KernelError::InvalidSegmentType)
+    }
 }
 

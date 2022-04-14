@@ -1,4 +1,18 @@
 
+* goal is to get a shell-type program
+----
+
+
+* does the linux copy user/kernel function do manual page lookups, including triggering page loading?  Or does it do soemthing else?
+* why does saving the floating point regs cause a null pointer exception?  Are we overflowing the stack?
+* the page fault doesn't work when in kernel space.  When enabling an EL1 to EL1 sync expception, it fails before getting into the
+  handler, the way it used to fail when the floating point unit was not enabled... but I don't think that's the actual problem here...
+  It doesn't seem to cause any other exception, in that qemu doesn't log any exceptions, just seems to loop
+
+
+* add input to the serial port driver
+
+
 * fix block allocation and tiered table lookups
 * add block truncation
 * add removing directory entries
@@ -19,12 +33,12 @@
 
 
 
+* there is no userspace/kernelspace copying in the api, which could cause a fatal error if the user program doesn't give a valid
+  input, so at some point this needs to be added
+
 * there's a lot of inconsistency between Ext2BlockNumber and BlockNum in ext2 which should be resolved somehow
 * it turns out there's a from_le and from_be function for u32 and others, so maybe you can simplify the byteorder stuff using them
 
-
-* the big thing now is how can we automatically write bufcache data back after it's been modified?  Or can/should
-  there be a single commit() that writes everything that's dirty after a bunch of mods?
 
 
 * syscall macros need to be more automatic, the entire marshal/unmarshal should be based only on types

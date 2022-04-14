@@ -54,7 +54,7 @@ pub extern "C" fn fatal_error(elr: u64, esr: u64, far: u64) -> ! {
 }
 
 #[no_mangle]
-extern "C" fn handle_exception(_context: u64, elr: u64, esr: u64, far: u64, sp: u64) {
+extern "C" fn handle_user_exception(_context: u64, elr: u64, esr: u64, far: u64, sp: u64) {
     printkln!("Handle an exception of {:x} for sp {:x}", esr, sp);
 
     match esr >> 26 {
@@ -68,6 +68,28 @@ extern "C" fn handle_exception(_context: u64, elr: u64, esr: u64, far: u64, sp: 
             Context::write_syscall_result_to_current_context(&syscall);
         },
 
+        // Instruction or Data Abort from lower EL
+        0b100000 | 0b100100 => {
+            if esr & 0b111100 == 0b001000 {
+                printkln!("Instruction Abort caused by Access Flag (ie. load the data) at {:x}", far);
+                use crate::proc::process::page_fault_handler;
+                page_fault_handler(far);
+            } else {
+                fatal_error(elr, esr, far);
+            }
+        },
+
+        _ => {
+            fatal_error(elr, esr, far);
+        }
+    }
+}
+
+#[no_mangle]
+extern "C" fn handle_kernel_exception(_context: u64, elr: u64, esr: u64, far: u64, sp: u64) {
+    printkln!("Handle a kernel exception of {:x} for sp {:x}", esr, sp);
+
+    match esr >> 26 {
         // Instruction or Data Abort from lower EL
         0b100000 | 0b100100 => {
             if esr & 0b111100 == 0b001000 {

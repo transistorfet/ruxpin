@@ -10,6 +10,7 @@ pub enum KernelError {
     UnexpectedGranualeSize,
     CorruptTranslationTable,
     OutOfMemory,
+    NoSegmentFound,
 
     // Device Errors
     OperationNotPermitted,
@@ -34,5 +35,7 @@ pub enum KernelError {
     ReadOnlyFilesystem,
 
     NotExecutable,
+    InvalidArgument,
+    InvalidSegmentType
 }
 
