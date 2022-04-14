@@ -3,7 +3,7 @@ use alloc::boxed::Box;
 
 use crate::sync::Spinlock;
 use crate::errors::KernelError;
-
+use crate::arch::exceptions::{enable_all_irq, disable_all_irq};
 
 
 pub trait InterruptController: Sync + Send {

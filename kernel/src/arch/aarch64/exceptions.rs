@@ -27,13 +27,17 @@ pub unsafe fn disable_irq() -> IrqFlags {
 }
 
 #[allow(dead_code)]
-pub unsafe fn enable_all_irq() {
-    asm!("msr    DAIFclr, #0xf");
+pub fn enable_all_irq() {
+    unsafe {
+        asm!("msr    DAIFclr, #0xf");
+    }
 }
 
 #[allow(dead_code)]
-pub unsafe fn disable_all_irq() {
-    asm!("msr    DAIFset, #0xf");
+pub fn disable_all_irq() {
+    unsafe {
+        asm!("msr    DAIFset, #0xf");
+    }
 }
 
 

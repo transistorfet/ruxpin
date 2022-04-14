@@ -34,7 +34,7 @@ _start:
 	bl	_setup_common_system_registers
 
 	// Switch to EL1
-	mov	x0, #0b00101
+	mov	x0, #0b1111000101	// Mask interrupts, no thumb, M[3:0] = EL1
 	msr	SPSR_EL2, x0
 
 	adr	x2, L_enter_E1

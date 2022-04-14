@@ -3,21 +3,23 @@ use alloc::boxed::Box;
 
 use ruxpin_api::types::{OpenFlags, DeviceID};
 
+use crate::irqs;
 use crate::errors::KernelError;
 use crate::tty::{self, CharOperations};
 use crate::printk::set_console_device;
 use crate::arch::types::KernelVirtualAddress;
 use crate::misc::deviceio::DeviceRegisters;
+use crate::misc::circular::CircularBuffer;
 
 
-static mut SAFE_CONSOLE: PL011Device = PL011Device { opens: 0 };
-static mut NORMAL_CONSOLE: DeviceID = DeviceID(0, 0);
+static mut RAW_CONSOLE: RawPL011Device = RawPL011Device::new();
+static mut TTY_CONSOLE: Option<DeviceID> = None;
 
 
 pub fn init() -> Result<(), KernelError> {
     let driver_id = tty::register_tty_driver("console")?;
-    let console = PL011Device { opens: 0 };
-    console.init();
+    let console = PL011Device::new();
+    unsafe { RAW_CONSOLE.init() };
     let subdevice_id = tty::register_tty_device(driver_id, Box::new(console))?;
     set_normal_console(DeviceID(driver_id, subdevice_id));
 
@@ -30,26 +32,34 @@ pub fn set_safe_console() {
 
 fn safe_console_print(s: &str) {
     unsafe {
-        SAFE_CONSOLE.print(s);
+        RAW_CONSOLE.print(s);
     }
 }
 
 pub fn set_normal_console(device: DeviceID) {
     unsafe {
-        NORMAL_CONSOLE = device;
+        TTY_CONSOLE = Some(device);
     }
     set_console_device(normal_console_print);
 }
 
 fn normal_console_print(s: &str) {
     unsafe {
-        tty::write(NORMAL_CONSOLE, s.as_bytes()).unwrap();
+        tty::write(TTY_CONSOLE.unwrap(), s.as_bytes()).unwrap();
     }
 }
 
 
 pub struct PL011Device {
     opens: u32,
+}
+
+impl PL011Device {
+    pub const fn new() -> Self {
+        Self {
+            opens: 0,
+        }
+    }
 }
 
 impl CharOperations for PL011Device {
@@ -70,7 +80,7 @@ impl CharOperations for PL011Device {
     fn read(&mut self, buffer: &mut [u8]) -> Result<usize, KernelError> {
         let mut i = 0;
         while i < buffer.len() {
-            if let Some(byte) = self.get_char() {
+            if let Some(byte) = unsafe { RAW_CONSOLE.get_char_buffered() } {
                 buffer[i] = byte;
             } else {
                 break;
@@ -82,13 +92,13 @@ impl CharOperations for PL011Device {
 
     fn write(&mut self, buffer: &[u8]) -> Result<usize, KernelError> {
         for byte in buffer {
-            self.put_char(*byte);
+            unsafe { RAW_CONSOLE.put_char(*byte) };
         }
         Ok(buffer.len())
     }
 }
 
-
+const PL011_IRQ: usize = 57;
 const PL011: DeviceRegisters<u32> = DeviceRegisters::new(KernelVirtualAddress::new(0x3F20_1000));
 
 mod registers {
@@ -112,17 +122,34 @@ const PL011_CTL_RX_ENABLE: u32          = 1 << 9;
 
 const PL011_LC_FIFO_ENABLE: u32         = 1 << 4;
 
+//const PL011_INT_RX_TIMEOUT: u32         = 1 << 6;
+//const PL011_INT_TX_READY: u32           = 1 << 5;
+const PL011_INT_RX_READY: u32           = 1 << 4;
+const PL011_INT_ALL: u32                = 0x3FF;
 
-impl PL011Device {
+
+struct RawPL011Device {
+    buffer: CircularBuffer<u8, 16>,
+}
+
+impl RawPL011Device {
+    pub const fn new() -> Self {
+        Self {
+            buffer: CircularBuffer::new(0),
+        }
+    }
+
     pub fn init(&self) {
         unsafe {
+            irqs::disable_irq(PL011_IRQ);
+
             // Disable UART
             PL011.set(registers::CONTROL, 0);
 
             // Clear all interrupt flags
-            PL011.set(registers::INTERRUPT_CLEAR, 0x3FF);
+            PL011.set(registers::INTERRUPT_CLEAR, PL011_INT_ALL);
             // Mask all the interrupts
-            PL011.set(registers::INTERRUPT_MASK, 0x3FF);
+            PL011.set(registers::INTERRUPT_MASK, 0x0);
 
             // Disable the FIFO before changing the baud rate
             let lcr = PL011.get(registers::LINE_CONTROL);
@@ -137,6 +164,11 @@ impl PL011Device {
 
             // Enable UART (TX only)
             PL011.set(registers::CONTROL, PL011_CTL_UART_ENABLE | PL011_CTL_TX_ENABLE | PL011_CTL_RX_ENABLE);
+
+            // Enable the RX interrupt
+            PL011.set(registers::INTERRUPT_MASK, PL011_INT_RX_READY);
+            irqs::register_irq(PL011_IRQ, handle_irq_pl011).unwrap();
+            irqs::enable_irq(PL011_IRQ);
         }
     }
 
@@ -144,16 +176,6 @@ impl PL011Device {
         unsafe {
             while (PL011.get(registers::FLAGS) & PL011_FLAGS_TX_FIFO_FULL) != 0 { }
             PL011.set(registers::DATA, byte as u32);
-        }
-    }
-
-    pub fn get_char(&self) -> Option<u8> {
-        unsafe {
-            if PL011.get(registers::FLAGS) & PL011_FLAGS_RX_FIFO_EMPTY == 0 {
-                Some(PL011.get(registers::DATA) as u8)
-            } else {
-                None
-            }
         }
     }
 
@@ -167,6 +189,33 @@ impl PL011Device {
     pub fn flush(&self) {
         unsafe {
             while (PL011.get(registers::FLAGS) & PL011_FLAGS_TX_FIFO_EMPTY) == 0 { }
+        }
+    }
+
+    pub fn get_char_unbuffered(&self) -> Option<u8> {
+        unsafe {
+            if PL011.get(registers::FLAGS) & PL011_FLAGS_RX_FIFO_EMPTY == 0 {
+                Some(PL011.get(registers::DATA) as u8)
+            } else {
+                None
+            }
+        }
+    }
+
+    pub fn get_char_buffered(&self) -> Option<u8> {
+        unsafe {
+            RAW_CONSOLE.buffer.pop()
+        }
+    }
+}
+
+pub fn handle_irq_pl011() {
+    unsafe {
+        PL011.set(registers::INTERRUPT_CLEAR, PL011_INT_ALL);
+
+        while let Some(ch) = RAW_CONSOLE.get_char_unbuffered() {
+            crate::printkln!(">>> {}", ch);
+            RAW_CONSOLE.buffer.insert(ch);
         }
     }
 }

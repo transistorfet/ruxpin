@@ -22,10 +22,17 @@ pub struct GenericInterruptController {
 
 impl GenericInterruptController {
     pub fn new() -> Self {
-        Self {
+        let gic = Self {
             registers: DeviceRegisters::new(KernelVirtualAddress::new(0x3F00_B200)),
             iter: None,
+        };
+
+        unsafe {
+            gic.registers.set(registers::IRQ_DISABLE1, !0);
+            gic.registers.set(registers::IRQ_DISABLE2, !0);
         }
+
+        gic
     }
 
     pub fn iter(&mut self) -> PendingInterruptIterator {
