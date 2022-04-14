@@ -2,6 +2,8 @@
 * goal is to get a shell-type program
 ----
 
+* the fix for segment loading and mem_offest is wrong because it will prevent the loading of the start of the page, leaving a blank
+  spot (the same size as the offset).  But it works in a limited fashion for the time being
 
 * does the linux copy user/kernel function do manual page lookups, including triggering page loading?  Or does it do soemthing else?
 * why does saving the floating point regs cause a null pointer exception?  Are we overflowing the stack?

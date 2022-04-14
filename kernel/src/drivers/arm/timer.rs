@@ -1,5 +1,5 @@
 
-use crate::arch::exceptions::register_irq;
+use crate::irqs;
 use crate::arch::types::KernelVirtualAddress;
 use crate::misc::deviceio::DeviceRegisters;
 
@@ -14,8 +14,9 @@ const SYS_TIMER: DeviceRegisters<u32> = DeviceRegisters::new(KernelVirtualAddres
 pub struct SystemTimer;
 
 impl SystemTimer {
-    pub fn init() {
-        register_irq(SystemTimer::handle_irq);
+    pub fn init(irq: usize) {
+        irqs::register_irq(irq ,SystemTimer::handle_irq).unwrap();
+        irqs::enable_irq(irq);
 
         unsafe {
             let value = SYS_TIMER.get(registers::COUNT_LOW) + 200000;

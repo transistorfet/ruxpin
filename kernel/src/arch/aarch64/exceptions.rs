@@ -1,6 +1,7 @@
 
 use core::arch::asm;
 
+use crate::irqs;
 use crate::printkln;
 
 use super::context::Context;
@@ -35,17 +36,6 @@ pub unsafe fn disable_all_irq() {
     asm!("msr    DAIFset, #0xf");
 }
 
-static mut IRQ_HANDLER: fn() = default_handler;
-
-pub fn register_irq(func: fn()) {
-    unsafe {
-        IRQ_HANDLER = func;
-    }
-}
-
-const fn default_handler() {
-    /* Do Nothing */
-}
 
 #[no_mangle]
 pub extern "C" fn fatal_error(elr: u64, esr: u64, far: u64) -> ! {
@@ -111,10 +101,7 @@ extern "C" fn handle_kernel_exception(_context: u64, elr: u64, esr: u64, far: u6
 extern "C" fn handle_irq(_context: u64, _elr: u64, esr: u64, _far: u64, sp: u64) {
     printkln!("Handle an irq of {:x} for sp {:x}", esr, sp);
 
-    unsafe {
-        IRQ_HANDLER();
-    }
-
+    irqs::handle_irqs();
     crate::proc::process::schedule();
 }
 

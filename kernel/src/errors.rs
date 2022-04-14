@@ -16,6 +16,7 @@ pub enum KernelError {
     OperationNotPermitted,
     DeviceTimeout,
     IOError,
+    InvalidIrq,
 
     // File System Errors
     FileNotOpen,

@@ -9,6 +9,7 @@ pub mod block;
 pub mod config;
 pub mod errors;
 pub mod fs;
+pub mod irqs;
 pub mod misc;
 pub mod mm;
 pub mod printk;

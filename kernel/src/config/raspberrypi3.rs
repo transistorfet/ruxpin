@@ -1,12 +1,15 @@
+
+use alloc::boxed::Box;
  
 use crate::printkln;
 use crate::errors::KernelError;
 use crate::arch::types::PhysicalAddress;
 
+use crate::fs::vfs;
 use crate::proc::process::init_processes;
 use crate::mm::kmalloc::init_kernel_heap;
 use crate::mm::vmalloc::init_virtual_memory;
-use crate::fs::vfs;
+use crate::irqs::register_interrupt_controller;
 
 use ruxpin_api::types::{OpenFlags, FileAccess, Seek, DeviceID};
 
@@ -28,6 +31,7 @@ pub fn register_devices() -> Result<(), KernelError> {
 
     init_kernel_heap(PhysicalAddress::from(0x20_0000), PhysicalAddress::from(0x100_0000));
     init_virtual_memory(PhysicalAddress::from(0x100_0000), PhysicalAddress::from(0x1000_0000));
+    register_interrupt_controller(Box::new(GenericInterruptController::new()));
 
     vfs::initialize()?;
 
@@ -145,8 +149,7 @@ pub fn register_devices() -> Result<(), KernelError> {
     */
 
 
-    SystemTimer::init();
-    GenericInterruptController::init();
+    SystemTimer::init(1);
 
     printkln!("kernel initialization complete");
 
