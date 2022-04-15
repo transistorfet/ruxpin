@@ -237,9 +237,8 @@ _loop:
 	b	_restore_context
 .endm
 
-// Handle an exception from EL1 to EL1 (ie. the kernel is already running,
-// save kernel registers on the stack instead of the process context).
-.macro HANDLE_KERNEL_EXCEPTION handler
+
+_save_kernel_context:
 	add	sp, sp, #160
 
 	// Integer Registers
@@ -252,48 +251,37 @@ _loop:
 	stp	x12, x13, [sp, 96]
 	stp	x14, x15, [sp, 112]
 	stp	x16, x17, [sp, 128]
-	stp	x18, x30, [sp, 144]
+	stp	x18, x19, [sp, 144]
 
-	//add	sp, sp, #320
-
-	//// Floating Point Registers
-	//stp	q0, q1, [sp, 0]
-	//stp	q2, q3, [sp, 32]
-	//stp	q4, q5, [sp, 64]
-	//stp	q6, q7, [sp, 96]
-	//stp	q8, q9, [sp, 128]
-	//stp	q10, q11, [sp, 160]
-	//stp	q12, q13, [sp, 192]
-	//stp	q14, q15, [sp, 224]
-	//stp	q16, q17, [sp, 256]
-	//stp	q18, q19, [sp, 288]
-
-	// Print a $ character (for debugging when printing from rust causes exceptions)
-	ldr	x1, =0xFFFF00003F201000
-	mov	w0, #0x24
-	strb	w0, [x1]
-
-	mov	x0, sp
-	bl	_debug_print_number
-
-	mrs	x1, ESR_EL1
-	mrs	x2, ELR_EL1
-	mrs	x3, FAR_EL1
-	bl	\handler
+	add	sp, sp, #320
 
 	// Floating Point Registers
-	//ldp	q18, q19, [sp, 288]
-	//ldp	q16, q17, [sp, 256]
-	//ldp	q14, q15, [sp, 224]
-	//ldp	q12, q13, [sp, 192]
-	//ldp	q10, q11, [sp, 160]
-	//ldp	q8, q9, [sp, 128]
-	//ldp	q6, q7, [sp, 96]
-	//ldp	q4, q5, [sp, 64]
-	//ldp	q2, q3, [sp, 32]
-	//ldp	q0, q1, [sp, 0]
+	stp	q0, q1, [sp, 0]
+	stp	q2, q3, [sp, 32]
+	stp	q4, q5, [sp, 64]
+	stp	q6, q7, [sp, 96]
+	stp	q8, q9, [sp, 128]
+	stp	q10, q11, [sp, 160]
+	stp	q12, q13, [sp, 192]
+	stp	q14, q15, [sp, 224]
+	stp	q16, q17, [sp, 256]
+	stp	q18, q19, [sp, 288]
+	ret
 
-	//sub	sp, sp, #320
+_restore_kernel_context:
+	// Floating Point Registers
+	ldp	q18, q19, [sp, 288]
+	ldp	q16, q17, [sp, 256]
+	ldp	q14, q15, [sp, 224]
+	ldp	q12, q13, [sp, 192]
+	ldp	q10, q11, [sp, 160]
+	ldp	q8, q9, [sp, 128]
+	ldp	q6, q7, [sp, 96]
+	ldp	q4, q5, [sp, 64]
+	ldp	q2, q3, [sp, 32]
+	ldp	q0, q1, [sp, 0]
+
+	sub	sp, sp, #320
 
 	// Integer Registers
 	ldp	x18, x30, [sp, 144]
@@ -309,7 +297,34 @@ _loop:
 
 	sub	sp, sp, #160
 
+	stp	x29, x30, [sp, 0]
+	sub	sp, sp, #16
+
 	eret
+
+
+// Handle an exception from EL1 to EL1 (ie. the kernel is already running,
+// save kernel registers on the stack instead of the process context).
+.macro HANDLE_KERNEL_EXCEPTION handler
+	add	sp, sp, #16
+	stp	x29, x30, [sp, 0]
+
+	bl	_save_kernel_context
+
+	// Print a $ character (for debugging when printing from rust causes exceptions)
+	ldr	x1, =0xFFFF00003F201000
+	mov	w0, #0x24
+	strb	w0, [x1]
+
+	mov	x0, sp
+	bl	_debug_print_number
+
+	mrs	x1, ESR_EL1
+	mrs	x2, ELR_EL1
+	mrs	x3, FAR_EL1
+	bl	\handler
+
+	b	_restore_kernel_context
 .endm
 
 
@@ -359,8 +374,7 @@ _default_exceptions_table:
 // Exceptions where SP_ELx is the stack
 .balign 0x80	// Synchronous
 	// TODO if this is enabled and a page fault occurs, locks up
-	//HANDLE_KERNEL_EXCEPTION handle_kernel_exception
-	b	_exception_fatal
+	HANDLE_KERNEL_EXCEPTION handle_kernel_exception
 
 .balign 0x80	// IRQ
 	HANDLE_KERNEL_EXCEPTION handle_irq
