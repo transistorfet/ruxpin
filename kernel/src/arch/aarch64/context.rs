@@ -1,5 +1,6 @@
 
 use core::ptr;
+use core::arch::asm;
 
 use ruxpin_api::syscalls::{SyscallRequest, SyscallFunction};
 
@@ -45,6 +46,12 @@ impl Context {
 
     pub fn switch_current_context(new_context: &mut Context) {
         unsafe {
+            // Update TTBR0 before the context switch, so we can restart a syscall in progress
+            asm!(
+                "msr     TTBR0_EL1, {ttbr}",
+                ttbr = in(reg) new_context.ttbr,
+            );
+
             CURRENT_CONTEXT = new_context as *mut Context;
         }
     }

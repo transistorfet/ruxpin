@@ -39,6 +39,19 @@ impl<T: ?Sized> Spinlock<T> {
         }
         SpinlockGuard { spinlock: self }
     }
+
+    pub fn try_lock(&self) -> Option<SpinlockGuard<'_, T>> {
+        let mut count = 0;
+        while self.lock.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed).is_err() {
+            // TODO delay
+            spin_loop();
+            count += 1;
+            if count == 1_000_000_000 {
+                return None;
+            }
+        }
+        Some(SpinlockGuard { spinlock: self })
+    }
 }
 
 impl<T: ?Sized> Deref for SpinlockGuard<'_, T> {

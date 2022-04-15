@@ -49,15 +49,15 @@ pub extern "C" fn fatal_error(elr: u64, esr: u64, far: u64) -> ! {
 
 #[no_mangle]
 extern "C" fn handle_user_exception(_context: u64, elr: u64, esr: u64, far: u64, sp: u64) {
-    printkln!("Handle an exception of {:x} for sp {:x}", esr, sp);
+    //printkln!("Handle an exception of {:x} for sp {:x}", esr, sp);
 
     match esr >> 26 {
         // SVC from Aarch64
         0b010101 => {
-            printkln!("A SYSCALL!");
             //crate::proc::process::schedule();
             use crate::api::handle_syscall;
             let mut syscall = Context::syscall_from_current_context();
+            printkln!("A SYSCALL for {:?}!", syscall.function);
             handle_syscall(&mut syscall);
             Context::write_syscall_result_to_current_context(&syscall);
         },
@@ -103,7 +103,7 @@ extern "C" fn handle_kernel_exception(_context: u64, elr: u64, esr: u64, far: u6
 
 #[no_mangle]
 extern "C" fn handle_irq(_context: u64, _elr: u64, esr: u64, _far: u64, sp: u64) {
-    printkln!("Handle an irq of {:x} for sp {:x}", esr, sp);
+    //printkln!("Handle an irq of {:x} for sp {:x}", esr, sp);
 
     irqs::handle_irqs();
     crate::proc::process::schedule();

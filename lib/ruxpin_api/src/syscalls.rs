@@ -1,6 +1,6 @@
 
 #[repr(usize)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum SyscallFunction {
     None,
     Open,

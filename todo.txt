@@ -2,12 +2,27 @@
 * goal is to get a shell-type program
 ----
 
+* it wont seem to restart the syscall... if I comment that out, things run but testapp never seems to break out of its loop.  If it
+  actually calls the handle_syscall function, then it has a fatal error
+
+* get some simple blocking block so that the testapp program is asleep while waiting for input
+
+
+* I'm not happy about how the process manager is going.  It's difficult to remove a process.  It's possible to use an Option and
+  reallocate old proc slots when needed, but that's unnecessarily slow, especially given that the process slots in the manager are
+  just Arcs.  Putting the linked list inside the Arc would be possible, but kind of clusmy, and it exposes the linked list node when
+  anything using the a Process shouldn't even know about it, let alone use it.  
+
 
 * there was an issue with the console driver when the raw device was wrapped in a spinlock.  It was causing a data abort to some
-  weird address.  I'm wondering if it's related to the kernel EL1 to EL1 context switch.  Perhaps it's causing registers to be
-  corrupted which eventually causes the problems being seen
+  weird address, and then looping forever (no timeout)
+* need to sort out the tty devices. how irqs can access the device object. whether only the tty subsystem or the driver as well, has
+  a reference to the devices as well. how the config will create the device object, and where it stores it (or does it assume each
+  driver will register and save global references to the devices if needed?  Is there a better way than using so many global references?
 
 
+* there is no userspace/kernelspace copying in the api, which could cause a fatal error if the user program doesn't give a valid
+  input, so at some point this needs to be added
 * does the linux copy user/kernel function do manual page lookups, including triggering page loading?  Or does it do soemthing else?
 * why does saving the floating point regs cause a null pointer exception?  Are we overflowing the stack?
 * the page fault doesn't work when in kernel space.  When enabling an EL1 to EL1 sync expception, it fails before getting into the
@@ -15,14 +30,14 @@
   It doesn't seem to cause any other exception, in that qemu doesn't log any exceptions, just seems to loop
 
 
-* add input to the serial port driver
-* the fix for segment loading and mem_offest is wrong because it will prevent the loading of the start of the page, leaving a blank
-  spot (the same size as the offset).  But it works in a limited fashion for the time being
+
+* I still don't trust the file backed segment calculations.  If there's a better/easier way of loading the binaries and setting up
+  segments...
 
 
 * fix block allocation and tiered table lookups
 * add block truncation
-* add removing directory entries
+* allow for removing directory entries
 * add file renaming
 
 
@@ -40,12 +55,9 @@
 
 
 
-* there is no userspace/kernelspace copying in the api, which could cause a fatal error if the user program doesn't give a valid
-  input, so at some point this needs to be added
 
 * there's a lot of inconsistency between Ext2BlockNumber and BlockNum in ext2 which should be resolved somehow
 * it turns out there's a from_le and from_be function for u32 and others, so maybe you can simplify the byteorder stuff using them
-
 
 
 * syscall macros need to be more automatic, the entire marshal/unmarshal should be based only on types

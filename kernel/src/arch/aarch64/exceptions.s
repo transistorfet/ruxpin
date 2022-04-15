@@ -312,12 +312,12 @@ _restore_kernel_context:
 	bl	_save_kernel_context
 
 	// Print a $ character (for debugging when printing from rust causes exceptions)
-	ldr	x1, =0xFFFF00003F201000
-	mov	w0, #0x24
-	strb	w0, [x1]
+	ldr	x9, =0xFFFF00003F201000
+	mov	w8, #0x24
+	strb	w8, [x9]
 
-	mov	x0, sp
-	bl	_debug_print_number
+	//mov	x0, x3
+	//bl	_debug_print_number
 
 	mrs	x1, ESR_EL1
 	mrs	x2, ELR_EL1
@@ -331,7 +331,7 @@ _restore_kernel_context:
 _debug_print_number:
 	// Print a $ character (for debugging when printing from rust causes exceptions)
 	ldr	x8, =0xFFFF00003F201000
-	mov	x1, #28
+	mov	x1, #64
 
     L_debug_loop:
 	mov	x2, x0

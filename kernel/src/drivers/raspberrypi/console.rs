@@ -2,11 +2,13 @@
 use alloc::boxed::Box;
 
 use ruxpin_api::types::{OpenFlags, DeviceID};
+use ruxpin_api::syscalls::SyscallFunction;
 
 use crate::irqs;
 use crate::errors::KernelError;
 use crate::tty::{self, CharOperations};
 use crate::printk::set_console_device;
+use crate::proc::process;
 use crate::arch::types::KernelVirtualAddress;
 use crate::misc::deviceio::DeviceRegisters;
 use crate::misc::circular::CircularBuffer;
@@ -83,6 +85,9 @@ impl CharOperations for PL011Device {
             if let Some(byte) = unsafe { RAW_CONSOLE.get_char_buffered() } {
                 buffer[i] = byte;
             } else {
+                if i == 0 {
+                    process::suspend_current();
+                }
                 break;
             }
             i += 1;
@@ -216,6 +221,7 @@ pub fn handle_irq_pl011() {
         while let Some(ch) = RAW_CONSOLE.get_char_unbuffered() {
             crate::printkln!(">>> {}", ch);
             RAW_CONSOLE.buffer.insert(ch);
+            process::restart_blocked(SyscallFunction::Read);
         }
     }
 }

@@ -5,10 +5,13 @@ use ruxpin_api::syscalls::{SyscallRequest, SyscallFunction};
 
 use crate::api::file::*;
 use crate::errors::KernelError;
+use crate::proc::process::get_current_proc;
 
 mod file;
 
 pub fn handle_syscall(syscall: &mut SyscallRequest) {
+    get_current_proc().lock().syscall = syscall.clone();
+
     match syscall.function {
         SyscallFunction::Open => {
             let mut i = 0;

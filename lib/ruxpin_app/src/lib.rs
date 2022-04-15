@@ -3,6 +3,9 @@
 
 use core::panic::PanicInfo;
 
+use ruxpin_api::types::FileDesc;
+use ruxpin_api::api::write;
+
 extern "Rust" {
     fn main();
 }
@@ -17,6 +20,8 @@ pub extern "C" fn _start(_argc: isize, _argv: *const *const u8) -> isize {
 
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
+    //let msg = format!("Rust Panic: {}", info);
+    write(FileDesc(0), b"Rust Panic\n").unwrap();
     loop {}
 }
 

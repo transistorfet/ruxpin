@@ -16,13 +16,22 @@ pub fn main() {
     write(FileDesc(0), &data[0..nbytes]).unwrap();
     close(file).unwrap();
 
+    let mut i = 0;
+    let mut data = [0; 256];
     loop {
-        let mut data = [0; 1];
-        let nbytes = read(FileDesc(0), &mut data[..]).unwrap();
+        let nbytes = read(FileDesc(0), &mut data[i..]).unwrap();
         if nbytes > 0 {
-            write(FileDesc(0), &data[..]).unwrap();
-            if data[0] == '\r' as u8 {
-                break;
+            i += nbytes;
+            if data[i - 1] == '\r' as u8 {
+                data[i - 1] = '\n' as u8;
+                write(FileDesc(0), b"read in ").unwrap();
+                write(FileDesc(0), &data[0..i]).unwrap();
+
+                if &data[0..i] == b"exit\r" {
+                    break;
+                }
+
+                i = 0;
             }
         }
     }
