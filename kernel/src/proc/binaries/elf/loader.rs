@@ -1,6 +1,5 @@
 
 use core::mem;
-use core::slice;
 
 use ruxpin_api::types::{OpenFlags, FileAccess, Seek};
 

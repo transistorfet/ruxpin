@@ -2,8 +2,11 @@
 * goal is to get a shell-type program
 ----
 
-* the fix for segment loading and mem_offest is wrong because it will prevent the loading of the start of the page, leaving a blank
-  spot (the same size as the offset).  But it works in a limited fashion for the time being
+
+* there was an issue with the console driver when the raw device was wrapped in a spinlock.  It was causing a data abort to some
+  weird address.  I'm wondering if it's related to the kernel EL1 to EL1 context switch.  Perhaps it's causing registers to be
+  corrupted which eventually causes the problems being seen
+
 
 * does the linux copy user/kernel function do manual page lookups, including triggering page loading?  Or does it do soemthing else?
 * why does saving the floating point regs cause a null pointer exception?  Are we overflowing the stack?
@@ -13,6 +16,8 @@
 
 
 * add input to the serial port driver
+* the fix for segment loading and mem_offest is wrong because it will prevent the loading of the start of the page, leaving a blank
+  spot (the same size as the offset).  But it works in a limited fashion for the time being
 
 
 * fix block allocation and tiered table lookups
