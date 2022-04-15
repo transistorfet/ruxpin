@@ -21,11 +21,15 @@ unsafe impl<T: Sync + Send> Sync for UnownedLinkedListNode<T> {}
 
 
 impl<T> UnownedLinkedList<T> {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             head: None,
             tail: None,
         }
+    }
+
+    pub fn get_head(&mut self) -> Option<NonNull<UnownedLinkedListNode<T>>> {
+        self.head
     }
 
     pub unsafe fn insert_head(&mut self, node: NonNull<UnownedLinkedListNode<T>>) {
@@ -40,6 +44,35 @@ impl<T> UnownedLinkedList<T> {
         }
         (*node.as_ptr()).next = self.head;
         self.head = Some(node);
+    }
+
+    pub unsafe fn insert_tail(&mut self, node: NonNull<UnownedLinkedListNode<T>>) {
+        self.insert_after(node, self.tail);
+    }
+
+    unsafe fn insert_after(&mut self, node: NonNull<UnownedLinkedListNode<T>>, mut after: Option<NonNull<UnownedLinkedListNode<T>>>) {
+	// If `after` is None then insert at the start of the list (ie. self.head)
+	let mut tail = if after.is_some() {
+	    (*after.as_mut().unwrap().as_ptr()).next
+	} else {
+	    self.head
+        };
+
+	// Connect the tail of the list to the node
+	if tail.is_some() {
+            (*tail.as_mut().unwrap().as_ptr()).prev = Some(node);
+        } else {
+            self.tail = Some(node);
+        }
+        (*node.as_ptr()).next = tail;
+
+	// Connect the list up to and including `after` to the node
+        if after.is_some() {
+            (*after.as_mut().unwrap().as_ptr()).next = Some(node);
+        } else {
+            self.head = Some(node);
+        }
+        (*node.as_ptr()).prev = after;
     }
 
     pub unsafe fn remove_node(&mut self, node: NonNull<UnownedLinkedListNode<T>>) {
@@ -77,8 +110,12 @@ impl<T> UnownedLinkedListNode<T> {
         }
     }
 
-    pub fn wrap_non_null(&mut self) -> NonNull<Self> {
+    pub fn as_node_ptr(&mut self) -> NonNull<Self> {
         NonNull::new(self as *mut Self).unwrap()
+    }
+
+    pub fn next(&self) -> Option<NonNull<Self>> {
+        self.next
     }
 }
 
