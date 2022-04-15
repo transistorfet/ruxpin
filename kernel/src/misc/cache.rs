@@ -70,15 +70,14 @@ impl<K: Copy + PartialEq, T> Cache<K, T> {
     {
         // Search the list for the matching object
         let mut iter = self.order.iter();
-        while let Some(ptr) = iter.next() {
-            let item = unsafe { &mut (*ptr.as_ptr()) };
-            if item.key == key {
+        while let Some(mut node) = iter.next() {
+            if unsafe { node.get().key } == key {
                 unsafe {
-                    self.order.remove_node(ptr);
-                    self.order.insert_head(ptr);
+                    self.order.remove_node(node);
+                    self.order.insert_head(node);
                 }
                 //printkln!("cache: returning existing");
-                return Ok(item.wrap_inner());
+                return Ok(unsafe { node.get_mut() }.wrap_inner());
             }
         }
 
@@ -95,7 +94,7 @@ impl<K: Copy + PartialEq, T> Cache<K, T> {
             self.items.push(UnownedLinkedListNode::new(CacheArcInner::new(key, load()?)));
             let i = self.items.len() - 1;
             unsafe {
-                self.order.insert_head(self.items[i].wrap_non_null());
+                self.order.insert_head(self.items[i].as_node_ptr());
             }
             //printkln!("cache: returning new");
             return Ok(self.items[i].wrap_inner());
@@ -103,17 +102,16 @@ impl<K: Copy + PartialEq, T> Cache<K, T> {
 
         // If the cache is full, then find the last entry in the list that has no references and recycle it
         let mut iter = self.order.iter_rev();
-        while let Some(ptr) = iter.next() {
-            let item = unsafe { &mut (*ptr.as_ptr()) };
-            if item.refcount.load(Ordering::Relaxed) == 0 {
-                store(key, &mut item.data)?;
-                item.data = load()?;
+        while let Some(mut node) = iter.next() {
+            if unsafe { node.get() }.refcount.load(Ordering::Relaxed) == 0 {
+                store(key, &mut unsafe { node.get_mut() }.data)?;
+                unsafe { node.get_mut() }.data = load()?;
                 unsafe {
-                    self.order.remove_node(ptr);
-                    self.order.insert_head(ptr);
+                    self.order.remove_node(node);
+                    self.order.insert_head(node);
                 }
                 //printkln!("cache: recycling old");
-                return Ok(item.wrap_inner());
+                return Ok(unsafe { node.get_mut() }.wrap_inner());
             }
         }
 
@@ -126,8 +124,8 @@ impl<K, T: Debug> Cache<K, T> {
         let mut i = 0;
         let mut iter = self.order.iter();
         printkln!("Cache contents:");
-        while let Some(ptr) = iter.next() {
-            let item = unsafe { &mut (*ptr.as_ptr()) };
+        while let Some(node) = iter.next() {
+            let item = unsafe { node.get() };
             printkln!("{}: {:?}", i, item.data);
             i += 1;
         }

@@ -4,15 +4,17 @@ use core::ops::{Deref, DerefMut};
 
 
 pub struct UnownedLinkedList<T> {
-    head: Option<NonNull<UnownedLinkedListNode<T>>>,
-    tail: Option<NonNull<UnownedLinkedListNode<T>>>,
+    head: Option<UnownedLinkedListRef<T>>,
+    tail: Option<UnownedLinkedListRef<T>>,
 }
 
 pub struct UnownedLinkedListNode<T> {
-    next: Option<NonNull<UnownedLinkedListNode<T>>>,
-    prev: Option<NonNull<UnownedLinkedListNode<T>>>,
+    next: Option<UnownedLinkedListRef<T>>,
+    prev: Option<UnownedLinkedListRef<T>>,
     data: T,
 }
+
+pub struct UnownedLinkedListRef<T>(NonNull<UnownedLinkedListNode<T>>);
 
 unsafe impl<T: Sync + Send> Send for UnownedLinkedList<T> {}
 unsafe impl<T: Sync + Send> Sync for UnownedLinkedList<T> {}
@@ -28,68 +30,68 @@ impl<T> UnownedLinkedList<T> {
         }
     }
 
-    pub fn get_head(&mut self) -> Option<NonNull<UnownedLinkedListNode<T>>> {
+    pub fn get_head(&mut self) -> Option<UnownedLinkedListRef<T>> {
         self.head
     }
 
-    pub unsafe fn insert_head(&mut self, node: NonNull<UnownedLinkedListNode<T>>) {
-        if (*node.as_ptr()).next.is_some() || (*node.as_ptr()).prev.is_some() {
+    pub unsafe fn insert_head(&mut self, node: UnownedLinkedListRef<T>) {
+        if node.next().is_some() || node.prev().is_some() {
             panic!("attempting to re-add a node");
         }
 
         if self.head.is_some() {
-            (*self.head.as_mut().unwrap().as_ptr()).prev = Some(node);
+            self.head.unwrap().set_prev(Some(node));
         } else {
             self.tail = Some(node);
         }
-        (*node.as_ptr()).next = self.head;
+        node.set_next(self.head);
         self.head = Some(node);
     }
 
-    pub unsafe fn insert_tail(&mut self, node: NonNull<UnownedLinkedListNode<T>>) {
+    pub unsafe fn insert_tail(&mut self, node: UnownedLinkedListRef<T>) {
         self.insert_after(node, self.tail);
     }
 
-    unsafe fn insert_after(&mut self, node: NonNull<UnownedLinkedListNode<T>>, mut after: Option<NonNull<UnownedLinkedListNode<T>>>) {
+    unsafe fn insert_after(&mut self, node: UnownedLinkedListRef<T>, after: Option<UnownedLinkedListRef<T>>) {
 	// If `after` is None then insert at the start of the list (ie. self.head)
-	let mut tail = if after.is_some() {
-	    (*after.as_mut().unwrap().as_ptr()).next
+	let tail = if after.is_some() {
+            after.unwrap().next()
 	} else {
 	    self.head
         };
 
 	// Connect the tail of the list to the node
 	if tail.is_some() {
-            (*tail.as_mut().unwrap().as_ptr()).prev = Some(node);
+            tail.unwrap().set_prev(Some(node));
         } else {
             self.tail = Some(node);
         }
-        (*node.as_ptr()).next = tail;
+        node.set_next(tail);
 
 	// Connect the list up to and including `after` to the node
         if after.is_some() {
-            (*after.as_mut().unwrap().as_ptr()).next = Some(node);
+            after.unwrap().set_next(Some(node));
         } else {
             self.head = Some(node);
         }
-        (*node.as_ptr()).prev = after;
+        node.set_prev(after);
     }
 
-    pub unsafe fn remove_node(&mut self, node: NonNull<UnownedLinkedListNode<T>>) {
-        if (*node.as_ptr()).next.is_some() {
-            (*(*node.as_ptr()).next.as_mut().unwrap().as_ptr()).prev = (*node.as_ptr()).prev;
+    pub unsafe fn remove_node(&mut self, node: UnownedLinkedListRef<T>) {
+        if node.next().is_some() {
+            node.next().unwrap().set_prev(node.prev());
         } else {
-            self.tail = (*node.as_ptr()).prev;
+            self.tail = node.prev();
         }
 
-        if (*node.as_ptr()).prev.is_some() {
-            (*(*node.as_ptr()).prev.as_mut().unwrap().as_ptr()).next = (*node.as_ptr()).next;
+        if node.prev().is_some() {
+            node.prev().unwrap().set_next(node.next());
         } else {
-            self.head = (*node.as_ptr()).next;
+            self.head = node.next();
         }
 
-        (*node.as_ptr()).next = None;
-        (*node.as_ptr()).prev = None;
+        node.set_next(None);
+        node.set_prev(None);
     }
 
     pub fn iter(&self) -> UnownedLinkedListIter<T> {
@@ -110,11 +112,11 @@ impl<T> UnownedLinkedListNode<T> {
         }
     }
 
-    pub fn as_node_ptr(&mut self) -> NonNull<Self> {
-        NonNull::new(self as *mut Self).unwrap()
+    pub fn as_node_ptr(&mut self) -> UnownedLinkedListRef<T> {
+        UnownedLinkedListRef(NonNull::new(self as *mut Self).unwrap())
     }
 
-    pub fn next(&self) -> Option<NonNull<Self>> {
+    pub fn next(&self) -> Option<UnownedLinkedListRef<T>> {
         self.next
     }
 }
@@ -135,8 +137,44 @@ impl<T> DerefMut for UnownedLinkedListNode<T> {
 
 
 
+impl<T> Clone for UnownedLinkedListRef<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<T> Copy for UnownedLinkedListRef<T> {}
+
+impl<T> UnownedLinkedListRef<T> {
+    pub unsafe fn get(&self) -> &T {
+        &(*self.0.as_ptr()).data
+    }
+
+    pub unsafe fn get_mut(&mut self) -> &mut T {
+        &mut (*self.0.as_ptr()).data
+    }
+
+    pub unsafe fn next(&self) -> Option<Self> {
+        (*self.0.as_ptr()).next
+    }
+
+    pub unsafe fn prev(&self) -> Option<Self> {
+        (*self.0.as_ptr()).prev
+    }
+
+    unsafe fn set_next(&self, node: Option<UnownedLinkedListRef<T>>) {
+        (*self.0.as_ptr()).next = node;
+    }
+
+    unsafe fn set_prev(&self, node: Option<UnownedLinkedListRef<T>>) {
+        (*self.0.as_ptr()).prev = node;
+    }
+}
+
+
+
 pub struct UnownedLinkedListIter<T> {
-    current: Option<NonNull<UnownedLinkedListNode<T>>>,
+    current: Option<UnownedLinkedListRef<T>>,
 }
 
 impl<T> UnownedLinkedListIter<T> {
@@ -148,18 +186,18 @@ impl<T> UnownedLinkedListIter<T> {
 }
 
 impl<T> Iterator for UnownedLinkedListIter<T> {
-    type Item = NonNull<UnownedLinkedListNode<T>>;
+    type Item = UnownedLinkedListRef<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let result = self.current;
-        self.current = self.current.map(|node| unsafe { (*node.as_ptr()).next }).flatten();
+        self.current = self.current.map(|node| unsafe { node.next() }).flatten();
         result
     }
 }
 
 
 pub struct UnownedLinkedListIterRev<T> {
-    current: Option<NonNull<UnownedLinkedListNode<T>>>,
+    current: Option<UnownedLinkedListRef<T>>,
 }
 
 impl<T> UnownedLinkedListIterRev<T> {
@@ -171,11 +209,11 @@ impl<T> UnownedLinkedListIterRev<T> {
 }
 
 impl<T> Iterator for UnownedLinkedListIterRev<T> {
-    type Item = NonNull<UnownedLinkedListNode<T>>;
+    type Item = UnownedLinkedListRef<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let result = self.current;
-        self.current = self.current.map(|node| unsafe { (*node.as_ptr()).prev }).flatten();
+        self.current = self.current.map(|node| unsafe { node.prev() }).flatten();
         result
     }
 }
