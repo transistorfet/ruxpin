@@ -54,6 +54,13 @@ impl VirtualAddressSpace {
         self.alloc_mapped(permissions, vaddr, align_up(len, mmu::page_size()));
     }
 
+    pub fn clear_segments(&mut self) {
+        self.unmap_range(VirtualAddress::from(0), 0xffff_ffff_ffff);
+
+        self.segments.clear();
+    }
+
+
     pub fn alloc_mapped(&mut self, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) -> PhysicalAddress {
         let pages = pages::get_page_area();
 

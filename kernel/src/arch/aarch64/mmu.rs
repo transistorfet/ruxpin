@@ -201,7 +201,7 @@ where
     let granuale_size = 1 << addr_bits;
 
     let mut index = table_index_from_vaddr(addr_bits, *vaddr);
-    while *len > 0 && index <= table_entries() {
+    while *len > 0 && index < table_entries() {
         if is_block(addr_bits, table, index) {
             unmap_granuales(addr_bits, table, &mut index, len, vaddr, pages, unmap_block)?;
         }
@@ -211,7 +211,7 @@ where
             unmap_level(addr_bits - 9, subtable, len, vaddr, pages, unmap_block)?;
 
             if table_is_empty(subtable) {
-                pages.free_page(PhysicalAddress::from(subtable.as_ptr() as u64));
+                pages.free_page(table_ptr(table, index));
                 table[index] = 0;
             }
         } else {

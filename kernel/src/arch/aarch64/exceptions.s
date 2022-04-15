@@ -319,8 +319,8 @@ _restore_kernel_context:
 	//mov	x0, x3
 	//bl	_debug_print_number
 
-	mrs	x1, ESR_EL1
-	mrs	x2, ELR_EL1
+	mrs	x1, ELR_EL1
+	mrs	x2, ESR_EL1
 	mrs	x3, FAR_EL1
 	bl	\handler
 

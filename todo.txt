@@ -2,10 +2,7 @@
 * goal is to get a shell-type program
 ----
 
-* it wont seem to restart the syscall... if I comment that out, things run but testapp never seems to break out of its loop.  If it
-  actually calls the handle_syscall function, then it has a fatal error
-
-* get some simple blocking block so that the testapp program is asleep while waiting for input
+* implement process exiting
 
 
 * I'm not happy about how the process manager is going.  It's difficult to remove a process.  It's possible to use an Option and

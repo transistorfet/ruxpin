@@ -3,6 +3,10 @@
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum SyscallFunction {
     None,
+
+    Exit,
+    Exec,
+
     Open,
     Close,
     Read,
@@ -30,6 +34,11 @@ impl Default for SyscallRequest {
 
 #[macro_export]
 macro_rules! syscall_encode {
+    ($syscall:ident, $i:ident, $name:ident: usize) => {
+        $i += 1;
+        $syscall.args[$i - 1] = $name;
+    };
+
     ($syscall:ident, $i:ident, $name:ident: FileDesc) => {
         $i += 1;
         $syscall.args[$i - 1] = $name.0;
@@ -66,6 +75,11 @@ macro_rules! syscall_encode {
 
 #[macro_export]
 macro_rules! syscall_decode {
+    ($syscall:ident, $i:ident, $name:ident: usize) => {
+        $i += 1;
+        let $name = $syscall.args[$i - 1];
+    };
+
     ($syscall:ident, $i:ident, $name:ident: FileDesc) => {
         $i += 1;
         let $name = FileDesc($syscall.args[$i - 1]);

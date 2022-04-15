@@ -21,6 +21,15 @@ impl FileDescriptors {
         self.0.get(file_num.as_usize() as usize).map(|file| file.clone()).flatten().ok_or(KernelError::BadFileNumber)
     }
 
+    pub fn close_all(&mut self) {
+        for file in self.0.iter() {
+            if let Some(file) = file {
+                vfs::close(file.clone());
+            }
+        }
+        self.0.clear();
+    }
+
     pub fn open(&mut self, cwd: Option<Vnode>, path: &str, flags: OpenFlags, access: FileAccess, current_uid: UserID) -> Result<FileDesc, KernelError> {
         let file_num = self.find_first()?;
         let file = vfs::open(cwd, path, flags, access, current_uid)?;

@@ -5,6 +5,24 @@ use crate::types::{FileDesc, ApiError, OpenFlags, FileAccess};
 use crate::syscalls::{SyscallRequest, SyscallFunction};
 
 
+
+pub fn exit(status: usize) {
+    let mut i = 0;
+    let mut syscall: SyscallRequest = Default::default();
+    syscall_encode!(syscall, i, status: usize);
+    syscall.function = SyscallFunction::Exit;
+    execute_syscall(&mut syscall);
+}
+
+pub fn exec(path: &str) {
+    let mut i = 0;
+    let mut syscall: SyscallRequest = Default::default();
+    syscall_encode!(syscall, i, path: &str);
+    syscall.function = SyscallFunction::Exec;
+    execute_syscall(&mut syscall);
+}
+
+
 pub fn open(path: &str, flags: OpenFlags, access: FileAccess) -> Result<FileDesc, ApiError> {
     let mut i = 0;
     let mut syscall: SyscallRequest = Default::default();

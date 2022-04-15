@@ -219,7 +219,7 @@ pub fn handle_irq_pl011() {
         PL011.set(registers::INTERRUPT_CLEAR, PL011_INT_ALL);
 
         while let Some(ch) = RAW_CONSOLE.get_char_unbuffered() {
-            crate::printkln!(">>> {}", ch);
+            //crate::printkln!(">>> {}", ch);
             RAW_CONSOLE.buffer.insert(ch);
             process::restart_blocked(SyscallFunction::Read);
         }

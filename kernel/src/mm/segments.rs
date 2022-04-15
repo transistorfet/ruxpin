@@ -15,8 +15,8 @@ pub trait SegmentOperations: Sync + Send {
 }
 
 pub struct Segment {
-    start: VirtualAddress,
-    end: VirtualAddress,
+    pub(super) start: VirtualAddress,
+    pub(super) end: VirtualAddress,
     pub(super) ops: Box<dyn SegmentOperations>,
 }
 

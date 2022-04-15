@@ -4,15 +4,29 @@ use ruxpin_api::syscall_decode;
 use ruxpin_api::syscalls::{SyscallRequest, SyscallFunction};
 
 use crate::api::file::*;
+use crate::api::proc::*;
 use crate::errors::KernelError;
 use crate::proc::process::get_current_proc;
 
 mod file;
+mod proc;
 
 pub fn handle_syscall(syscall: &mut SyscallRequest) {
     get_current_proc().lock().syscall = syscall.clone();
 
     match syscall.function {
+        SyscallFunction::Exit => {
+            let result = syscall_exit(syscall.args[0]);
+            store_result(syscall, result.map(|_| 0));
+        },
+
+        SyscallFunction::Exec => {
+            let mut i = 0;
+            syscall_decode!(syscall, i, path: &str);
+            let result = syscall_exec(path);
+            store_result(syscall, result.map(|_| 0));
+        },
+
         SyscallFunction::Open => {
             let mut i = 0;
             syscall_decode!(syscall, i, path: &str);

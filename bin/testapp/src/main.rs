@@ -3,7 +3,7 @@
 
 extern crate ruxpin_app;
 
-use ruxpin_api::api::{open, close, read, write};
+use ruxpin_api::api::{exit, exec, open, close, read, write};
 use ruxpin_api::types::{FileDesc, OpenFlags, FileAccess};
 
 #[no_mangle]
@@ -27,8 +27,13 @@ pub fn main() {
                 write(FileDesc(0), b"read in ").unwrap();
                 write(FileDesc(0), &data[0..i]).unwrap();
 
-                if &data[0..i] == b"exit\r" {
+                if &data[0..i] == b"exit\n" {
                     break;
+                }
+
+                if &data[0..i] == b"run\n" {
+                    write(FileDesc(0), b"executing self\n").unwrap();
+                    exec("/mnt/bin/testapp");
                 }
 
                 i = 0;
@@ -38,6 +43,9 @@ pub fn main() {
 
     write(FileDesc(0), b"done\n").unwrap();
 
+    exit(0);
+
+    write(FileDesc(0), b"didn't exit\n").unwrap();
     loop {
     }
 }

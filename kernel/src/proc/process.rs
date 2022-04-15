@@ -162,6 +162,21 @@ impl ProcessManager {
             self.scheduled.remove_node(current);
             self.blocked.insert_head(current);
         }
+
+        let new_current = self.get_current_proc();
+        Context::switch_current_context(&mut new_current.lock().context);
+    }
+
+    fn exit_current_proc(&mut self, status: usize) {
+        let current = self.scheduled.get_head().unwrap();
+        crate::printkln!("Exiting process {}", unsafe { current.get() }.lock().pid);
+
+        // TODO this is just junking the process record (it will never be removed but never be scheduled again)
+        //      It shouldn't be removed here anyways, but it would be when the parent proc "wait()"s for it
+        unsafe {
+            self.scheduled.remove_node(current);
+        }
+
         let new_current = self.get_current_proc();
         Context::switch_current_context(&mut new_current.lock().context);
     }
@@ -206,6 +221,10 @@ pub fn create_process() -> Process {
 
 pub fn get_current_proc() -> Process {
     PROCESS_MANAGER.try_lock().unwrap().get_current_proc()
+}
+
+pub fn exit_current_proc(status: usize) {
+    PROCESS_MANAGER.try_lock().unwrap().exit_current_proc(status)
 }
 
 pub(crate) fn schedule() {
