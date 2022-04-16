@@ -1,12 +1,12 @@
 
 use alloc::vec::Vec;
 
-use ruxpin_api::types::{OpenFlags, FileAccess, Seek, UserID, FileDesc};
+use ruxpin_api::types::{OpenFlags, FileAccess, UserID, FileDesc};
 
 use crate::errors::KernelError;
 
 use super::vfs;
-use super::types::{File, Vnode, DirEntry};
+use super::types::{File, Vnode};
 
 const MAX_OPEN_FILES: usize = 100;
 
@@ -41,17 +41,12 @@ impl FileDescriptors {
 
     pub fn close(&mut self, file_num: FileDesc) -> Result<(), KernelError> {
         let file = self.get_file(file_num)?;
-        vfs::close(file)?;
+        //vfs::close(file)?;
         self.list[file_num.as_usize() as usize] = None;
         Ok(())
     }
 
     pub fn close_all(&mut self) {
-        for file in self.list.iter() {
-            if let Some(file) = file {
-                vfs::close(file.clone()).unwrap();
-            }
-        }
         self.list.clear();
     }
 

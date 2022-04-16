@@ -48,9 +48,9 @@ pub fn register_devices() -> Result<(), KernelError> {
     // TODO this is a temporary test
     vfs::mount(None, "/", "tmpfs", None, 0).unwrap();
     let file = vfs::open(None, "/dev", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
-    vfs::close(file).unwrap();
+    //vfs::close(file).unwrap();
     let file = vfs::open(None, "/mnt", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
-    vfs::close(file).unwrap();
+    //vfs::close(file).unwrap();
     vfs::mount(None, "/dev", "devfs", None, 0).unwrap();
 
     vfs::open(None, "test", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
@@ -65,7 +65,7 @@ pub fn register_devices() -> Result<(), KernelError> {
 
     let file = vfs::open(None, "/dev/console0", OpenFlags::ReadOnly, FileAccess::DefaultFile, 0).unwrap();
     vfs::write(file.clone(), b"the device file can write\n").unwrap();
-    vfs::close(file).unwrap();
+    //vfs::close(file).unwrap();
 
 
 
@@ -106,7 +106,7 @@ pub fn register_devices() -> Result<(), KernelError> {
             break;
         //}
     }
-    vfs::close(file)?;
+    //vfs::close(file)?;
 
     use crate::proc::process::create_process;
     use crate::proc::binaries::elf::loader;
@@ -118,13 +118,13 @@ pub fn register_devices() -> Result<(), KernelError> {
 
     let file = vfs::open(None, "/mnt/test2", OpenFlags::ReadWrite.plus(OpenFlags::Create), FileAccess::DefaultFile, 0)?;
     vfs::write(file.clone(), b"this is some test data")?;
-    vfs::close(file)?;
+    //vfs::close(file)?;
 
     let file = vfs::open(None, "/mnt/test", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0)?;
     let mut data = [0; 128];
     vfs::read(file.clone(), &mut data)?;
     unsafe { crate::printk::printk_dump(&data as *const u8, 128); }
-    vfs::close(file)?;
+    //vfs::close(file)?;
 
     let file = vfs::open(None, "/mnt", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0)?;
     while let Some(dirent) = vfs::readdir(file.clone())? {

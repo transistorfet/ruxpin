@@ -94,11 +94,20 @@ pub fn open(cwd: Option<Vnode>, path: &str, flags: OpenFlags, access: FileAccess
     Ok(Arc::new(Spinlock::new(file)))
 }
 
+/*
 pub fn close(file: File) -> Result<(), KernelError> {
-    let mut fptr = file.lock();
-    let vnode = fptr.vnode.clone();
-    vnode.lock().close(&mut *fptr)?;
+    //let mut fptr = file.lock();
+    //let vnode = fptr.vnode.clone();
+    //vnode.lock().close(&mut *fptr)?;
     Ok(())
+}
+*/
+
+impl Drop for FilePointer {
+    fn drop(&mut self) {
+        let vnode = self.vnode.clone();
+        vnode.lock().close(self).unwrap();
+    }
 }
 
 pub fn read(file: File, buffer: &mut [u8]) -> Result<usize, KernelError> {
