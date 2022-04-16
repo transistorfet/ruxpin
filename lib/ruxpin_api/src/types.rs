@@ -2,6 +2,7 @@
 pub type UserID = u16;
 pub type GroupID = u16;
 pub type InodeNum = u32;
+pub type Pid = i32;
 
 
 #[repr(u16)]

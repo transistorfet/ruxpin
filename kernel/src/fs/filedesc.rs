@@ -10,6 +10,7 @@ use super::types::{File, Vnode, DirEntry};
 
 const MAX_OPEN_FILES: usize = 100;
 
+#[derive(Clone)]
 pub struct FileDescriptors(Vec<Option<File>>);
 
 impl FileDescriptors {
@@ -24,7 +25,7 @@ impl FileDescriptors {
     pub fn close_all(&mut self) {
         for file in self.0.iter() {
             if let Some(file) = file {
-                vfs::close(file.clone());
+                vfs::close(file.clone()).unwrap();
             }
         }
         self.0.clear();

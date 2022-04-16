@@ -101,7 +101,7 @@ impl VirtualAddress {
         Self(self.0 & !(align - 1) as u64)
     }
 
-    pub fn align_offset(self, align: usize) -> usize {
+    pub fn offset_from_align(self, align: usize) -> usize {
         (self.0 as usize) & (align - 1)
     }
 }

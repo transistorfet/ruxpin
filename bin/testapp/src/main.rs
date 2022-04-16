@@ -3,12 +3,13 @@
 
 extern crate ruxpin_app;
 
+use ruxpin_api::println;
 use ruxpin_api::api::{exit, exec, open, close, read, write};
 use ruxpin_api::types::{FileDesc, OpenFlags, FileAccess};
 
 #[no_mangle]
 pub fn main() {
-    write(FileDesc(0), b"a really cool message that I'd like to see\n").unwrap();
+    println!("a really cool message that I'd like to see");
 
     let file = open("/mnt/test2", OpenFlags::ReadOnly, FileAccess::DefaultFile).unwrap();
     let mut data = [0; 100];
@@ -32,7 +33,7 @@ pub fn main() {
                 }
 
                 if &data[0..i] == b"run\n" {
-                    write(FileDesc(0), b"executing self\n").unwrap();
+                    println!("executing self");
                     exec("/mnt/bin/testapp");
                 }
 
@@ -41,11 +42,11 @@ pub fn main() {
         }
     }
 
-    write(FileDesc(0), b"done\n").unwrap();
+    println!("done");
 
     exit(0);
 
-    write(FileDesc(0), b"didn't exit\n").unwrap();
+    println!("didn't exit");
     loop {
     }
 }

@@ -16,6 +16,7 @@ extern "C" {
 pub static mut CURRENT_CONTEXT: *mut Context = ptr::null_mut();
 
 #[repr(C)]
+#[derive(Clone)]
 pub struct Context {
     x_registers: [u64; 32],
     v_registers: [u64; 64],     // TODO this should be u128, but they don't have a stable ABI, so I'm avoiding them for safety
@@ -38,10 +39,14 @@ impl Default for Context {
 
 impl Context {
     pub fn init(&mut self, entry: VirtualAddress, sp: VirtualAddress, ttbr: u64) {
-        self.ttbr = ttbr;
+        self.set_ttbr(ttbr);
         unsafe {
             _create_context(self, u64::from(sp), u64::from(entry));
         }
+    }
+
+    pub fn set_ttbr(&mut self, ttbr: u64) {
+        self.ttbr = ttbr;
     }
 
     pub fn switch_current_context(new_context: &mut Context) {
@@ -64,13 +69,26 @@ impl Context {
 
     pub fn write_syscall_result_to_current_context(syscall: &SyscallRequest) {
         unsafe {
-            (&mut *CURRENT_CONTEXT).write_result(syscall);
+            (&mut *CURRENT_CONTEXT).write_syscall_result(syscall);
         }
     }
 
-    pub fn write_result(&mut self, syscall: &SyscallRequest) {
+    pub fn write_syscall_result(&mut self, syscall: &SyscallRequest) {
         self.x_registers[0] = syscall.result as u64;
         self.x_registers[1] = syscall.error as u64;
+    }
+
+    pub fn write_result(&mut self, result: Result<usize, usize>) {
+        match result {
+            Ok(num) => {
+                self.x_registers[0] = num as u64;
+                self.x_registers[1] = false as u64;
+            },
+            Err(num) => {
+                self.x_registers[0] = num as u64;
+                self.x_registers[1] = true as u64;
+            },
+        }
     }
 }
 

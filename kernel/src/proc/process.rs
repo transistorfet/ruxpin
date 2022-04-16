@@ -2,7 +2,7 @@
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 
-use ruxpin_api::types::UserID;
+use ruxpin_api::types::{Pid, UserID};
 use ruxpin_api::syscalls::{SyscallRequest, SyscallFunction};
 
 use crate::api::handle_syscall;
@@ -15,7 +15,6 @@ use crate::mm::MemoryPermissions;
 use crate::mm::vmalloc::VirtualAddressSpace;
 use crate::sync::Spinlock;
 
-pub type Pid = i32;
 
 pub struct ProcessRecord {
     // TODO I don't like that these are all pub... I might need to either isolate this more or change how things interact with processes
@@ -115,7 +114,7 @@ impl ProcessManager {
     }
     */
 
-    pub fn get_current_proc(&mut self) -> Process {
+    pub fn get_current_process(&mut self) -> Process {
         if self.scheduled.get_head().is_none() {
             panic!("no scheduled processes when looking for the current process");
         }
@@ -125,6 +124,29 @@ impl ProcessManager {
         }
     }
 
+    pub fn fork_current_process(&mut self) -> Process {
+        let current_proc = self.scheduled.get_head().unwrap();
+        let new_proc = self.create_process();
+
+        {
+            let locked_current_proc = unsafe { current_proc.get() }.lock();
+            let mut locked_new_proc = new_proc.lock();
+            locked_new_proc.current_uid = locked_current_proc.current_uid;
+            locked_new_proc.cwd = locked_current_proc.cwd.clone();
+            locked_new_proc.files = locked_current_proc.files.clone();
+            locked_new_proc.space.copy_segments(&locked_current_proc.space);
+            locked_new_proc.context = locked_current_proc.context.clone();
+            let ttbr = locked_new_proc.space.get_ttbr();
+            locked_new_proc.context.set_ttbr(ttbr);
+
+            // The return result will be 0 to indicate it's the child process
+            locked_new_proc.context.write_result(Ok(0));
+        }
+
+        new_proc
+    }
+
+
     fn schedule(&mut self) -> Process {
         let current = self.scheduled.get_head().unwrap();
 
@@ -133,7 +155,7 @@ impl ProcessManager {
             self.scheduled.insert_tail(current);
         }
 
-        let new_current = self.get_current_proc();
+        let new_current = self.get_current_process();
         Context::switch_current_context(&mut new_current.lock().context);
 
         new_current
@@ -163,11 +185,11 @@ impl ProcessManager {
             self.blocked.insert_head(current);
         }
 
-        let new_current = self.get_current_proc();
+        let new_current = self.get_current_process();
         Context::switch_current_context(&mut new_current.lock().context);
     }
 
-    fn exit_current_proc(&mut self, status: usize) {
+    fn exit_current_process(&mut self, status: usize) {
         let current = self.scheduled.get_head().unwrap();
         crate::printkln!("Exiting process {}", unsafe { current.get() }.lock().pid);
 
@@ -177,12 +199,12 @@ impl ProcessManager {
             self.scheduled.remove_node(current);
         }
 
-        let new_current = self.get_current_proc();
+        let new_current = self.get_current_process();
         Context::switch_current_context(&mut new_current.lock().context);
     }
 
     fn page_fault(&mut self, far: u64) {
-        self.get_current_proc().lock().space.alloc_page_at(VirtualAddress::from(far)).unwrap();
+        self.get_current_process().lock().space.alloc_page_at(VirtualAddress::from(far)).unwrap();
     }
 }
 
@@ -219,12 +241,16 @@ pub fn create_process() -> Process {
     PROCESS_MANAGER.try_lock().unwrap().create_process()
 }
 
-pub fn get_current_proc() -> Process {
-    PROCESS_MANAGER.try_lock().unwrap().get_current_proc()
+pub fn get_current_process() -> Process {
+    PROCESS_MANAGER.try_lock().unwrap().get_current_process()
 }
 
-pub fn exit_current_proc(status: usize) {
-    PROCESS_MANAGER.try_lock().unwrap().exit_current_proc(status)
+pub fn fork_current_process() -> Process {
+    PROCESS_MANAGER.try_lock().unwrap().fork_current_process()
+}
+
+pub fn exit_current_process(status: usize) {
+    PROCESS_MANAGER.try_lock().unwrap().exit_current_process(status)
 }
 
 pub(crate) fn schedule() {

@@ -34,10 +34,16 @@ load-image:
 	- make load-image-contents
 	make umount-image
 
-load-image-contents:
+testapp:
 	cd bin/testapp && cargo build --release
+
+sh:
+	cd bin/sh && cargo build --release
+
+load-image-contents: testapp sh
 	sudo mkdir -p $(MOUNTPOINT)/bin
-	sudo cp bin/testapp/target/$(TARGET)/testapp $(MOUNTPOINT)/bin/testapp
+	sudo cp bin/testapp/target/$(TARGET)/testapp $(MOUNTPOINT)/bin
+	sudo cp bin/sh/target/$(TARGET)/sh $(MOUNTPOINT)/bin
 
 
 build-kernel:

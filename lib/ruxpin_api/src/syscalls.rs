@@ -5,6 +5,7 @@ pub enum SyscallFunction {
     None,
 
     Exit,
+    Fork,
     Exec,
 
     Open,

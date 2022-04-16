@@ -2,9 +2,22 @@
 * goal is to get a shell-type program
 ----
 
-* implement process exiting
+* there is a bug with translation tables where, when mapping the stack, it asks for page_size * page_size, so gets mapped as a 2MiB
+  granuale instead of individual pages, even though the memory is backed by the page fault allocator, which expects to have single
+  pages.
+* in fact, since there might already be a page fault that occurs to load the first stack page, it should cause an error if, when
+  updating the page address of the translation table, the granuale size is not a page!
 
 
+* implement fork
+* implement wait/wait_pid
+
+* this is at least the second time I've had an issues with the length of mapped segment not aligned to a page boundary, in the mmu
+  translation table code, which causes an infinite loop with no other indications.  I should fix this in a way that throws an error
+* make it consistent whether you use a usize length or a start/end address, not both
+
+
+* processes are never removed, which needs to be fixed
 * I'm not happy about how the process manager is going.  It's difficult to remove a process.  It's possible to use an Option and
   reallocate old proc slots when needed, but that's unnecessarily slow, especially given that the process slots in the manager are
   just Arcs.  Putting the linked list inside the Arc would be possible, but kind of clusmy, and it exposes the linked list node when

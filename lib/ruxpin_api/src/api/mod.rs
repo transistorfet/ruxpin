@@ -1,7 +1,10 @@
 
+use core::fmt;
+use core::fmt::Write;
+
 use crate::syscall_encode;
 use crate::arch::execute_syscall;
-use crate::types::{FileDesc, ApiError, OpenFlags, FileAccess};
+use crate::types::{Pid, FileDesc, ApiError, OpenFlags, FileAccess};
 use crate::syscalls::{SyscallRequest, SyscallFunction};
 
 
@@ -12,6 +15,16 @@ pub fn exit(status: usize) {
     syscall_encode!(syscall, i, status: usize);
     syscall.function = SyscallFunction::Exit;
     execute_syscall(&mut syscall);
+}
+
+pub fn fork() -> Result<Pid, ApiError> {
+    let mut syscall: SyscallRequest = Default::default();
+    syscall.function = SyscallFunction::Fork;
+    execute_syscall(&mut syscall);
+    match syscall.error {
+        false => Ok(syscall.result as Pid),
+        true => Err(ApiError::SomethingWentWrong),
+    }
 }
 
 pub fn exec(path: &str) {
@@ -73,5 +86,30 @@ pub fn write(file: FileDesc, buffer: &[u8]) -> Result<usize, ApiError> {
         false => Ok(syscall.result),
         true => Err(ApiError::SomethingWentWrong),
     }
+}
+
+
+impl Write for FileDesc {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        write(*self, s.as_bytes()).unwrap();
+        Ok(())
+    }
+}
+
+#[macro_export]
+macro_rules! print {
+    ($($args:tt)*) => ({
+        use core::fmt::Write;
+        FileDesc(0).write_fmt(format_args!($($args)*)).unwrap();
+    })
+}
+
+#[macro_export]
+macro_rules! println {
+    ($($args:tt)*) => ({
+        use core::fmt::Write;
+        FileDesc(0).write_fmt(format_args!($($args)*)).unwrap();
+        FileDesc(0).write_str("\n").unwrap();
+    })
 }
 
