@@ -18,6 +18,7 @@ use crate::sync::Spinlock;
 pub struct ProcessRecord {
     // TODO I don't like that these are all pub... I might need to either isolate this more or change how things interact with processes
     pub pid: Pid,
+    pub exit_status: Option<usize>,
     pub current_uid: UserID,
     pub space: VirtualAddressSpace,
     pub files: FileDescriptors,
@@ -27,11 +28,8 @@ pub struct ProcessRecord {
 }
 
 pub type Process = QueueNodeRef<ProcessRecord>;
-//pub struct Process2(Arc<Spinlock<UnownedLinkedListNode<ProcessRecord>>>);
 
 struct ProcessManager {
-// TODO should you make this Vec<UnownedLinkedListNode<Option<Process>>> so that you can close and reuse process entries to avoid changing their locations?
-// TODO the alternative actually would be to get rid of the Vec, but also create a new queue type that *does* own the entries
     processes: Vec<QueueNodeRef<ProcessRecord>>,
     scheduled: Queue<ProcessRecord>,
     blocked: Queue<ProcessRecord>,
@@ -65,6 +63,7 @@ impl ProcessManager {
 
         self.processes.push(QueueNode::new(ProcessRecord {
             pid,
+            exit_status: None,
             current_uid: 0,
             space: VirtualAddressSpace::new_user_space(),
             files: FileDescriptors::new(),
@@ -87,12 +86,9 @@ impl ProcessManager {
             let mut locked_proc = proc.lock();
 
             // Allocate text segment
-            //locked_proc.space.alloc_mapped(MemoryPermissions::ReadExecute, VirtualAddress::from(0x77777000), 4096);
             locked_proc.space.add_memory_segment_allocated(MemoryPermissions::ReadExecute, VirtualAddress::from(0x77777000), 4096);
 
             // Allocate stack segment
-            //proc.space.alloc_mapped(MemoryPermissions::ReadWrite, VirtualAddress::from(0xFF000000), 4096 * 4096);
-            //locked_proc.space.map_on_demand(MemoryPermissions::ReadWrite, VirtualAddress::from(0xFF000000), 4096 * 4096);
             locked_proc.space.add_memory_segment(MemoryPermissions::ReadWrite, VirtualAddress::from(0xFF000000), 4096 * 4096);
 
             let ttrb = locked_proc.space.get_ttbr();
@@ -101,14 +97,6 @@ impl ProcessManager {
 
         proc
     }
-
-    /*
-    // TODO this is temporary to suppress unused warnings
-    #[allow(dead_code)]
-    fn destroy_process(&mut self, proc: &mut ProcessRecord) {
-        proc.space.unmap_range(VirtualAddress::from(0), usize::MAX);
-    }
-    */
 
     pub fn get_current_process(&mut self) -> Process {
         if self.scheduled.get_head().is_none() {
@@ -122,23 +110,16 @@ impl ProcessManager {
         let current_proc = self.scheduled.get_head().unwrap();
         let new_proc = self.create_process();
 
-        {
-            let locked_current_proc = current_proc.lock();
-            let mut locked_new_proc = new_proc.lock();
-            locked_new_proc.current_uid = locked_current_proc.current_uid;
-            locked_new_proc.files = locked_current_proc.files.clone();
-            locked_new_proc.space.copy_segments(&locked_current_proc.space);
-            locked_new_proc.context = locked_current_proc.context.clone();
-            let ttbr = locked_new_proc.space.get_ttbr();
-            locked_new_proc.context.set_ttbr(ttbr);
-
-            // The return result will be 0 to indicate it's the child process
-            locked_new_proc.context.write_result(Ok(0));
-        }
+        new_proc.lock().copy_resources(&*current_proc.lock());
 
         new_proc
     }
 
+    fn set_current_context(&mut self) -> Process {
+        let new_current = self.get_current_process();
+        Context::switch_current_context(&mut new_current.lock().context);
+        new_current
+    }
 
     fn schedule(&mut self) -> Process {
         let current = self.scheduled.get_head().unwrap();
@@ -146,20 +127,7 @@ impl ProcessManager {
         self.scheduled.remove_node(current.clone());
         self.scheduled.insert_tail(current);
 
-        let new_current = self.get_current_process();
-        Context::switch_current_context(&mut new_current.lock().context);
-
-        new_current
-    }
-
-    fn restart_blocked_by_syscall(&mut self, function: SyscallFunction) {
-        for node in self.blocked.iter() {
-            if node.lock().syscall.function == function {
-                self.blocked.remove_node(node.clone());
-                self.scheduled.insert_head(node.clone());
-                node.lock().restart_syscall = true;
-            }
-        }
+        self.set_current_context()
     }
 
     fn suspend(&mut self) {
@@ -172,26 +140,54 @@ impl ProcessManager {
         self.scheduled.remove_node(current.clone());
         self.blocked.insert_head(current);
 
-        let new_current = self.get_current_process();
-        Context::switch_current_context(&mut new_current.lock().context);
+        self.set_current_context();
+    }
+
+    fn restart_blocked_by_syscall(&mut self, function: SyscallFunction) {
+        for node in self.blocked.iter() {
+            if node.lock().syscall.function == function {
+                self.blocked.remove_node(node.clone());
+                self.scheduled.insert_head(node.clone());
+                node.lock().restart_syscall = true;
+            }
+        }
+
+        self.set_current_context();
     }
 
     fn exit_current_process(&mut self, status: usize) {
-        let current = self.scheduled.get_head().unwrap();
+        let current = self.get_current_process();
+
+        self.scheduled.remove_node(current.clone());
+
         crate::printkln!("Exiting process {}", current.lock().pid);
-
-        // TODO this is just junking the process record (it will never be removed but never be scheduled again)
-        //      It shouldn't be removed here anyways, but it would be when the parent proc "wait()"s for it
-        self.scheduled.remove_node(current);
-
-        let new_current = self.get_current_process();
-        Context::switch_current_context(&mut new_current.lock().context);
+        //current.lock().free_resources();
+        current.lock().exit_status = Some(status);
 
         self.restart_blocked_by_syscall(SyscallFunction::WaitPid);
     }
 
     fn page_fault(&mut self, far: u64) {
         self.get_current_process().lock().space.alloc_page_at(VirtualAddress::from(far)).unwrap();
+    }
+}
+
+impl ProcessRecord {
+    pub fn free_resources(&mut self) {
+        self.files.close_all();
+        self.space.clear_segments();
+    }
+
+    pub fn copy_resources(&mut self, source: &ProcessRecord) {
+        self.current_uid = source.current_uid;
+        self.files = source.files.clone();
+        self.space.copy_segments(&source.space);
+        self.context = source.context.clone();
+        let ttbr = self.space.get_ttbr();
+        self.context.set_ttbr(ttbr);
+
+        // The return result will be 0 to indicate it's the child process
+        self.context.write_result(Ok(0));
     }
 }
 

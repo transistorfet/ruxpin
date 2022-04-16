@@ -1,7 +1,7 @@
 
 #[repr(usize)]
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum KernelError {
     // Memory Errors
     AddressAlreadyMapped,
@@ -37,6 +37,8 @@ pub enum KernelError {
 
     NotExecutable,
     InvalidArgument,
-    InvalidSegmentType
+    InvalidSegmentType,
+
+    SuspendProcess,
 }
 

@@ -6,7 +6,7 @@ use ruxpin_api::syscalls::{SyscallRequest, SyscallFunction};
 use crate::api::file::*;
 use crate::api::proc::*;
 use crate::errors::KernelError;
-use crate::proc::process::get_current_process;
+use crate::proc::process::{get_current_process, suspend_current_process};
 
 mod file;
 mod proc;
@@ -80,6 +80,10 @@ pub fn store_result(syscall: &mut SyscallRequest, result: Result<usize, KernelEr
             syscall.result = value;
         },
         Err(value) => {
+            if value == KernelError::SuspendProcess {
+                suspend_current_process();
+            }
+
             syscall.error = true;
             syscall.result = value as usize;
         },

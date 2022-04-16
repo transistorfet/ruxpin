@@ -87,6 +87,7 @@ impl CharOperations for PL011Device {
             } else {
                 if i == 0 {
                     process::suspend_current_process();
+                    //return Err(KernelError::SuspendProcess);
                 }
                 break;
             }

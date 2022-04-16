@@ -26,11 +26,7 @@ pub fn syscall_exec(path: &str /*, _args: &[&str], _evnp: &[&str] */) -> Result<
     saved_path.copy_into(path);
 
     crate::printkln!("clearing old process space");
-    {
-        let mut locked_proc = proc.lock();
-        locked_proc.files.close_all();
-        locked_proc.space.clear_segments();
-    }
+    proc.lock().free_resources();
 
     crate::printkln!("executing a new process");
     loader::load_binary(proc.clone(), saved_path.as_str()).unwrap();
