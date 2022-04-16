@@ -3,7 +3,7 @@ use ruxpin_api::types::{Pid, OpenFlags, FileAccess};
 
 use crate::misc::StrArray;
 use crate::errors::KernelError;
-use crate::proc::process::{get_current_process, fork_current_process, exit_current_process};
+use crate::proc::process::{get_current_process, fork_current_process, exit_current_process, suspend_current_process};
 use crate::proc::binaries::elf::loader;
 
 
@@ -12,7 +12,7 @@ pub fn syscall_exit(status: usize) -> Result<(), KernelError> {
     Ok(())
 }
 
-pub fn syscall_fork(status: usize) -> Result<Pid, KernelError> {
+pub fn syscall_fork() -> Result<Pid, KernelError> {
     let new_proc = fork_current_process();
     let child_pid = new_proc.lock().pid;
     Ok(child_pid)
@@ -39,4 +39,18 @@ pub fn syscall_exec(path: &str /*, _args: &[&str], _evnp: &[&str] */) -> Result<
     Ok(())
 }
 
+pub fn syscall_waitpid(pid: Pid, status: &mut usize, options: usize) -> Result<Pid, KernelError> {
+    //let new_proc = fork_current_process();
+    //let child_pid = new_proc.lock().pid;
+    // TODO need to give a reason, an event
+    // TODO this is so super hacky, but it'll work for now.  We just need to allow the process to restart if *any* process exits
+    if *status != 0xdeadbeef {
+        suspend_current_process();
+        *status = 0xdeadbeef;
+    }
+
+    // TODO this should return the pid of the process that just exited, and also needs to use a proper status
+    let pid = 1;
+    Ok(pid)
+}
 

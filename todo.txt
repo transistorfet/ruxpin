@@ -2,6 +2,11 @@
 * goal is to get a shell-type program
 ----
 
+* add an events system for processes to wait on
+
+* since there's no reference counting of the segments, it might free all the pages when destroying the translation table of the
+  first process to be destroyed (processes aren't actually destroyed yet though)
+
 * there is a bug with translation tables where, when mapping the stack, it asks for page_size * page_size, so gets mapped as a 2MiB
   granuale instead of individual pages, even though the memory is backed by the page fault allocator, which expects to have single
   pages.

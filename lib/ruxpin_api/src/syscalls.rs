@@ -7,6 +7,7 @@ pub enum SyscallFunction {
     Exit,
     Fork,
     Exec,
+    WaitPid,
 
     Open,
     Close,
@@ -38,6 +39,11 @@ macro_rules! syscall_encode {
     ($syscall:ident, $i:ident, $name:ident: usize) => {
         $i += 1;
         $syscall.args[$i - 1] = $name;
+    };
+
+    ($syscall:ident, $i:ident, $name:ident: Pid) => {
+        $i += 1;
+        $syscall.args[$i - 1] = $name as usize;
     };
 
     ($syscall:ident, $i:ident, $name:ident: FileDesc) => {
@@ -72,6 +78,16 @@ macro_rules! syscall_encode {
         $syscall.args[$i - 2] = $name.as_bytes().as_ptr() as usize;
         $syscall.args[$i - 1] = $name.as_bytes().len();
     };
+
+    ($syscall:ident, $i:ident, $name:ident: &$type:ty) => {
+        $i += 1;
+        $syscall.args[$i - 1] = $name as *const $type as *const usize as usize;
+    };
+
+    ($syscall:ident, $i:ident, $name:ident: &mut $type:ty) => {
+        $i += 1;
+        $syscall.args[$i - 1] = $name as *mut $type as *mut usize as usize;
+    };
 }
 
 #[macro_export]
@@ -79,6 +95,11 @@ macro_rules! syscall_decode {
     ($syscall:ident, $i:ident, $name:ident: usize) => {
         $i += 1;
         let $name = $syscall.args[$i - 1];
+    };
+
+    ($syscall:ident, $i:ident, $name:ident: Pid) => {
+        $i += 1;
+        let $name = $syscall.args[$i - 1] as Pid;
     };
 
     ($syscall:ident, $i:ident, $name:ident: FileDesc) => {
@@ -115,6 +136,16 @@ macro_rules! syscall_decode {
         let $name = unsafe {
             core::str::from_utf8_unchecked(core::slice::from_raw_parts($syscall.args[$i - 2] as *const u8, $syscall.args[$i - 1]))
         };
+    };
+
+    ($syscall:ident, $i:ident, $name:ident: &$type:ty) => {
+        $i += 1;
+        let $name = unsafe { &*($syscall.args[$i - 1] as *const usize as *const $type) };
+    };
+
+    ($syscall:ident, $i:ident, $name:ident: &mut $type:ty) => {
+        $i += 1;
+        let $name = unsafe { &mut *($syscall.args[$i - 1] as *mut usize as *mut $type) };
     };
 }
 

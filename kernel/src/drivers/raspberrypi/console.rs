@@ -86,7 +86,7 @@ impl CharOperations for PL011Device {
                 buffer[i] = byte;
             } else {
                 if i == 0 {
-                    process::suspend_current();
+                    process::suspend_current_process();
                 }
                 break;
             }

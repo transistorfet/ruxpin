@@ -35,6 +35,19 @@ pub fn exec(path: &str) {
     execute_syscall(&mut syscall);
 }
 
+pub fn waitpid(pid: Pid, status: &mut usize, options: usize) -> Result<Pid, ApiError> {
+    let mut i = 0;
+    let mut syscall: SyscallRequest = Default::default();
+    syscall.function = SyscallFunction::WaitPid;
+    syscall_encode!(syscall, i, pid: Pid);
+    syscall_encode!(syscall, i, status: &usize);
+    syscall_encode!(syscall, i, options: usize);
+    execute_syscall(&mut syscall);
+    match syscall.error {
+        false => Ok(syscall.result as Pid),
+        true => Err(ApiError::SomethingWentWrong),
+    }
+}
 
 pub fn open(path: &str, flags: OpenFlags, access: FileAccess) -> Result<FileDesc, ApiError> {
     let mut i = 0;

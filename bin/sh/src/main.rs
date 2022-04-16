@@ -4,7 +4,7 @@
 extern crate ruxpin_app;
 
 use ruxpin_api::println;
-use ruxpin_api::api::{exit, fork, exec, open, close, read, write};
+use ruxpin_api::api::{exit, fork, exec, open, close, read, write, waitpid};
 use ruxpin_api::types::{FileDesc, OpenFlags, FileAccess, ApiError};
 
 
@@ -44,6 +44,8 @@ pub fn main() {
                 exec("/mnt/bin/testapp");
             } else {
                 println!("child pid is {}", pid);
+                let mut status = 0;
+                waitpid(pid, &status, 0).unwrap();
             }
         }
     }

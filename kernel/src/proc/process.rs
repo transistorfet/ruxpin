@@ -201,6 +201,8 @@ impl ProcessManager {
 
         let new_current = self.get_current_process();
         Context::switch_current_context(&mut new_current.lock().context);
+
+        self.restart_blocked_by_syscall(SyscallFunction::WaitPid);
     }
 
     fn page_fault(&mut self, far: u64) {
@@ -264,7 +266,7 @@ pub(crate) fn schedule() {
     }
 }
 
-pub(crate) fn suspend_current() {
+pub(crate) fn suspend_current_process() {
     PROCESS_MANAGER.try_lock().unwrap().suspend();
 }
 

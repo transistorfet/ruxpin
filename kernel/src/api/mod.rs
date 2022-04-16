@@ -1,5 +1,5 @@
 
-use ruxpin_api::types::{FileDesc, OpenFlags, FileAccess};
+use ruxpin_api::types::{Pid, FileDesc, OpenFlags, FileAccess};
 use ruxpin_api::syscall_decode;
 use ruxpin_api::syscalls::{SyscallRequest, SyscallFunction};
 
@@ -21,7 +21,7 @@ pub fn handle_syscall(syscall: &mut SyscallRequest) {
         },
 
         SyscallFunction::Fork => {
-            let result = syscall_fork(syscall.args[0]);
+            let result = syscall_fork();
             store_result(syscall, result.map(|ret| ret as usize));
         },
 
@@ -30,6 +30,15 @@ pub fn handle_syscall(syscall: &mut SyscallRequest) {
             syscall_decode!(syscall, i, path: &str);
             let result = syscall_exec(path);
             store_result(syscall, result.map(|_| 0));
+        },
+
+        SyscallFunction::WaitPid => {
+            let mut i = 0;
+            syscall_decode!(syscall, i, pid: Pid);
+            syscall_decode!(syscall, i, status: &mut usize);
+            syscall_decode!(syscall, i, options: usize);
+            let result = syscall_waitpid(pid, status, options);
+            store_result(syscall, result.map(|ret| ret as usize));
         },
 
         SyscallFunction::Open => {
