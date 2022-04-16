@@ -32,15 +32,6 @@ impl FileDescriptors {
         self.list.get(file_num.as_usize() as usize).map(|file| file.clone()).flatten().ok_or(KernelError::BadFileNumber)
     }
 
-    pub fn close_all(&mut self) {
-        for file in self.list.iter() {
-            if let Some(file) = file {
-                vfs::close(file.clone()).unwrap();
-            }
-        }
-        self.list.clear();
-    }
-
     pub fn open(&mut self, cwd: Option<Vnode>, path: &str, flags: OpenFlags, access: FileAccess, current_uid: UserID) -> Result<FileDesc, KernelError> {
         let file_num = self.find_first()?;
         let file = vfs::open(cwd, path, flags, access, current_uid)?;
@@ -55,24 +46,13 @@ impl FileDescriptors {
         Ok(())
     }
 
-    pub fn read(&mut self, file_num: FileDesc, buffer: &mut [u8]) -> Result<usize, KernelError> {
-        let file = self.get_file(file_num)?;
-        vfs::read(file, buffer)
-    }
-
-    pub fn write(&mut self, file_num: FileDesc, buffer: &[u8]) -> Result<usize, KernelError> {
-        let file = self.get_file(file_num)?;
-        vfs::write(file, buffer)
-    }
-
-    pub fn seek(&mut self, file_num: FileDesc, offset: usize, whence: Seek) -> Result<usize, KernelError> {
-        let file = self.get_file(file_num)?;
-        vfs::seek(file, offset, whence)
-    }
-
-    pub fn readdir(&mut self, file_num: FileDesc) -> Result<Option<DirEntry>, KernelError> {
-        let file = self.get_file(file_num)?;
-        vfs::readdir(file)
+    pub fn close_all(&mut self) {
+        for file in self.list.iter() {
+            if let Some(file) = file {
+                vfs::close(file.clone()).unwrap();
+            }
+        }
+        self.list.clear();
     }
 
     fn find_first(&mut self) -> Result<FileDesc, KernelError> {

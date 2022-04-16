@@ -1,6 +1,7 @@
 
 use ruxpin_api::types::{FileDesc, OpenFlags, FileAccess};
 
+use crate::fs::vfs;
 use crate::errors::KernelError;
 use crate::proc::process::get_current_process;
 
@@ -20,14 +21,12 @@ pub fn syscall_close(file: FileDesc) -> Result<(), KernelError> {
 }
 
 pub fn syscall_read(file: FileDesc, buffer: &mut [u8]) -> Result<usize, KernelError> {
-    let proc = get_current_process();
-    let mut locked_proc = proc.lock();
-    locked_proc.files.read(file, buffer)
+    let file = get_current_process().lock().files.get_file(file)?;
+    vfs::read(file, buffer)
 }
 
 pub fn syscall_write(file: FileDesc, buffer: &[u8]) -> Result<usize, KernelError> {
-    let proc = get_current_process();
-    let mut locked_proc = proc.lock();
-    locked_proc.files.write(file, buffer)
+    let file = get_current_process().lock().files.get_file(file)?;
+    vfs::write(file, buffer)
 }
 

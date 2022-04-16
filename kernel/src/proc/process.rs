@@ -9,7 +9,7 @@ use crate::api::handle_syscall;
 use crate::arch::Context;
 use crate::arch::types::VirtualAddress;
 use crate::fs::filedesc::FileDescriptors;
-use crate::misc::linkedlist::{UnownedLinkedList, UnownedLinkedListNode};
+use crate::misc::queue::{Queue, QueueNode, QueueNodeRef};
 use crate::mm::MemoryPermissions;
 use crate::mm::vmalloc::VirtualAddressSpace;
 use crate::sync::Spinlock;
@@ -26,15 +26,15 @@ pub struct ProcessRecord {
     pub context: Context,
 }
 
-pub type Process = Arc<Spinlock<ProcessRecord>>;
-pub struct Process2(Arc<Spinlock<UnownedLinkedListNode<ProcessRecord>>>);
+pub type Process = QueueNodeRef<ProcessRecord>;
+//pub struct Process2(Arc<Spinlock<UnownedLinkedListNode<ProcessRecord>>>);
 
 struct ProcessManager {
 // TODO should you make this Vec<UnownedLinkedListNode<Option<Process>>> so that you can close and reuse process entries to avoid changing their locations?
 // TODO the alternative actually would be to get rid of the Vec, but also create a new queue type that *does* own the entries
-    processes: Vec<UnownedLinkedListNode<Process>>,
-    scheduled: UnownedLinkedList<Process>,
-    blocked: UnownedLinkedList<Process>,
+    processes: Vec<QueueNodeRef<ProcessRecord>>,
+    scheduled: Queue<ProcessRecord>,
+    blocked: Queue<ProcessRecord>,
 }
 
 static NEXT_PID: Spinlock<Pid> = Spinlock::new(1);
@@ -55,15 +55,15 @@ impl ProcessManager {
     const fn new() -> Self {
         Self {
             processes: Vec::new(),
-            scheduled: UnownedLinkedList::new(),
-            blocked: UnownedLinkedList::new(),
+            scheduled: Queue::new(None),
+            blocked: Queue::new(None),
         }
     }
 
     pub fn create_process(&mut self) -> Process {
         let pid = next_pid();
 
-        self.processes.push(UnownedLinkedListNode::new(Arc::new(Spinlock::new(ProcessRecord {
+        self.processes.push(QueueNode::new(ProcessRecord {
             pid,
             current_uid: 0,
             space: VirtualAddressSpace::new_user_space(),
@@ -71,13 +71,11 @@ impl ProcessManager {
             syscall: Default::default(),
             restart_syscall: false,
             context: Default::default(),
-        }))));
+        }));
 
         let current = self.processes.len() - 1;
 
-        unsafe {
-            self.scheduled.insert_tail(self.processes[current].as_node_ptr());
-        }
+        self.scheduled.insert_tail(self.processes[current].clone());
 
         self.processes[current].clone()
     }
@@ -117,9 +115,7 @@ impl ProcessManager {
             panic!("no scheduled processes when looking for the current process");
         }
 
-        unsafe {
-            self.scheduled.get_head().unwrap().get().clone()
-        }
+        self.scheduled.get_head().unwrap().clone()
     }
 
     pub fn fork_current_process(&mut self) -> Process {
@@ -127,7 +123,7 @@ impl ProcessManager {
         let new_proc = self.create_process();
 
         {
-            let locked_current_proc = unsafe { current_proc.get() }.lock();
+            let locked_current_proc = current_proc.lock();
             let mut locked_new_proc = new_proc.lock();
             locked_new_proc.current_uid = locked_current_proc.current_uid;
             locked_new_proc.files = locked_current_proc.files.clone();
@@ -147,10 +143,8 @@ impl ProcessManager {
     fn schedule(&mut self) -> Process {
         let current = self.scheduled.get_head().unwrap();
 
-        unsafe {
-            self.scheduled.remove_node(current);
-            self.scheduled.insert_tail(current);
-        }
+        self.scheduled.remove_node(current.clone());
+        self.scheduled.insert_tail(current);
 
         let new_current = self.get_current_process();
         Context::switch_current_context(&mut new_current.lock().context);
@@ -160,12 +154,10 @@ impl ProcessManager {
 
     fn restart_blocked_by_syscall(&mut self, function: SyscallFunction) {
         for node in self.blocked.iter() {
-            if unsafe { node.get() }.lock().syscall.function == function {
-                unsafe {
-                    self.blocked.remove_node(node);
-                    self.scheduled.insert_head(node);
-                }
-                unsafe { node.get() }.lock().restart_syscall = true;
+            if node.lock().syscall.function == function {
+                self.blocked.remove_node(node.clone());
+                self.scheduled.insert_head(node.clone());
+                node.lock().restart_syscall = true;
             }
         }
     }
@@ -177,10 +169,8 @@ impl ProcessManager {
 
         let current = self.scheduled.get_head().unwrap();
 
-        unsafe {
-            self.scheduled.remove_node(current);
-            self.blocked.insert_head(current);
-        }
+        self.scheduled.remove_node(current.clone());
+        self.blocked.insert_head(current);
 
         let new_current = self.get_current_process();
         Context::switch_current_context(&mut new_current.lock().context);
@@ -188,13 +178,11 @@ impl ProcessManager {
 
     fn exit_current_process(&mut self, status: usize) {
         let current = self.scheduled.get_head().unwrap();
-        crate::printkln!("Exiting process {}", unsafe { current.get() }.lock().pid);
+        crate::printkln!("Exiting process {}", current.lock().pid);
 
         // TODO this is just junking the process record (it will never be removed but never be scheduled again)
         //      It shouldn't be removed here anyways, but it would be when the parent proc "wait()"s for it
-        unsafe {
-            self.scheduled.remove_node(current);
-        }
+        self.scheduled.remove_node(current);
 
         let new_current = self.get_current_process();
         Context::switch_current_context(&mut new_current.lock().context);

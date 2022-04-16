@@ -9,6 +9,7 @@ pub use self::strarray::StrArray;
 
 pub mod deviceio;
 
+pub mod queue;
 pub mod linkedlist;
 
 
