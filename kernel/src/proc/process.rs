@@ -9,7 +9,6 @@ use crate::api::handle_syscall;
 use crate::arch::Context;
 use crate::arch::types::VirtualAddress;
 use crate::fs::filedesc::FileDescriptors;
-use crate::fs::types::Vnode;
 use crate::misc::linkedlist::{UnownedLinkedList, UnownedLinkedListNode};
 use crate::mm::MemoryPermissions;
 use crate::mm::vmalloc::VirtualAddressSpace;
@@ -21,7 +20,6 @@ pub struct ProcessRecord {
     pub pid: Pid,
     pub current_uid: UserID,
     pub space: VirtualAddressSpace,
-    pub cwd: Option<Vnode>,
     pub files: FileDescriptors,
     pub syscall: SyscallRequest,
     pub restart_syscall: bool,
@@ -29,6 +27,7 @@ pub struct ProcessRecord {
 }
 
 pub type Process = Arc<Spinlock<ProcessRecord>>;
+pub struct Process2(Arc<Spinlock<UnownedLinkedListNode<ProcessRecord>>>);
 
 struct ProcessManager {
 // TODO should you make this Vec<UnownedLinkedListNode<Option<Process>>> so that you can close and reuse process entries to avoid changing their locations?
@@ -68,7 +67,6 @@ impl ProcessManager {
             pid,
             current_uid: 0,
             space: VirtualAddressSpace::new_user_space(),
-            cwd: None,
             files: FileDescriptors::new(),
             syscall: Default::default(),
             restart_syscall: false,
@@ -132,7 +130,6 @@ impl ProcessManager {
             let locked_current_proc = unsafe { current_proc.get() }.lock();
             let mut locked_new_proc = new_proc.lock();
             locked_new_proc.current_uid = locked_current_proc.current_uid;
-            locked_new_proc.cwd = locked_current_proc.cwd.clone();
             locked_new_proc.files = locked_current_proc.files.clone();
             locked_new_proc.space.copy_segments(&locked_current_proc.space);
             locked_new_proc.context = locked_current_proc.context.clone();

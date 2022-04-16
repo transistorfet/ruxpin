@@ -8,7 +8,7 @@ use crate::proc::process::get_current_process;
 pub fn syscall_open(path: &str, flags: OpenFlags, access: FileAccess) -> Result<FileDesc, KernelError> {
     let proc = get_current_process();
     let mut locked_proc = proc.lock();
-    let cwd = locked_proc.cwd.clone();
+    let cwd = locked_proc.files.get_cwd();
     let current_uid = locked_proc.current_uid;
     locked_proc.files.open(cwd, path, flags, access, current_uid)
 }

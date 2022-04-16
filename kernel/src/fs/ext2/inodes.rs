@@ -185,7 +185,7 @@ impl Ext2Mount {
         vnode.attrs.mtime = u32::from(data.mtime).into();
         vnode.attrs.ctime = u32::from(data.ctime).into();
 
-        crate::printkln!("loading inode {}: {:#?} {:#?}", inode_num, (*data), vnode.attrs);
+        //crate::printkln!("loading inode {}: {:#?} {:#?}", inode_num, (*data), vnode.attrs);
         Ok(())
     }
 
@@ -212,7 +212,7 @@ impl Ext2Mount {
         data.mtime = u32::from(vnode.attrs.mtime).into();
         data.ctime = u32::from(vnode.attrs.ctime).into();
 
-        crate::printkln!("storing inode {}: {:#?}", inode_num, (*data));
+        //crate::printkln!("storing inode {}: {:#?}", inode_num, (*data));
         Ok(())
     }
 }

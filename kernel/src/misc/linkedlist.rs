@@ -35,17 +35,7 @@ impl<T> UnownedLinkedList<T> {
     }
 
     pub unsafe fn insert_head(&mut self, node: UnownedLinkedListRef<T>) {
-        if node.next().is_some() || node.prev().is_some() {
-            panic!("attempting to re-add a node");
-        }
-
-        if self.head.is_some() {
-            self.head.unwrap().set_prev(Some(node));
-        } else {
-            self.tail = Some(node);
-        }
-        node.set_next(self.head);
-        self.head = Some(node);
+        self.insert_after(node, None);
     }
 
     pub unsafe fn insert_tail(&mut self, node: UnownedLinkedListRef<T>) {
@@ -53,6 +43,10 @@ impl<T> UnownedLinkedList<T> {
     }
 
     unsafe fn insert_after(&mut self, node: UnownedLinkedListRef<T>, after: Option<UnownedLinkedListRef<T>>) {
+        if node.next().is_some() || node.prev().is_some() {
+            panic!("attempting to re-add a node");
+        }
+
 	// If `after` is None then insert at the start of the list (ie. self.head)
 	let tail = if after.is_some() {
             after.unwrap().next()

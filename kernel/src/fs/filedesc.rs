@@ -11,71 +11,81 @@ use super::types::{File, Vnode, DirEntry};
 const MAX_OPEN_FILES: usize = 100;
 
 #[derive(Clone)]
-pub struct FileDescriptors(Vec<Option<File>>);
+pub struct FileDescriptors {
+    cwd: Option<Vnode>,
+    list: Vec<Option<File>>
+}
 
 impl FileDescriptors {
     pub fn new() -> Self {
-        Self(Vec::with_capacity(10))
+        Self {
+            cwd: None,
+            list: Vec::with_capacity(10)
+        }
     }
 
-    pub fn get(&self, file_num: FileDesc) -> Result<File, KernelError> {
-        self.0.get(file_num.as_usize() as usize).map(|file| file.clone()).flatten().ok_or(KernelError::BadFileNumber)
+    pub fn get_cwd(&self) -> Option<Vnode> {
+        self.cwd.clone()
+    }
+
+    pub fn get_file(&self, file_num: FileDesc) -> Result<File, KernelError> {
+        self.list.get(file_num.as_usize() as usize).map(|file| file.clone()).flatten().ok_or(KernelError::BadFileNumber)
     }
 
     pub fn close_all(&mut self) {
-        for file in self.0.iter() {
+        for file in self.list.iter() {
             if let Some(file) = file {
                 vfs::close(file.clone()).unwrap();
             }
         }
-        self.0.clear();
+        self.list.clear();
     }
 
     pub fn open(&mut self, cwd: Option<Vnode>, path: &str, flags: OpenFlags, access: FileAccess, current_uid: UserID) -> Result<FileDesc, KernelError> {
         let file_num = self.find_first()?;
         let file = vfs::open(cwd, path, flags, access, current_uid)?;
-        self.0[file_num.as_usize() as usize] = Some(file);
+        self.list[file_num.as_usize() as usize] = Some(file);
         Ok(file_num)
     }
 
     pub fn close(&mut self, file_num: FileDesc) -> Result<(), KernelError> {
-        let file = self.get(file_num)?;
+        let file = self.get_file(file_num)?;
         vfs::close(file)?;
-        self.0[file_num.as_usize() as usize] = None;
+        self.list[file_num.as_usize() as usize] = None;
         Ok(())
     }
 
     pub fn read(&mut self, file_num: FileDesc, buffer: &mut [u8]) -> Result<usize, KernelError> {
-        let file = self.get(file_num)?;
+        let file = self.get_file(file_num)?;
         vfs::read(file, buffer)
     }
 
     pub fn write(&mut self, file_num: FileDesc, buffer: &[u8]) -> Result<usize, KernelError> {
-        let file = self.get(file_num)?;
+        let file = self.get_file(file_num)?;
         vfs::write(file, buffer)
     }
 
     pub fn seek(&mut self, file_num: FileDesc, offset: usize, whence: Seek) -> Result<usize, KernelError> {
-        let file = self.get(file_num)?;
+        let file = self.get_file(file_num)?;
         vfs::seek(file, offset, whence)
     }
 
     pub fn readdir(&mut self, file_num: FileDesc) -> Result<Option<DirEntry>, KernelError> {
-        let file = self.get(file_num)?;
+        let file = self.get_file(file_num)?;
         vfs::readdir(file)
     }
 
     fn find_first(&mut self) -> Result<FileDesc, KernelError> {
         let mut i = 0;
-        while i < self.0.len() && self.0[i].is_some() {
+        while i < self.list.len() && self.list[i].is_some() {
             i += 1;
         }
 
-        if i == self.0.len() {
+        if i == self.list.len() {
             if i >= MAX_OPEN_FILES {
                 return Err(KernelError::TooManyFilesOpen);
             }
-            self.0.push(None);
+            self.list.push(None);
         }
 
         Ok(FileDesc(i))
