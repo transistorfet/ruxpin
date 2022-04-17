@@ -1,6 +1,8 @@
 #![no_std]
 #![no_main]
 
+use core::str;
+
 extern crate ruxpin_app;
 
 use ruxpin_api::{print, println};
@@ -25,6 +27,15 @@ fn read_input(data: &mut [u8]) -> Result<usize, ApiError> {
     }
 }
 
+fn get_next_word<'a>(input: &'a [u8]) -> (&'a [u8], &'a [u8]) {
+    for i in 0..input.len() {
+        if input[i] == ' ' as u8 || input[i] == '\n' as u8 || input[i] == '\r' as u8 {
+            return (&input[..i], &input[i + 1..]);
+        }
+    }
+    return (input, &input[input.len() - 1..]);
+}
+
 
 #[no_mangle]
 pub fn main() {
@@ -33,16 +44,23 @@ pub fn main() {
     let mut data = [0; 256];
     loop {
         let length = read_input(&mut data).unwrap();
+        let (first, remain) = get_next_word(&data);
+        let command = str::from_utf8(first).unwrap();
 
-        if &data[0..length] == b"exit\n" {
+        if command == "exit" {
             break;
         }
 
-        if &data[0..length] == b"run\n" {
-            println!("executing testapp");
+        if command != "" {
+            let mut fullpath = [0; 256];
+            (&mut fullpath[..5]).copy_from_slice(b"/bin/");
+            (&mut fullpath[5..5 + command.len()]).copy_from_slice(first);
+            let command = str::from_utf8(&fullpath[..5 + command.len()]).unwrap();
+
+            println!("executing {}", command);
             let pid = fork().unwrap();
             if pid == 0 {
-                exec("/bin/ls");
+                exec(command);
             } else {
                 println!("child pid is {}", pid);
                 let mut status = 0;

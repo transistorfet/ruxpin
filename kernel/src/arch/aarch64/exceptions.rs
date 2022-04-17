@@ -65,7 +65,7 @@ extern "C" fn handle_user_exception(_context: u64, elr: u64, esr: u64, far: u64,
         // Instruction or Data Abort from lower EL
         0b100000 | 0b100100 => {
             if esr & 0b111100 == 0b001000 {
-                printkln!("Instruction Abort caused by Access Flag (ie. load the data) at {:x}", far);
+                printkln!("Instruction or Data Abort caused by Access Flag at address {:x} (allocating new page)", far);
                 use crate::proc::process::page_fault_handler;
                 page_fault_handler(far);
             } else {
@@ -87,7 +87,7 @@ extern "C" fn handle_kernel_exception(_context: u64, elr: u64, esr: u64, far: u6
         // Instruction or Data Abort from lower EL
         0b100000 | 0b100100 | 0b100101 => {
             if esr & 0b111100 == 0b001000 {
-                printkln!("Instruction Abort caused by Access Flag (ie. load the data) at {:x}", far);
+                printkln!("Instruction or Data Abort caused by Access Flag at address {:x} (allocating new page)", far);
                 use crate::proc::process::page_fault_handler;
                 page_fault_handler(far);
             } else {
