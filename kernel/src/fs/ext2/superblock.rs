@@ -160,7 +160,6 @@ impl Ext2SuperBlock {
             printkln!("ext2: this filesystem has incompatible features than aren't supported: {:x}", incompat_features & !EXT2_INCOMPAT_SUPPORTED);
             return Err(KernelError::IncompatibleFeatures);
         }
-
         let inode_size = if u32::from(data.major_version) >= 1 { u16::from(data.extended.inode_size) as usize } else { 128 };
         let total_blocks = data.total_blocks.into();
         let blocks_per_group = u32::from(data.blocks_per_group) as usize;
@@ -188,6 +187,10 @@ impl Ext2SuperBlock {
             total_block_groups,
             groups: Vec::with_capacity(total_block_groups),
         };
+
+        printkln!("ext2: magic number {:x}, block size {}", superblock.magic, superblock.block_size);
+        printkln!("ext2: total blocks {}, total inodes {}, unallocated blocks: {}, unallocated inodes: {}", superblock.total_blocks, superblock.total_inodes, superblock.total_unalloc_blocks, superblock.total_unalloc_inodes);
+        printkln!("ext2: features compat: {:x}, ro: {:x}, incompat: {:x}", u32::from(data.extended.compat_features), u32::from(data.extended.ro_compat_features), u32::from(data.extended.incompat_features));
 
         Ok(superblock)
     }
@@ -348,7 +351,7 @@ impl Ext2SuperBlock {
                 self.groups[group].free_block_count -= 1;
                 self.total_unalloc_blocks -= 1;
 
-                crate::printkln!("allocating block {} in group {}", (group * self.blocks_per_group) + bit, group);
+                crate::printkln!("ext2: allocating block {} in group {}", (group * self.blocks_per_group) + bit, group);
                 return Ok(((group * self.blocks_per_group) + bit) as Ext2BlockNumber);
             }
 

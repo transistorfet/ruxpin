@@ -44,7 +44,7 @@ impl Ext2Vnode {
             let block_num = self.get_file_block_num(znum, GetFileBlockOp::Allocate)?;
             let buf = block::get_buf(device_id, block_num)?;
 
-            crate::printkln!("writing to block {}", block_num);
+            crate::printkln!("ext2: writing to block {}", block_num);
             let zlen = if block_size - zpos <= nbytes { block_size - zpos } else { nbytes };
             let subslice = &buffer[offset..offset + zlen];
             (&mut buf.lock_mut()[zpos..zpos + zlen]).copy_from_slice(subslice);

@@ -46,7 +46,7 @@ pub fn load_binary(proc: Process, path: &str) -> Result<(), KernelError> {
     for i in 0..header.e_phnum as usize {
         let segment: Elf64ProgramSegment = read_file_data_into_struct(file.clone())?;
 
-        printkln!("Segment {}: {:x} {:x} offset: {:x} v:{:x} p:{:x} size: {:x}", i, segment.p_type, segment.p_flags, segment.p_offset, segment.p_vaddr, segment.p_paddr, segment.p_filesz);
+        printkln!("program segment {}: {:x} {:x} offset: {:x} v:{:x} p:{:x} size: {:x}", i, segment.p_type, segment.p_flags, segment.p_offset, segment.p_vaddr, segment.p_paddr, segment.p_filesz);
         segments[i] = Some(segment);
     }
 

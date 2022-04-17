@@ -28,6 +28,7 @@ pub fn register_filesystem(fs: Arc<Spinlock<dyn Filesystem>>) -> Result<(), Kern
 }
 
 pub fn mount(cwd: Option<Vnode>, path: &str, fstype: &str, device_id: Option<DeviceID>, current_uid: UserID) -> Result<(), KernelError> {
+    crate::printkln!("fs: mounting {} at {}, device {:?}", fstype, path, device_id);
     if current_uid != 0 {
         return Err(KernelError::OperationNotPermitted);
     }

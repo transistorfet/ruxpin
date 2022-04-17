@@ -1,5 +1,6 @@
 
 use crate::irqs;
+use crate::printkln;
 use crate::arch::types::KernelVirtualAddress;
 use crate::misc::deviceio::DeviceRegisters;
 
@@ -15,6 +16,8 @@ pub struct SystemTimer;
 
 impl SystemTimer {
     pub fn init(irq: usize) {
+        printkln!("timer: initializing generic arm timer to trigger context switch");
+
         irqs::register_irq(irq ,SystemTimer::handle_irq).unwrap();
         irqs::enable_irq(irq);
 
@@ -34,6 +37,7 @@ impl SystemTimer {
 
     fn handle_irq() {
         SystemTimer::reset();
+        //process::schedule();
     }
 }
 

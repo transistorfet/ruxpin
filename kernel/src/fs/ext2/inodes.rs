@@ -129,7 +129,7 @@ impl Ext2Mount {
         let mut vnode = Ext2Vnode::new(mount_ptr, access, uid, gid);
         vnode.attrs.inode = inode_num;
         self.store_inode(&vnode, inode_num)?;
-        crate::printkln!("allocating inode {}: {:#?}", inode_num, vnode.attrs);
+        crate::printkln!("ext2: allocating inode {}", inode_num);
 
         // Insert the node into the cache
         let arc_vnode = self.vnode_cache.insert(inode_num, || {
@@ -142,7 +142,7 @@ impl Ext2Mount {
     }
 
     pub(super) fn free_inode(&mut self, inode_num: Ext2InodeNum) -> Result<(), KernelError> {
-        crate::printkln!("freeing inode {}", inode_num);
+        crate::printkln!("ext2: freeing inode {}", inode_num);
         self.superblock.free_inode(inode_num)?;
         Ok(())
     }

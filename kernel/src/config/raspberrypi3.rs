@@ -67,7 +67,9 @@ pub fn register_devices() -> Result<(), KernelError> {
 }
 
 fn startup_tests() -> Result<(), KernelError> {
-    // TODO this is a temporary test
+    printkln!("\nRunning some hardcoded tests before completing the startup\n");
+
+    printkln!("Mount the tmpfs filesystem (simple in-memory file system)");
     vfs::open(None, "/tmp", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
     vfs::mount(None, "/tmp", "tmpfs", None, 0).unwrap();
 
@@ -108,6 +110,7 @@ fn startup_tests() -> Result<(), KernelError> {
 
 
 
+    printkln!("\nOpening the testapp binary through the vfs interface and reading some data");
     let file = vfs::open(None, "/bin/testapp", OpenFlags::ReadOnly, FileAccess::DefaultFile, 0).unwrap();
     let mut data = [0; 1024];
     loop {
@@ -122,16 +125,19 @@ fn startup_tests() -> Result<(), KernelError> {
 
 
 
+    printkln!("\nOpening a new file and writing some data into it");
     let file = vfs::open(None, "/test2", OpenFlags::ReadWrite.plus(OpenFlags::Create), FileAccess::DefaultFile, 0).unwrap();
     vfs::write(file.clone(), b"this is some test data").unwrap();
     //vfs::close(file)?;
 
+    printkln!("\nReading back the data written previously");
     let file = vfs::open(None, "/test", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0).unwrap();
     let mut data = [0; 128];
     vfs::read(file.clone(), &mut data).unwrap();
     unsafe { crate::printk::printk_dump(&data as *const u8, 128); }
     //vfs::close(file)?;
 
+    printkln!("\nPrinting the contents of the root directory (ext2 mount)");
     let file = vfs::open(None, "/", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0).unwrap();
     while let Some(dirent) = vfs::readdir(file.clone()).unwrap() {
         printkln!("reading dir {} with inode {}", dirent.as_str(), dirent.inode);

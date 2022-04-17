@@ -51,7 +51,7 @@ impl Filesystem for Ext2Filesystem {
         block::open(device_id, OpenFlags::ReadOnly)?;
 
         let mount = Ext2Mount::create_mount(parent, device_id)?;
-        printkln!("superblock: {:#?}", mount.superblock);
+        //printkln!("superblock: {:#?}", mount.superblock);
 
         Ok(Arc::new(Spinlock::new(mount)))
     }
@@ -86,9 +86,8 @@ impl VnodeOperations for Ext2Vnode {
         let mut dirent = DirEntry::new_empty();
         while position < self.attrs.size {
             position += self.read_next_dirent_from_vnode(&mut dirent, position)?;
-            printkln!("found {:?} at inode {}", dirent.as_str(), dirent.inode);
             if dirent.as_str() == filename {
-                printkln!("a winner: inode {}", dirent.inode);
+                crate::printkln!("ext2: looking for {:?}, found inode {}", filename, dirent.inode); 
                 return self.get_inode(dirent.inode);
             }
         }

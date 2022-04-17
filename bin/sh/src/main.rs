@@ -3,21 +3,22 @@
 
 extern crate ruxpin_app;
 
-use ruxpin_api::println;
+use ruxpin_api::{print, println};
 use ruxpin_api::api::{exit, fork, exec, open, close, read, write, waitpid};
 use ruxpin_api::types::{FileDesc, OpenFlags, FileAccess, ApiError};
 
 
 fn read_input(data: &mut [u8]) -> Result<usize, ApiError> {
     let mut i = 0;
+    print!("% ");
     loop {
         let nbytes = read(FileDesc(0), &mut data[i..])?;
         if nbytes > 0 {
+            write(FileDesc(0), &data[i..i + nbytes])?;
             i += nbytes;
             if data[i - 1] == '\r' as u8 {
                 data[i - 1] = '\n' as u8;
-                write(FileDesc(0), b"read in ")?;
-                write(FileDesc(0), &data[0..i])?;
+                println!("");
                 return Ok(i);
             }
         }
@@ -27,7 +28,7 @@ fn read_input(data: &mut [u8]) -> Result<usize, ApiError> {
 
 #[no_mangle]
 pub fn main() {
-    println!("Starting shell...");
+    println!("\nStarting shell...");
 
     let mut data = [0; 256];
     loop {

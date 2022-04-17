@@ -1,4 +1,5 @@
 
+use crate::printkln;
 use crate::arch::types::KernelVirtualAddress;
 use crate::misc::deviceio::DeviceRegisters;
 
@@ -22,6 +23,8 @@ pub struct GenericInterruptController {
 
 impl GenericInterruptController {
     pub fn new() -> Self {
+        printkln!("interrupts: initializing generic arm interrupt controller");
+
         let gic = Self {
             registers: DeviceRegisters::new(KernelVirtualAddress::new(0x3F00_B200)),
             iter: None,
