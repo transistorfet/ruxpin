@@ -1,5 +1,5 @@
 
-use ruxpin_api::types::{FileDesc, OpenFlags, FileAccess};
+use ruxpin_api::types::{FileDesc, OpenFlags, FileAccess, DirEntry};
 
 use crate::fs::vfs;
 use crate::errors::KernelError;
@@ -28,5 +28,16 @@ pub fn syscall_read(file: FileDesc, buffer: &mut [u8]) -> Result<usize, KernelEr
 pub fn syscall_write(file: FileDesc, buffer: &[u8]) -> Result<usize, KernelError> {
     let file = get_current_process().lock().files.get_file(file)?;
     vfs::write(file, buffer)
+}
+
+pub fn syscall_readdir(file: FileDesc, dirent: &mut DirEntry) -> Result<bool, KernelError> {
+    let file = get_current_process().lock().files.get_file(file)?;
+    match vfs::readdir(file)? {
+        Some(result) => {
+            *dirent = result;
+            Ok(true)
+        },
+        None => Ok(false),
+    }
 }
 

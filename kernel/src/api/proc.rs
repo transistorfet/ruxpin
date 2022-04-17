@@ -7,7 +7,7 @@ use crate::proc::process::{get_current_process, fork_current_process, exit_curre
 use crate::proc::binaries::elf::loader;
 
 
-pub fn syscall_exit(status: usize) -> Result<(), KernelError> {
+pub fn syscall_exit(status: isize) -> Result<(), KernelError> {
     exit_current_process(status);
     Ok(())
 }

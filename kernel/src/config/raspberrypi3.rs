@@ -128,7 +128,7 @@ pub fn register_devices() -> Result<(), KernelError> {
 
     let file = vfs::open(None, "/mnt", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0)?;
     while let Some(dirent) = vfs::readdir(file.clone())? {
-        printkln!("reading dir {} with inode {}", dirent.name.as_str(), dirent.inode);
+        printkln!("reading dir {} with inode {}", dirent.as_str(), dirent.inode);
     }
 
     /*

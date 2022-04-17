@@ -1,13 +1,12 @@
 
 use core::str;
 
-use ruxpin_api::types::FileAccess;
+use ruxpin_api::types::{FileAccess, DirEntry};
 
 use crate::block;
 use crate::misc::align_up;
 use crate::block::BlockNum;
 use crate::errors::KernelError;
-use crate::fs::types::DirEntry;
 use crate::misc::memory::{cast_to_ref, cast_to_ref_mut};
 use crate::misc::byteorder::{leu16, leu32};
 
@@ -59,10 +58,7 @@ impl Ext2Vnode {
 
         // Copy data into the directory entry pointer we were given
         dirent.inode = u32::from(entry_on_disk.inode);
-        dirent.name.as_mut()[..name_len].copy_from_slice(&locked_buf[(offset + 8)..(offset + 8 + name_len)]);
-        unsafe {
-            dirent.name.set_len(entry_on_disk.name_len as usize);
-        }
+        dirent.copy_into(&locked_buf[(offset + 8)..(offset + 8 + name_len)]);
 
         // return the length of the entry (which added to the position we were given gives the next entry)
         Ok(entry_len)

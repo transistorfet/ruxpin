@@ -1,5 +1,5 @@
 
-use ruxpin_api::types::{Pid, FileDesc, OpenFlags, FileAccess};
+use ruxpin_api::types::{Pid, FileDesc, OpenFlags, FileAccess, DirEntry};
 use ruxpin_api::syscall_decode;
 use ruxpin_api::syscalls::{SyscallRequest, SyscallFunction};
 
@@ -16,7 +16,9 @@ pub fn handle_syscall(syscall: &mut SyscallRequest) {
 
     match syscall.function {
         SyscallFunction::Exit => {
-            let result = syscall_exit(syscall.args[0]);
+            let mut i = 0;
+            syscall_decode!(syscall, i, status: isize);
+            let result = syscall_exit(status);
             store_result(syscall, result.map(|_| 0));
         },
 
@@ -68,6 +70,13 @@ pub fn handle_syscall(syscall: &mut SyscallRequest) {
             syscall_decode!(syscall, i, buffer: &[u8]);
             let result = syscall_write(file, buffer);
             store_result(syscall, result);
+        },
+        SyscallFunction::ReadDir => {
+            let mut i = 0;
+            syscall_decode!(syscall, i, file: FileDesc);
+            syscall_decode!(syscall, i, dirent: &mut DirEntry);
+            let result = syscall_readdir(file, dirent);
+            store_result(syscall, result.map(|r| r as usize));
         },
         _ => panic!("syscall: invalid function number: {}", syscall.function as usize),
     }

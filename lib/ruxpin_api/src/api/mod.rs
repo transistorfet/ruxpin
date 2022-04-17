@@ -4,17 +4,19 @@ use core::fmt::Write;
 
 use crate::syscall_encode;
 use crate::arch::execute_syscall;
-use crate::types::{Pid, FileDesc, ApiError, OpenFlags, FileAccess};
+use crate::types::{Pid, FileDesc, ApiError, OpenFlags, FileAccess, DirEntry};
 use crate::syscalls::{SyscallRequest, SyscallFunction};
 
 
 
-pub fn exit(status: usize) {
+pub fn exit(status: isize) -> ! {
     let mut i = 0;
     let mut syscall: SyscallRequest = Default::default();
-    syscall_encode!(syscall, i, status: usize);
+    syscall_encode!(syscall, i, status: isize);
     syscall.function = SyscallFunction::Exit;
     execute_syscall(&mut syscall);
+
+    unsafe { core::hint::unreachable_unchecked(); }
 }
 
 pub fn fork() -> Result<Pid, ApiError> {
@@ -100,6 +102,21 @@ pub fn write(file: FileDesc, buffer: &[u8]) -> Result<usize, ApiError> {
         true => Err(ApiError::SomethingWentWrong),
     }
 }
+
+pub fn readdir(file: FileDesc, dirent: &mut DirEntry) -> Result<bool, ApiError> {
+    let mut i = 0;
+    let mut syscall: SyscallRequest = Default::default();
+    syscall_encode!(syscall, i, file: FileDesc);
+    syscall_encode!(syscall, i, dirent: &mut DirEntry);
+    syscall.function = SyscallFunction::Read;
+    execute_syscall(&mut syscall);
+    match syscall.error {
+        false => Ok(syscall.result != 0),
+        true => Err(ApiError::SomethingWentWrong),
+    }
+}
+
+
 
 
 impl Write for FileDesc {

@@ -170,6 +170,42 @@ impl FileDesc {
     }
 }
 
+pub struct DirEntry {
+    pub inode: InodeNum,
+    pub name_len: u8,
+    pub name: [u8; 256],
+}
+
+impl DirEntry {
+    pub fn new_empty() -> Self {
+        Self {
+            inode: 0,
+            name_len: 0,
+            name: [0; 256],
+        }
+    }
+
+    pub fn new(inode: InodeNum, name: &[u8]) -> Self {
+        let mut entry = Self::new_empty();
+        entry.inode = inode;
+        entry.copy_into(name);
+        entry
+    }
+
+    pub fn copy_into(&mut self, source: &[u8]) {
+        let name_len = if source.len() < 256 { source.len() } else { 256 };
+        self.name[..name_len].copy_from_slice(&source[..name_len]);
+        self.name_len = name_len as u8;
+    }
+
+    pub fn as_str(&self) -> &str {
+        unsafe {
+            core::str::from_utf8_unchecked(&self.name[..self.name_len as usize])
+        }
+    }
+}
+
+
 #[derive(Copy, Clone, Debug)]
 pub enum ApiError {
     SomethingWentWrong,

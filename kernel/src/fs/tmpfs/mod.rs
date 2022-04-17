@@ -2,13 +2,13 @@
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 
-use ruxpin_api::types::{OpenFlags, FileAccess, Seek, UserID, GroupID, DeviceID};
+use ruxpin_api::types::{OpenFlags, FileAccess, Seek, UserID, GroupID, DeviceID, DirEntry};
 
 use crate::sync::Spinlock;
 use crate::misc::StrArray;
 use crate::errors::KernelError;
 
-use super::types::{Filesystem, Mount, MountOperations, Vnode, VnodeOperations, FileAttributes, FilePointer, DirEntry};
+use super::types::{Filesystem, Mount, MountOperations, Vnode, VnodeOperations, FileAttributes, FilePointer};
 
 
 const TMPFS_MAX_FILENAME: usize = 32;
@@ -138,10 +138,7 @@ impl VnodeOperations for TmpVnodeDirectory {
             return Ok(None);
         }
 
-        let result = DirEntry {
-            inode: 0,
-            name: self.contents[file.position].name.as_str().try_into()?,
-        };
+        let result = DirEntry::new(0, self.contents[file.position].name.as_str().as_bytes());
 
         file.position += 1;
 

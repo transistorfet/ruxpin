@@ -17,7 +17,7 @@ use crate::sync::Spinlock;
 pub struct ProcessRecord {
     // TODO I don't like that these are all pub... I might need to either isolate this more or change how things interact with processes
     pub pid: Pid,
-    pub exit_status: Option<usize>,
+    pub exit_status: Option<isize>,
     pub current_uid: UserID,
     pub space: VirtualAddressSpace,
     pub files: FileDescriptors,
@@ -154,7 +154,7 @@ impl ProcessManager {
         self.set_current_context();
     }
 
-    fn exit_current_process(&mut self, status: usize) {
+    fn exit_current_process(&mut self, status: isize) {
         let current = self.get_current_process();
 
         self.scheduled.remove_node(current.clone());
@@ -231,7 +231,7 @@ pub fn fork_current_process() -> Process {
     PROCESS_MANAGER.try_lock().unwrap().fork_current_process()
 }
 
-pub fn exit_current_process(status: usize) {
+pub fn exit_current_process(status: isize) {
     PROCESS_MANAGER.try_lock().unwrap().exit_current_process(status)
 }
 

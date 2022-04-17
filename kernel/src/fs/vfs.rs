@@ -2,13 +2,13 @@
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 
-use ruxpin_api::types::{OpenFlags, FileAccess, Seek, UserID, DeviceID};
+use ruxpin_api::types::{OpenFlags, FileAccess, Seek, UserID, DeviceID, DirEntry};
 
 use crate::printkln;
 use crate::sync::Spinlock;
 use crate::errors::KernelError;
 
-use super::types::{Filesystem, Mount, Vnode, File, FilePointer, DirEntry, FileAttributes};
+use super::types::{Filesystem, Mount, Vnode, File, FilePointer, FileAttributes};
 
 
 static FILESYSTEMS: Spinlock<Vec<Arc<Spinlock<dyn Filesystem>>>> = Spinlock::new(Vec::new());

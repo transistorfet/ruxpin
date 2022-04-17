@@ -1,17 +1,11 @@
 
 use alloc::sync::Arc;
 
-use ruxpin_api::types::{OpenFlags, FileAccess, Seek, UserID, GroupID, InodeNum, DeviceID, Timestamp};
+use ruxpin_api::types::{OpenFlags, FileAccess, Seek, UserID, GroupID, InodeNum, DeviceID, Timestamp, DirEntry};
 
 use crate::sync::Spinlock;
 use crate::misc::StrArray;
 use crate::errors::KernelError;
-
-
-pub struct DirEntry {
-    pub inode: InodeNum,
-    pub name: StrArray<256>,
-}
 
 
 pub trait Filesystem: Sync + Send {
@@ -167,15 +161,6 @@ impl Default for FileAttributes {
             atime: Timestamp(0),
             ctime: Timestamp(0),
             mtime: Timestamp(0),
-        }
-    }
-}
-
-impl DirEntry {
-    pub fn new() -> Self {
-        Self {
-            inode: 0,
-            name: StrArray::new(),
         }
     }
 }

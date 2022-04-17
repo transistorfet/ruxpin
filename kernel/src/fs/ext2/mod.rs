@@ -1,14 +1,14 @@
 
 use alloc::sync::Arc;
 
-use ruxpin_api::types::{OpenFlags, FileAccess, Seek, DeviceID, UserID, GroupID};
+use ruxpin_api::types::{OpenFlags, FileAccess, Seek, DeviceID, UserID, GroupID, DirEntry};
 
 use crate::block;
 use crate::printkln;
 use crate::sync::Spinlock;
 use crate::errors::KernelError;
 
-use super::types::{Filesystem, Mount, Vnode, VnodeOperations, FileAttributes, FilePointer, DirEntry};
+use super::types::{Filesystem, Mount, Vnode, VnodeOperations, FileAttributes, FilePointer};
 
 mod blocks;
 mod directories;
@@ -83,11 +83,11 @@ impl VnodeOperations for Ext2Vnode {
         }
 
         let mut position = 0;
-        let mut dirent = DirEntry::new();
+        let mut dirent = DirEntry::new_empty();
         while position < self.attrs.size {
             position += self.read_next_dirent_from_vnode(&mut dirent, position)?;
-            printkln!("found {:?} at inode {}", dirent.name.as_str(), dirent.inode);
-            if dirent.name.as_str() == filename {
+            printkln!("found {:?} at inode {}", dirent.as_str(), dirent.inode);
+            if dirent.as_str() == filename {
                 printkln!("a winner: inode {}", dirent.inode);
                 return self.get_inode(dirent.inode);
             }
@@ -190,7 +190,7 @@ impl VnodeOperations for Ext2Vnode {
         if file.position >= self.attrs.size {
             Ok(None)
         } else {
-            let mut dirent = DirEntry::new();
+            let mut dirent = DirEntry::new_empty();
             let offset = self.read_next_dirent_from_vnode(&mut dirent, file.position)?;
 
             file.position += offset;

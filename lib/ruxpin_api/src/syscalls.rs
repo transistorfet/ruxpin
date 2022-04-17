@@ -13,6 +13,7 @@ pub enum SyscallFunction {
     Close,
     Read,
     Write,
+    ReadDir,
 }
 
 #[derive(Clone, Debug)]
@@ -39,6 +40,11 @@ macro_rules! syscall_encode {
     ($syscall:ident, $i:ident, $name:ident: usize) => {
         $i += 1;
         $syscall.args[$i - 1] = $name;
+    };
+
+    ($syscall:ident, $i:ident, $name:ident: isize) => {
+        $i += 1;
+        $syscall.args[$i - 1] = $name as usize;
     };
 
     ($syscall:ident, $i:ident, $name:ident: Pid) => {
@@ -95,6 +101,11 @@ macro_rules! syscall_decode {
     ($syscall:ident, $i:ident, $name:ident: usize) => {
         $i += 1;
         let $name = $syscall.args[$i - 1];
+    };
+
+    ($syscall:ident, $i:ident, $name:ident: isize) => {
+        $i += 1;
+        let $name = $syscall.args[$i - 1] as isize;
     };
 
     ($syscall:ident, $i:ident, $name:ident: Pid) => {
