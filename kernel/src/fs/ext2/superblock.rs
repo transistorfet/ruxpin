@@ -308,7 +308,7 @@ impl Ext2SuperBlock {
     pub(super) fn check_inode_is_allocated(&self, inode_num: Ext2InodeNum) -> Result<(), KernelError> {
         let (group, group_inode) = self.get_inode_group_and_offset(inode_num)?;
         let buf = block::get_buf(self.device_id, self.groups[group].inode_bitmap)?;
-        let locked_buf = &mut *buf.lock_mut();
+        let locked_buf = &*buf.lock();
 
         if locked_buf[group_inode as usize / 8] & (1 << (group_inode % 8)) != 0 {
             Ok(())
@@ -351,8 +351,11 @@ impl Ext2SuperBlock {
                 self.groups[group].free_block_count -= 1;
                 self.total_unalloc_blocks -= 1;
 
-                crate::printkln!("ext2: allocating block {} in group {}", (group * self.blocks_per_group) + bit, group);
-                return Ok(((group * self.blocks_per_group) + bit) as Ext2BlockNumber);
+                let block_num = ((group * self.blocks_per_group) + bit) as Ext2BlockNumber;
+                self.zero_block(block_num)?;
+
+                crate::printkln!("ext2: allocating block {} in group {}", block_num, group);
+                return Ok(block_num);
             }
 
             group += 1;
@@ -385,6 +388,15 @@ impl Ext2SuperBlock {
             return Err(KernelError::InvalidInode);
         }
         Ok((group, group_block))
+    }
+
+    fn zero_block(&self, block_num: Ext2BlockNumber) -> Result<(), KernelError> {
+        let buf = block::get_buf(self.device_id, block_num as BlockNum)?;
+        let locked_buf = &mut *buf.lock_mut();
+        for i in 0..locked_buf.len() {
+            locked_buf[i] = 0;
+        }
+        Ok(())
     }
 }
 

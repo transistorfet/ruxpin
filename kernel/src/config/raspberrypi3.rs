@@ -67,25 +67,26 @@ pub fn register_devices() -> Result<(), KernelError> {
 }
 
 fn startup_tests() -> Result<(), KernelError> {
-    printkln!("\nRunning some hardcoded tests before completing the startup\n");
+    printkln!("\nRunning some hardcoded tests before completing the startup");
 
-    printkln!("Mount the tmpfs filesystem (simple in-memory file system)");
+    printkln!("\nMounting the tmpfs filesystem (simple in-memory file system)");
     vfs::open(None, "/tmp", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
     vfs::mount(None, "/tmp", "tmpfs", None, 0).unwrap();
 
-/*
-    vfs::open(None, "test", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
-    let file = vfs::open(None, "test/file.txt", OpenFlags::Create, FileAccess::DefaultFile, 0).unwrap();
+    printkln!("\nCreating a directory and a file inside of it");
+    vfs::open(None, "testdir", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
+    let file = vfs::open(None, "testdir/file.txt", OpenFlags::Create, FileAccess::DefaultFile, 0).unwrap();
     vfs::write(file.clone(), b"This is a test").unwrap();
     vfs::seek(file.clone(), 0, Seek::FromStart).unwrap();
     let mut buffer = [0; 100];
     let n = vfs::read(file.clone(), &mut buffer).unwrap();
-    crate::printkln!("Read file {}: {}", n, core::str::from_utf8(&buffer).unwrap());
+    printkln!("Read file {}: {}", n, core::str::from_utf8(&buffer).unwrap());
 
+
+    printkln!("\nOpening the console device file and writing to it");
     let file = vfs::open(None, "/dev/console0", OpenFlags::ReadOnly, FileAccess::DefaultFile, 0).unwrap();
     vfs::write(file.clone(), b"the device file can write\n").unwrap();
     //vfs::close(file).unwrap();
-*/
 
     /*
     let device_id = DeviceID(0, 0);
@@ -131,7 +132,7 @@ fn startup_tests() -> Result<(), KernelError> {
     //vfs::close(file)?;
 
     printkln!("\nReading back the data written previously");
-    let file = vfs::open(None, "/test", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0).unwrap();
+    let file = vfs::open(None, "/test2", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0).unwrap();
     let mut data = [0; 128];
     vfs::read(file.clone(), &mut data).unwrap();
     unsafe { crate::printk::printk_dump(&data as *const u8, 128); }
@@ -142,6 +143,16 @@ fn startup_tests() -> Result<(), KernelError> {
     while let Some(dirent) = vfs::readdir(file.clone()).unwrap() {
         printkln!("reading dir {} with inode {}", dirent.as_str(), dirent.inode);
     }
+
+    /*
+    printkln!("\nOpening a new file and writing a whole bunch of data into it");
+    let file = vfs::open(None, "/test3", OpenFlags::ReadWrite.plus(OpenFlags::Create), FileAccess::DefaultFile, 0).unwrap();
+    let data = [0; 4096];
+    for _ in 0..20 {
+        vfs::write(file.clone(), &data).unwrap();
+    }
+    //vfs::close(file)?;
+    */
 
     /*
     use crate::misc::cache::Cache;

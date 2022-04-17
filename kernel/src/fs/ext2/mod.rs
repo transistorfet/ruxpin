@@ -85,7 +85,11 @@ impl VnodeOperations for Ext2Vnode {
         let mut position = 0;
         let mut dirent = DirEntry::new_empty();
         while position < self.attrs.size {
-            position += self.read_next_dirent_from_vnode(&mut dirent, position)?;
+            let nbytes = match self.read_next_dirent_from_vnode(&mut dirent, position)? {
+                None => { break; },
+                Some(nbtyes) => nbtyes,
+            };
+            position += nbytes;
             if dirent.as_str() == filename {
                 crate::printkln!("ext2: looking for {:?}, found inode {}", filename, dirent.inode); 
                 return self.get_inode(dirent.inode);
@@ -190,10 +194,13 @@ impl VnodeOperations for Ext2Vnode {
             Ok(None)
         } else {
             let mut dirent = DirEntry::new_empty();
-            let offset = self.read_next_dirent_from_vnode(&mut dirent, file.position)?;
-
-            file.position += offset;
-            Ok(Some(dirent))
+            match self.read_next_dirent_from_vnode(&mut dirent, file.position)? {
+                None => Ok(None),
+                Some(offset) => {
+                    file.position += offset;
+                    Ok(Some(dirent))
+                },
+            }
         }
     }
 }

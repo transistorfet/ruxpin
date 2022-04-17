@@ -33,7 +33,7 @@ struct Ext2DirEntryHeader {
 }
 
 impl Ext2Vnode {
-    pub(super) fn read_next_dirent_from_vnode(&mut self, dirent: &mut DirEntry, position: usize) -> Result<usize, KernelError> {
+    pub(super) fn read_next_dirent_from_vnode(&mut self, dirent: &mut DirEntry, position: usize) -> Result<Option<usize>, KernelError> {
         let block_size = self.get_block_size();
         let device_id = self.get_device_id();
 
@@ -43,7 +43,10 @@ impl Ext2Vnode {
             return Err(KernelError::FileNotFound);
         }
 
-        let block_num = self.get_file_block_num(znum, GetFileBlockOp::Lookup)?;
+        let block_num = match self.get_file_block_num(znum, GetFileBlockOp::Lookup)? {
+            None => { return Ok(None); },
+            Some(num) => num,
+        };
         let buf = block::get_buf(device_id, block_num)?;
         let locked_buf = &*buf.lock();
 
@@ -61,7 +64,7 @@ impl Ext2Vnode {
         dirent.copy_into(&locked_buf[(offset + 8)..(offset + 8 + name_len)]);
 
         // return the length of the entry (which added to the position we were given gives the next entry)
-        Ok(entry_len)
+        Ok(Some(entry_len))
     }
 
     pub(super) fn add_directory_to_vnode(&mut self, access: FileAccess, filename: &str, inode: Ext2InodeNum) -> Result<(), KernelError> {
@@ -104,7 +107,10 @@ impl Ext2Vnode {
 
         let mut znum = 0;
         while znum * block_size <= self.attrs.size {
-            let block_num = self.get_file_block_num(znum, GetFileBlockOp::Lookup)?;
+            let block_num = match self.get_file_block_num(znum, GetFileBlockOp::Lookup)? {
+                None => { break; },
+                Some(num) => num,
+            };
             let buf = block::get_buf(device_id, block_num)?;
             let locked_buf = &*buf.lock();
 
@@ -128,7 +134,7 @@ impl Ext2Vnode {
         }
 
         // No existing entries can be split, so we add a new block
-        let block_num = self.get_file_block_num(znum, GetFileBlockOp::Allocate)?;
+        let block_num = self.get_file_block_num(znum, GetFileBlockOp::Allocate)?.unwrap();
         let buf = block::get_buf(device_id, block_num)?;
         let locked_buf = &mut *buf.lock_mut();
 

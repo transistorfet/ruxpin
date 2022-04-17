@@ -6,7 +6,7 @@ use ruxpin_api::types::DeviceID;
 use crate::block;
 use crate::block::BlockNum;
 use crate::errors::KernelError;
-use crate::misc::memory::cast_to_slice;
+use crate::misc::memory::{cast_to_slice, cast_to_slice_mut};
 
 use super::Ext2InodeNum;
 use super::Ext2BlockNumber;
@@ -21,45 +21,72 @@ pub(super) enum GetFileBlockOp {
 }
 
 impl Ext2Vnode {
-    pub fn get_file_block_num(&mut self, linear_block_num: usize, op: GetFileBlockOp) -> Result<BlockNum, KernelError> {
-        if linear_block_num < EXT2_INODE_DIRECT_BLOCKS {
-            if op == GetFileBlockOp::Allocate && self.blocks[linear_block_num] == 0 {
-                self.blocks[linear_block_num] = self.get_mount().alloc_block(self.attrs.inode as Ext2InodeNum)?;
-            }
-            Ok(self.blocks[linear_block_num])
+    pub fn get_file_block_num(&mut self, linear_block_num: usize, op: GetFileBlockOp) -> Result<Option<BlockNum>, KernelError> {
+        let tiers = self.get_number_of_tiers(linear_block_num)?;
+        let index = if linear_block_num < EXT2_INODE_DIRECT_BLOCKS {
+            linear_block_num
         } else {
-            let remaining_offset = linear_block_num - EXT2_INODE_DIRECT_BLOCKS;
-            let tiers = self.get_number_of_tiers(remaining_offset)?;
+            EXT2_INODE_DIRECT_BLOCKS + tiers - 1
+        };
 
-            self.get_block_in_tier(self.get_device_id(), tiers, self.blocks[EXT2_INODE_DIRECT_BLOCKS + tiers - 1], remaining_offset, op)
+        if self.blocks[index] == 0 {
+            if op == GetFileBlockOp::Lookup {
+                return Ok(None);
+            }
+            self.blocks[index] = self.get_mount().alloc_block(self.attrs.inode as Ext2InodeNum)?;
+        }
+
+        if tiers == 0 {
+            Ok(Some(self.blocks[index]))
+        } else {
+            self.get_block_in_tier(self.get_device_id(), tiers, self.blocks[index], linear_block_num - EXT2_INODE_DIRECT_BLOCKS, op)
         }
     }
 
-    fn get_block_in_tier(&mut self, device_id: DeviceID, tiers: usize, table: BlockNum, offset: usize, op: GetFileBlockOp) -> Result<BlockNum, KernelError> {
-        // TODO this doesn't check that a block is 0 before using it as a reference.  What should be returned if a block isn't assigned?
+    fn get_block_in_tier(&mut self, device_id: DeviceID, tiers: usize, table_block: BlockNum, offset: usize, op: GetFileBlockOp) -> Result<Option<BlockNum>, KernelError> {
         let entries_per_block = self.get_block_size() / mem::size_of::<Ext2BlockNumber>();
-        let buf = block::get_buf(device_id, table)?;
-        let locked_buf = &*buf.lock();
-
-        let table_data = unsafe { cast_to_slice(locked_buf) };
-        let index = offset / entries_per_block.pow(tiers as u32);
+        let index = offset / entries_per_block.pow(tiers as u32 - 1);
 
         if tiers <= 1 {
-            if op == GetFileBlockOp::Allocate && table_data[index] == 0 {
-                // TODO this needs mutability, which requires a bunch of changes
-                //table_data[index] = get_mount(self.mount_ptr).alloc_block(self.attrs.inode as Ext2InodeNum)?;
-            }
-            Ok(table_data[index])
+            self.get_or_allocate_block(device_id, table_block, index, op)
         } else {
-            let remain = offset % entries_per_block.pow(tiers as u32);
-            self.get_block_in_tier(device_id, tiers - 1, table_data[index], remain, op)
+            let block = match self.get_or_allocate_block(device_id, table_block, index, op)? {
+                None => { return Ok(None); },
+                Some(block) => block,
+            };
+            let remain = offset % entries_per_block.pow(tiers as u32 - 1);
+            self.get_block_in_tier(device_id, tiers - 1, block, remain, op)
         }
     }
 
-    fn get_number_of_tiers(&self, remaining_offset: usize) -> Result<usize, KernelError> {
-        let entries_per_block = self.get_block_size() / mem::size_of::<Ext2BlockNumber>();
+    fn get_or_allocate_block(&mut self, device_id: DeviceID, table_block: BlockNum, index: usize, op: GetFileBlockOp) -> Result<Option<BlockNum>, KernelError> {
+        let buf = block::get_buf(device_id, table_block)?;
 
-        if remaining_offset < entries_per_block {
+        let block = {
+            let locked_buf = buf.lock();
+            let table = unsafe { cast_to_slice(&*locked_buf) };
+            table[index]
+        };
+
+        if block != 0 {
+            Ok(Some(block))
+        } else if op == GetFileBlockOp::Lookup {
+            Ok(None)
+        } else {
+            let mut locked_buf = buf.lock_mut();
+            let table = unsafe { cast_to_slice_mut(&mut *locked_buf) };
+            table[index] = self.get_mount().alloc_block(self.attrs.inode as Ext2InodeNum)?;
+            Ok(Some(table[index]))
+        }
+    }
+
+    fn get_number_of_tiers(&self, linear_block_num: usize) -> Result<usize, KernelError> {
+        let entries_per_block = self.get_block_size() / mem::size_of::<Ext2BlockNumber>();
+        let remaining_offset = linear_block_num - EXT2_INODE_DIRECT_BLOCKS;
+
+        if linear_block_num < EXT2_INODE_DIRECT_BLOCKS {
+            Ok(0)
+        } else if remaining_offset < entries_per_block {
             Ok(1)
         } else if remaining_offset < entries_per_block * entries_per_block {
             Ok(2)

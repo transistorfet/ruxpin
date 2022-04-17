@@ -111,6 +111,15 @@ impl Buf {
         self.dirty.store(true, Ordering::Release);
         self.block.lock()
     }
+
+    /*
+    pub fn lock_mut(&self) -> BufGuardMut<'_> {
+        BufGuardMut {
+            dirty: &self.dirty,
+            guard: self.block.lock(),
+        }
+    }
+    */
 }
 
 impl Drop for Buf {
@@ -134,3 +143,24 @@ impl<'a> Deref for BufGuard<'a> {
     }
 }
 
+/*
+pub struct BufGuardMut<'a> {
+    dirty: &'a AtomicBool,
+    guard: SpinlockGuard<'a, Box<[u8]>>,
+}
+
+impl<'a> Deref for BufGuardMut<'a> {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        &*self.guard
+    }
+}
+
+impl<'a> DerefMut for BufGuardMut<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.dirty.store(true, Ordering::Release);
+        &mut *self.guard
+    }
+}
+*/

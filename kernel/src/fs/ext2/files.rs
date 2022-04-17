@@ -16,7 +16,10 @@ impl Ext2Vnode {
 	let mut zpos = position % block_size;
 
 	while nbytes > 0 {
-            let block_num = self.get_file_block_num(znum, GetFileBlockOp::Lookup)?;
+            let block_num = match self.get_file_block_num(znum, GetFileBlockOp::Lookup)? {
+                None => { break; },
+                Some(num) => num,
+            };
             let buf = block::get_buf(device_id, block_num)?;
 
             let zlen = if block_size - zpos <= nbytes { block_size - zpos } else { nbytes };
@@ -41,7 +44,7 @@ impl Ext2Vnode {
 	let mut zpos = position % block_size;
 
 	while nbytes > 0 {
-            let block_num = self.get_file_block_num(znum, GetFileBlockOp::Allocate)?;
+            let block_num = self.get_file_block_num(znum, GetFileBlockOp::Allocate)?.unwrap();
             let buf = block::get_buf(device_id, block_num)?;
 
             crate::printkln!("ext2: writing to block {}", block_num);

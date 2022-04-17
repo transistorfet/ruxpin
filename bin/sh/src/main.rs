@@ -64,7 +64,7 @@ pub fn main() {
             } else {
                 println!("child pid is {}", pid);
                 let mut status = 0;
-                waitpid(pid, &mut status, 0).unwrap();
+                waitpid(pid, &mut status, 0);
             }
         }
     }
