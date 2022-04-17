@@ -5,6 +5,7 @@ use ruxpin_api::types::{OpenFlags, DeviceID};
 use ruxpin_api::syscalls::SyscallFunction;
 
 use crate::irqs;
+use crate::printkln;
 use crate::errors::KernelError;
 use crate::tty::{self, CharOperations};
 use crate::printk::set_console_device;
@@ -13,13 +14,15 @@ use crate::arch::types::KernelVirtualAddress;
 use crate::misc::deviceio::DeviceRegisters;
 use crate::misc::circular::CircularBuffer;
 
+static PL011_DRIVER_NAME: &'static str = "console";
 
 static mut RAW_CONSOLE: RawPL011Device = RawPL011Device::new();
 static mut TTY_CONSOLE: Option<DeviceID> = None;
 
 
-pub fn init() -> Result<(), KernelError> {
-    let driver_id = tty::register_tty_driver("console")?;
+pub fn register() -> Result<(), KernelError> {
+    printkln!("{}: initializing", PL011_DRIVER_NAME);
+    let driver_id = tty::register_tty_driver(PL011_DRIVER_NAME)?;
     let console = PL011Device::new();
     unsafe { RAW_CONSOLE.init() };
     let subdevice_id = tty::register_tty_device(driver_id, Box::new(console))?;

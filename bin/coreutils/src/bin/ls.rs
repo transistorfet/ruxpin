@@ -10,7 +10,7 @@ use ruxpin_api::types::{FileDesc, OpenFlags, FileAccess, DirEntry};
 
 #[no_mangle]
 pub fn main() {
-    let file = open("/mnt/bin", OpenFlags::ReadOnly, FileAccess::DefaultDir).unwrap();
+    let file = open(".", OpenFlags::ReadOnly, FileAccess::DefaultDir).unwrap();
     loop {
         let mut dirent = DirEntry::new_empty();
         if readdir(file.clone(), &mut dirent).unwrap() {

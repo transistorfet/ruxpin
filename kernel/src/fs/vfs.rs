@@ -161,7 +161,12 @@ pub(super) fn lookup(cwd: Option<Vnode>, path: &str, current_uid: UserID) -> Res
     };
 
     let mut component;
-    let mut remaining = path;
+    let mut remaining = if path.len() > 0 && &path[..1] == "/" {
+        &path[1..]
+    } else {
+        path
+    };
+
     loop {
         let mounted_root_node = current.lock().get_mount_mut().ok().map(|mount| if let Some(mount) = mount { Some(mount.clone()) } else { None }).flatten();
         if mounted_root_node.is_some() {

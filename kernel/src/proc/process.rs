@@ -7,6 +7,7 @@ use ruxpin_api::syscalls::{SyscallRequest, SyscallFunction};
 use crate::api::handle_syscall;
 use crate::arch::Context;
 use crate::arch::types::VirtualAddress;
+use crate::errors::KernelError;
 use crate::fs::filedesc::FileDescriptors;
 use crate::misc::queue::{Queue, QueueNode, QueueNodeRef};
 use crate::mm::MemoryPermissions;
@@ -38,7 +39,7 @@ static NEXT_PID: Spinlock<Pid> = Spinlock::new(1);
 static PROCESS_MANAGER: Spinlock<ProcessManager> = Spinlock::new(ProcessManager::new());
 
 
-pub fn init_processes() {
+pub fn initialize() -> Result<(), KernelError> {
     //let idle = PROCESS_MANAGER.lock().create_process();
     //load_code(idle.cast(), TEST_PROC1);
 
@@ -46,6 +47,7 @@ pub fn init_processes() {
 
     // NOTE this ensures the context is set before we start multitasking
     PROCESS_MANAGER.lock().schedule();
+    Ok(())
 }
 
 impl ProcessManager {
@@ -156,10 +158,10 @@ impl ProcessManager {
 
     fn exit_current_process(&mut self, status: isize) {
         let current = self.get_current_process();
+        crate::printkln!("Exiting process {}", current.lock().pid);
 
         self.scheduled.remove_node(current.clone());
 
-        crate::printkln!("Exiting process {}", current.lock().pid);
         current.lock().free_resources();
         current.lock().exit_status = Some(status);
 

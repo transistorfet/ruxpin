@@ -29,6 +29,7 @@ enum ReadWrite {
 
 impl EmmcDevice {
     pub fn register() -> Result<(), KernelError> {
+        printkln!("{}: initializing", EMMC_DRIVER_NAME);
         let driver_id = block::register_block_driver(EMMC_DRIVER_NAME)?;
         let device_id = block::register_block_device(driver_id, Box::new(EmmcDevice::new(0, 0)))?;
         let raw_device = DeviceID(driver_id, device_id);
@@ -79,9 +80,9 @@ impl BlockOperations for EmmcDevice {
         if self.size != 0 && offset + buffer.len() as u64 > self.size {
             buffer = &buffer[..(self.size - offset as u64) as usize];
         }
-    unsafe {
-        crate::printk::printk_dump(buffer.as_ptr(), buffer.len());
-    }
+unsafe {
+    crate::printk::printk_dump(buffer.as_ptr(), buffer.len());
+}
         EmmcDevice::write_data(buffer, self.base + offset)
     }
 }
@@ -264,7 +265,7 @@ impl EmmcHost {
             // In order to reset the interrupt flags, they must be set to 1 (not 0), so writing it to itself will do that
             EMMC1.set(registers::INTERRUPT_FLAGS, EMMC1.get(registers::INTERRUPT_FLAGS));
 
-            printkln!("mmc: sending command {:?} {:x}", cmd, arg1);
+            //printkln!("mmc: sending command {:?} {:x}", cmd, arg1);
             EMMC1.set(registers::ARG1, arg1);
             EMMC1.set(registers::COMMAND, command_code(cmd));
 
@@ -272,7 +273,7 @@ impl EmmcHost {
 
             let flags = EMMC1.get(registers::INTERRUPT_FLAGS);
             if flags & EMMC1_INT_ANY_ERROR != 0 {
-                printkln!("mmc: error occurred: {:x}", flags);
+                //printkln!("mmc: error occurred: {:x}", flags);
                 // TODO this is temporary until the error issue is solved
                 Ok(0)
             } else {
@@ -280,7 +281,7 @@ impl EmmcHost {
                 let r1 = EMMC1.get(registers::RESPONSE1);
                 let r2 = EMMC1.get(registers::RESPONSE2);
                 let r3 = EMMC1.get(registers::RESPONSE3);
-                printkln!("mmc: received response {:x} {:x} {:x} {:x}", r0, r1, r2, r3);
+                //printkln!("mmc: received response {:x} {:x} {:x} {:x}", r0, r1, r2, r3);
                 Ok(r0)
             }
         }
@@ -296,7 +297,7 @@ impl EmmcHost {
             // In order to reset the interrupt flags, they must be set to 1 (not 0), so writing it to itself will do that
             EMMC1.set(registers::INTERRUPT_FLAGS, EMMC1.get(registers::INTERRUPT_FLAGS));
 
-            printkln!("mmc: sending command {:?} {:x}", cmd, offset);
+            //printkln!("mmc: sending command {:?} {:x}", cmd, offset);
             EMMC1.set(registers::ARG1, offset as u32);
             EMMC1.set(registers::ARG2, (offset >> 32) as u32);
             EMMC1.set(registers::COMMAND, command_code(cmd));
@@ -305,7 +306,7 @@ impl EmmcHost {
 
             let flags = EMMC1.get(registers::INTERRUPT_FLAGS);
             if flags & EMMC1_INT_ANY_ERROR != 0 {
-                printkln!("mmc: error occurred: {:x}", flags);
+                //printkln!("mmc: error occurred: {:x}", flags);
                 Err(KernelError::IOError)
             } else {
                 Ok(())

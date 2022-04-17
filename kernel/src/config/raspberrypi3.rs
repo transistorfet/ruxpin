@@ -5,11 +5,13 @@ use crate::printkln;
 use crate::errors::KernelError;
 use crate::arch::types::PhysicalAddress;
 
+use crate::irqs;
 use crate::fs::vfs;
-use crate::proc::process::init_processes;
+use crate::proc::process;
+use crate::proc::binaries::elf::loader;
+use crate::proc::process::create_process;
 use crate::mm::kmalloc::init_kernel_heap;
 use crate::mm::vmalloc::init_virtual_memory;
-use crate::irqs::register_interrupt_controller;
 
 use ruxpin_api::types::{OpenFlags, FileAccess, Seek, DeviceID};
 
@@ -31,9 +33,10 @@ pub fn register_devices() -> Result<(), KernelError> {
 
     init_kernel_heap(PhysicalAddress::from(0x20_0000), PhysicalAddress::from(0x100_0000));
     init_virtual_memory(PhysicalAddress::from(0x100_0000), PhysicalAddress::from(0x1000_0000));
-    register_interrupt_controller(Box::new(GenericInterruptController::new()));
+    irqs::register_interrupt_controller(Box::new(GenericInterruptController::new()));
 
     vfs::initialize()?;
+    process::initialize()?;
 
     use crate::fs::tmpfs::TmpFilesystem;
     vfs::register_filesystem(TmpFilesystem::new())?;
@@ -42,15 +45,33 @@ pub fn register_devices() -> Result<(), KernelError> {
     use crate::fs::ext2::Ext2Filesystem;
     vfs::register_filesystem(Ext2Filesystem::new())?;
 
-    init_processes();
+    console::register()?;
+    EmmcDevice::register()?;
 
-
-    // TODO this is a temporary test
-    vfs::mount(None, "/", "tmpfs", None, 0).unwrap();
-    vfs::open(None, "/dev", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
-    vfs::open(None, "/mnt", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
+    vfs::mount(None, "/", "ext2", Some(DeviceID(0, 2)), 0).unwrap();
+    vfs::open(None, "/dev", OpenFlags::Create, FileAccess::DefaultDir, 0).unwrap();
     vfs::mount(None, "/dev", "devfs", None, 0).unwrap();
 
+    startup_tests().unwrap();
+
+    // Create the first process
+    let proc = create_process();
+    loader::load_binary(proc.clone(), "/bin/sh").unwrap();
+    proc.lock().files.open(None, "/dev/console0", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0).unwrap();
+
+    SystemTimer::init(1);
+
+    printkln!("kernel initialization complete");
+
+    Ok(())
+}
+
+fn startup_tests() -> Result<(), KernelError> {
+    // TODO this is a temporary test
+    vfs::open(None, "/tmp", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
+    vfs::mount(None, "/tmp", "tmpfs", None, 0).unwrap();
+
+/*
     vfs::open(None, "test", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
     let file = vfs::open(None, "test/file.txt", OpenFlags::Create, FileAccess::DefaultFile, 0).unwrap();
     vfs::write(file.clone(), b"This is a test").unwrap();
@@ -59,16 +80,10 @@ pub fn register_devices() -> Result<(), KernelError> {
     let n = vfs::read(file.clone(), &mut buffer).unwrap();
     crate::printkln!("Read file {}: {}", n, core::str::from_utf8(&buffer).unwrap());
 
-    console::init()?;
-
     let file = vfs::open(None, "/dev/console0", OpenFlags::ReadOnly, FileAccess::DefaultFile, 0).unwrap();
     vfs::write(file.clone(), b"the device file can write\n").unwrap();
     //vfs::close(file).unwrap();
-
-
-
-    printkln!("emmc: initializing");
-    EmmcDevice::register()?;
+*/
 
     /*
     let device_id = DeviceID(0, 0);
@@ -92,12 +107,11 @@ pub fn register_devices() -> Result<(), KernelError> {
     */
 
 
-    vfs::mount(None, "/mnt", "ext2", Some(DeviceID(0, 2)), 0)?;
 
-    let file = vfs::open(None, "/mnt/bin/testapp", OpenFlags::ReadOnly, FileAccess::DefaultFile, 0)?;
+    let file = vfs::open(None, "/bin/testapp", OpenFlags::ReadOnly, FileAccess::DefaultFile, 0).unwrap();
     let mut data = [0; 1024];
     loop {
-        let nbytes = vfs::read(file.clone(), &mut data)?;
+        let nbytes = vfs::read(file.clone(), &mut data).unwrap();
         printkln!("read in {} bytes", nbytes);
         unsafe { crate::printk::printk_dump(&data as *const u8, 1024); }
         //if nbytes != 1024 {
@@ -106,26 +120,20 @@ pub fn register_devices() -> Result<(), KernelError> {
     }
     //vfs::close(file)?;
 
-    use crate::proc::process::create_process;
-    use crate::proc::binaries::elf::loader;
-    let proc = create_process();
-    loader::load_binary(proc.clone(), "/mnt/bin/sh").unwrap();
-    proc.lock().files.open(None, "/dev/console0", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0).unwrap();
 
 
-
-    let file = vfs::open(None, "/mnt/test2", OpenFlags::ReadWrite.plus(OpenFlags::Create), FileAccess::DefaultFile, 0)?;
-    vfs::write(file.clone(), b"this is some test data")?;
+    let file = vfs::open(None, "/test2", OpenFlags::ReadWrite.plus(OpenFlags::Create), FileAccess::DefaultFile, 0).unwrap();
+    vfs::write(file.clone(), b"this is some test data").unwrap();
     //vfs::close(file)?;
 
-    let file = vfs::open(None, "/mnt/test", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0)?;
+    let file = vfs::open(None, "/test", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0).unwrap();
     let mut data = [0; 128];
-    vfs::read(file.clone(), &mut data)?;
+    vfs::read(file.clone(), &mut data).unwrap();
     unsafe { crate::printk::printk_dump(&data as *const u8, 128); }
     //vfs::close(file)?;
 
-    let file = vfs::open(None, "/mnt", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0)?;
-    while let Some(dirent) = vfs::readdir(file.clone())? {
+    let file = vfs::open(None, "/", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0).unwrap();
+    while let Some(dirent) = vfs::readdir(file.clone()).unwrap() {
         printkln!("reading dir {} with inode {}", dirent.as_str(), dirent.inode);
     }
 
@@ -145,11 +153,6 @@ pub fn register_devices() -> Result<(), KernelError> {
     let thing1: Result<_, KernelError> = cache.get(|item| item.0 == 1, || Ok(SpecialNumber(1)));
     cache.print();
     */
-
-
-    SystemTimer::init(1);
-
-    printkln!("kernel initialization complete");
 
     Ok(())
 }
