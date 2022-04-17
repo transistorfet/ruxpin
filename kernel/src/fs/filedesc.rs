@@ -40,7 +40,7 @@ impl FileDescriptors {
     }
 
     pub fn close(&mut self, file_num: FileDesc) -> Result<(), KernelError> {
-        let file = self.get_file(file_num)?;
+        //let file = self.get_file(file_num)?;
         //vfs::close(file)?;
         self.list[file_num.as_usize() as usize] = None;
         Ok(())

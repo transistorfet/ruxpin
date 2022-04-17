@@ -60,7 +60,7 @@ pub fn load_binary(proc: Process, path: &str) -> Result<(), KernelError> {
             locked_proc.space.add_file_backed_segment(permissions, file.clone(), segment.p_offset as usize, segment.p_filesz as usize, vaddr, offset, segment.p_memsz as usize);
 
             // TODO this is a hack to forcefully load the page because the page fault in kernel space doesn't work
-            //locked_proc.space.alloc_page_at(vaddr)?;
+            locked_proc.space.alloc_page_at(vaddr)?;
 
         } else if segment.p_type == PT_GNU_RELRO {
             //char **data = proc->map.segments[M_TEXT].base + prog_headers[i].p_vaddr;

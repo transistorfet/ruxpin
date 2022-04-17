@@ -1,5 +1,5 @@
 
-TARGET = aarch64-unknown-none/release
+TARGETDIR = target/aarch64-unknown-none/release
 
 
 MOUNTPOINT = build
@@ -34,16 +34,20 @@ load-image:
 	- make load-image-contents
 	make umount-image
 
+coreutils:
+	cd bin/coreutils && cargo build --release
+
 testapp:
 	cd bin/testapp && cargo build --release
 
 sh:
 	cd bin/sh && cargo build --release
 
-load-image-contents: testapp sh
+load-image-contents: testapp sh coreutils
 	sudo mkdir -p $(MOUNTPOINT)/bin
-	sudo cp bin/testapp/target/$(TARGET)/testapp $(MOUNTPOINT)/bin
-	sudo cp bin/sh/target/$(TARGET)/sh $(MOUNTPOINT)/bin
+	sudo cp bin/testapp/$(TARGETDIR)/testapp $(MOUNTPOINT)/bin
+	sudo cp bin/sh/$(TARGETDIR)/sh $(MOUNTPOINT)/bin
+	sudo cp bin/coreutils/$(TARGETDIR)/ls $(MOUNTPOINT)/bin
 
 
 build-kernel:

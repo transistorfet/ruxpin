@@ -41,7 +41,7 @@ pub fn main() {
             println!("executing testapp");
             let pid = fork().unwrap();
             if pid == 0 {
-                exec("/mnt/bin/testapp");
+                exec("/mnt/bin/ls");
             } else {
                 println!("child pid is {}", pid);
                 let mut status = 0;

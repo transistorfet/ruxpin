@@ -206,8 +206,87 @@ impl DirEntry {
 }
 
 
-#[derive(Copy, Clone, Debug)]
+#[repr(usize)]
+#[allow(dead_code)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ApiError {
-    SomethingWentWrong,
+    // Memory Errors
+    AddressAlreadyMapped        = 1,
+    AddressUnmapped             = 2,
+    AddressMisaligned           = 3,
+    UnexpectedGranualeSize      = 4,
+    CorruptTranslationTable     = 5,
+    OutOfMemory                 = 6,
+    NoSegmentFound              = 7,
+
+    // Device Errors
+    OperationNotPermitted       = 8,
+    DeviceTimeout               = 9,
+    IOError                     = 10,
+    InvalidIrq                  = 11,
+
+    // File System Errors
+    FileNotOpen                 = 12,
+    FileNotFound                = 13,
+    NoSuchDevice                = 14,
+    NotAFile                    = 15,
+    NotADirectory               = 16,
+    IsADirectory                = 17,
+    NoSuchFilesystem            = 18,
+    BadFileNumber               = 19,
+    TooManyFilesOpen            = 20,
+    InvalidSuperblock           = 21,
+    InvalidInode                = 22,
+    IncompatibleFeatures        = 23,
+    FileSizeTooLarge            = 24,
+    OutOfDiskSpace              = 25,
+    ReadOnlyFilesystem          = 26,
+
+    NotExecutable               = 27,
+    InvalidArgument             = 28,
+    InvalidSegmentType          = 29,
+
+    UnknownError                = 30,
+}
+
+impl From<usize> for ApiError {
+    fn from(source: usize) -> Self {
+        match source {
+             1 => ApiError::AddressAlreadyMapped,
+             2 => ApiError::AddressUnmapped,
+             3 => ApiError::AddressMisaligned,
+             4 => ApiError::UnexpectedGranualeSize,
+             5 => ApiError::CorruptTranslationTable,
+             6 => ApiError::OutOfMemory,
+             7 => ApiError::NoSegmentFound,
+
+             8 => ApiError::OperationNotPermitted,
+             9 => ApiError::DeviceTimeout,
+            10 => ApiError::IOError,
+            11 => ApiError::InvalidIrq,
+
+            12 => ApiError::FileNotOpen,
+            13 => ApiError::FileNotFound,
+            14 => ApiError::NoSuchDevice,
+            15 => ApiError::NotAFile,
+            16 => ApiError::NotADirectory,
+            17 => ApiError::IsADirectory,
+            18 => ApiError::NoSuchFilesystem,
+            19 => ApiError::BadFileNumber,
+            20 => ApiError::TooManyFilesOpen,
+            21 => ApiError::InvalidSuperblock,
+            22 => ApiError::InvalidInode,
+            23 => ApiError::IncompatibleFeatures,
+            24 => ApiError::FileSizeTooLarge,
+            25 => ApiError::OutOfDiskSpace,
+            26 => ApiError::ReadOnlyFilesystem,
+
+            27 => ApiError::NotExecutable,
+            28 => ApiError::InvalidArgument,
+            29 => ApiError::InvalidSegmentType,
+
+            _ => ApiError::UnknownError,
+        }
+    }
 }
 

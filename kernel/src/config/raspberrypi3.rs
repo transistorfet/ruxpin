@@ -47,10 +47,8 @@ pub fn register_devices() -> Result<(), KernelError> {
 
     // TODO this is a temporary test
     vfs::mount(None, "/", "tmpfs", None, 0).unwrap();
-    let file = vfs::open(None, "/dev", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
-    //vfs::close(file).unwrap();
-    let file = vfs::open(None, "/mnt", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
-    //vfs::close(file).unwrap();
+    vfs::open(None, "/dev", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
+    vfs::open(None, "/mnt", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
     vfs::mount(None, "/dev", "devfs", None, 0).unwrap();
 
     vfs::open(None, "test", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();

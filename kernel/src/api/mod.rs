@@ -1,7 +1,7 @@
 
-use ruxpin_api::types::{Pid, FileDesc, OpenFlags, FileAccess, DirEntry};
 use ruxpin_api::syscall_decode;
 use ruxpin_api::syscalls::{SyscallRequest, SyscallFunction};
+use ruxpin_api::types::{Pid, FileDesc, OpenFlags, FileAccess, DirEntry, ApiError};
 
 use crate::api::file::*;
 use crate::api::proc::*;
@@ -94,7 +94,7 @@ pub fn store_result(syscall: &mut SyscallRequest, result: Result<usize, KernelEr
             }
 
             syscall.error = true;
-            syscall.result = value as usize;
+            syscall.result = ApiError::from(value) as usize;
         },
     }
 }

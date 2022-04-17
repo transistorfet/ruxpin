@@ -35,7 +35,7 @@ pub fn syscall_exec(path: &str /*, _args: &[&str], _evnp: &[&str] */) -> Result<
     Ok(())
 }
 
-pub fn syscall_waitpid(pid: Pid, status: &mut usize, options: usize) -> Result<Pid, KernelError> {
+pub fn syscall_waitpid(pid: Pid, status: &mut usize, _options: usize) -> Result<Pid, KernelError> {
     //let new_proc = fork_current_process();
     //let child_pid = new_proc.lock().pid;
     // TODO need to give a reason, an event

@@ -25,7 +25,7 @@ pub fn fork() -> Result<Pid, ApiError> {
     execute_syscall(&mut syscall);
     match syscall.error {
         false => Ok(syscall.result as Pid),
-        true => Err(ApiError::SomethingWentWrong),
+        true => Err(ApiError::from(syscall.result)),
     }
 }
 
@@ -47,7 +47,7 @@ pub fn waitpid(pid: Pid, status: &mut usize, options: usize) -> Result<Pid, ApiE
     execute_syscall(&mut syscall);
     match syscall.error {
         false => Ok(syscall.result as Pid),
-        true => Err(ApiError::SomethingWentWrong),
+        true => Err(ApiError::from(syscall.result)),
     }
 }
 
@@ -61,7 +61,7 @@ pub fn open(path: &str, flags: OpenFlags, access: FileAccess) -> Result<FileDesc
     execute_syscall(&mut syscall);
     match syscall.error {
         false => Ok(FileDesc(syscall.result)),
-        true => Err(ApiError::SomethingWentWrong),
+        true => Err(ApiError::from(syscall.result)),
     }
 }
 
@@ -73,7 +73,7 @@ pub fn close(file: FileDesc) -> Result<(), ApiError> {
     execute_syscall(&mut syscall);
     match syscall.error {
         false => Ok(()),
-        true => Err(ApiError::SomethingWentWrong),
+        true => Err(ApiError::from(syscall.result)),
     }
 }
 
@@ -86,7 +86,7 @@ pub fn read(file: FileDesc, buffer: &mut [u8]) -> Result<usize, ApiError> {
     execute_syscall(&mut syscall);
     match syscall.error {
         false => Ok(syscall.result),
-        true => Err(ApiError::SomethingWentWrong),
+        true => Err(ApiError::from(syscall.result)),
     }
 }
 
@@ -99,7 +99,7 @@ pub fn write(file: FileDesc, buffer: &[u8]) -> Result<usize, ApiError> {
     execute_syscall(&mut syscall);
     match syscall.error {
         false => Ok(syscall.result),
-        true => Err(ApiError::SomethingWentWrong),
+        true => Err(ApiError::from(syscall.result)),
     }
 }
 
@@ -108,11 +108,11 @@ pub fn readdir(file: FileDesc, dirent: &mut DirEntry) -> Result<bool, ApiError> 
     let mut syscall: SyscallRequest = Default::default();
     syscall_encode!(syscall, i, file: FileDesc);
     syscall_encode!(syscall, i, dirent: &mut DirEntry);
-    syscall.function = SyscallFunction::Read;
+    syscall.function = SyscallFunction::ReadDir;
     execute_syscall(&mut syscall);
     match syscall.error {
         false => Ok(syscall.result != 0),
-        true => Err(ApiError::SomethingWentWrong),
+        true => Err(ApiError::from(syscall.result)),
     }
 }
 
