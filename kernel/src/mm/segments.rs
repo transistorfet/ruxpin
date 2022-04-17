@@ -4,6 +4,8 @@ use alloc::boxed::Box;
 use ruxpin_api::types::Seek;
 
 use crate::fs::vfs;
+use crate::arch::mmu;
+use crate::misc::align_up;
 use crate::fs::types::File;
 use crate::mm::MemoryPermissions;
 use crate::errors::KernelError;
@@ -20,7 +22,7 @@ pub struct Segment {
     pub(super) permissions: MemoryPermissions,
     pub(super) start: VirtualAddress,
     pub(super) end: VirtualAddress,
-    pub(super) ops: Box<dyn SegmentOperations>,
+    ops: Box<dyn SegmentOperations>,
 }
 
 impl Segment {
@@ -31,10 +33,6 @@ impl Segment {
             end,
             ops,
         }
-    }
-
-    pub fn match_range(&self, addr: VirtualAddress) -> bool {
-        addr >= self.start && addr <= self.end
     }
 
     pub fn new_memory(permissions: MemoryPermissions, start: VirtualAddress, end: VirtualAddress) -> Self {
@@ -54,6 +52,18 @@ impl Segment {
             end: self.end,
             ops: self.ops.share_segment(),
         }
+    }
+
+    pub fn page_aligned_len(&self) -> usize {
+        align_up(usize::from(self.end) - usize::from(self.start), mmu::page_size())
+    }
+
+    pub fn match_range(&self, addr: VirtualAddress) -> bool {
+        addr >= self.start && addr <= self.end
+    }
+
+    pub fn load_page_at(&self, segment: &Segment, vaddr: VirtualAddress, page: &mut [u8]) -> Result<(), KernelError> {
+        self.ops.load_page_at(segment, vaddr, page)
     }
 }
 

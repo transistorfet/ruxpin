@@ -2,6 +2,7 @@
 use core::slice;
 
 use alloc::vec::Vec;
+use alloc::sync::Arc;
 
 use crate::mm::pages;
 use crate::misc::align_up;
@@ -22,7 +23,7 @@ pub fn init_virtual_memory(start: PhysicalAddress, end: PhysicalAddress) {
 
 pub struct VirtualAddressSpace {
     table: TranslationTable,
-    segments: Vec<Segment>,
+    segments: Vec<Arc<Segment>>,
 }
 
 impl VirtualAddressSpace {
@@ -38,33 +39,34 @@ impl VirtualAddressSpace {
 
     pub fn add_memory_segment(&mut self, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) {
         let segment = Segment::new_memory(permissions, vaddr, vaddr.add(len));
-        self.segments.push(segment);
+        self.segments.push(Arc::new(segment));
         self.map_on_demand(permissions, vaddr, align_up(len, mmu::page_size()));
     }
 
     pub fn add_file_backed_segment(&mut self, permissions: MemoryPermissions, file: File, file_offset: usize, file_size: usize, vaddr: VirtualAddress, mem_offset: usize, mem_size: usize) {
         let segment = Segment::new_file_backed(file, file_offset, file_size, permissions, mem_offset, vaddr, vaddr.add(mem_size).add(mem_offset));
-        self.segments.push(segment);
+        self.segments.push(Arc::new(segment));
         self.map_on_demand(permissions, vaddr, align_up(mem_size + mem_offset, mmu::page_size()));
     }
 
     pub fn add_memory_segment_allocated(&mut self, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) {
         let segment = Segment::new_memory(permissions, vaddr, vaddr.add(len));
-        self.segments.push(segment);
+        self.segments.push(Arc::new(segment));
         self.alloc_mapped(permissions, vaddr, align_up(len, mmu::page_size()));
     }
 
     pub fn clear_segments(&mut self) {
-        self.unmap_range(VirtualAddress::from(0), 0x1_0000_0000_0000);
-
+        for i in 0..self.segments.len() {
+            let free_pages = Arc::strong_count(&self.segments[i]) == 1;
+            self.unmap_range(self.segments[i].start, self.segments[i].page_aligned_len(), free_pages);
+        }
         self.segments.clear();
     }
 
     pub fn copy_segments(&mut self, parent: &Self) {
         for segment in parent.segments.iter() {
-            crate::printkln!("cloning {:x} to {:x}", usize::from(segment.start), usize::from(segment.end));
-            let shared_segment = segment.share_segment();
-            self.segments.push(shared_segment);
+            //crate::printkln!("cloning segment {:x} to {:x}", usize::from(segment.start), usize::from(segment.end));
+            self.segments.push(segment.clone());
             self.copy_segment_map(&parent.table, segment);
         }
     }
@@ -97,9 +99,7 @@ impl VirtualAddressSpace {
 
     pub fn copy_segment_map(&mut self, parent_table: &TranslationTable, segment: &Segment) {
         let pages = pages::get_page_area();
-        // TODO make it consistent whether you use a usize length or a start/end address, not both
-        let len = align_up(usize::from(segment.end) - usize::from(segment.start), mmu::page_size());
-        self.table.map_addr(MemoryType::Existing, segment.permissions, segment.start, len, pages, &|_, page_addr, len| {
+        self.table.map_addr(MemoryType::Existing, segment.permissions, segment.start, segment.page_aligned_len(), pages, &|_, page_addr, len| {
             if len == mmu::page_size() {
                 Some(parent_table.translate_addr(page_addr).unwrap())
             } else {
@@ -117,16 +117,14 @@ impl VirtualAddressSpace {
         }).unwrap();
     }
 
-    pub fn unmap_range(&mut self, start: VirtualAddress, len: usize) {
+    pub fn unmap_range(&mut self, start: VirtualAddress, len: usize, free_pages: bool) {
         let pages = pages::get_page_area();
-        self.table.unmap_addr(start, len, pages, &|pages, vaddr, paddr| {
-            for segment in &self.segments {
-                if segment.match_range(vaddr) {
-                    // TODO this would normally call the segment operations to determine what to do
-                    pages.free_page(paddr);
-                }
-            }
-        }).unwrap();
+
+        if free_pages {
+            self.table.unmap_addr(start, len, pages, &|pages, _, paddr| if usize::from(paddr) != 0 { pages.free_page(paddr) }).unwrap();
+        } else {
+            self.table.unmap_addr(start, len, pages, &|_, _, _| { }).unwrap();
+        }
     }
 
     pub fn translate_addr(&mut self, vaddr: VirtualAddress) -> Result<PhysicalAddress, KernelError> {
@@ -151,7 +149,7 @@ impl VirtualAddressSpace {
                 let page_buffer = unsafe {
                     slice::from_raw_parts_mut(page.to_kernel_addr().as_mut(), mmu::page_size())
                 };
-                segment.ops.load_page_at(segment, page_vaddr, page_buffer).unwrap();
+                segment.load_page_at(segment, page_vaddr, page_buffer).unwrap();
 
                 return Ok(());
             }

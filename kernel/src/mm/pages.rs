@@ -65,9 +65,11 @@ impl PagePool {
         for region in &mut self.regions {
             if ptr >= region.pages_start && ptr <= region.pages_start.add(region.total_pages() * mmu::page_size()) {
                 //crate::printkln!("free page {:x}", usize::from(ptr));
-                return region.free_page(ptr);
+                region.free_page(ptr);
+                return;
             }
         }
+        panic!("pages: attempting to free a page with no region: {:x}", usize::from(ptr));
     }
 }
 

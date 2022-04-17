@@ -1,6 +1,5 @@
 
 use alloc::vec::Vec;
-use alloc::sync::Arc;
 
 use ruxpin_api::types::{Pid, UserID};
 use ruxpin_api::syscalls::{SyscallRequest, SyscallFunction};
@@ -161,7 +160,7 @@ impl ProcessManager {
         self.scheduled.remove_node(current.clone());
 
         crate::printkln!("Exiting process {}", current.lock().pid);
-        //current.lock().free_resources();
+        current.lock().free_resources();
         current.lock().exit_status = Some(status);
 
         self.restart_blocked_by_syscall(SyscallFunction::WaitPid);

@@ -54,6 +54,9 @@ impl<'a> Bitmap<'a> {
         self.table[i] &= !(0x01 << bit);
         self.free_bits += 1;
         // NOTE we could set last_index here, but not doing that might mean more contiguous chunks get allocated
+        //if i < self.last_index {
+        //    self.last_index = i;
+        //}
     }
 
     pub const fn total_bits(&self) -> usize {
