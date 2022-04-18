@@ -55,6 +55,7 @@ pub fn register_devices() -> Result<(), KernelError> {
     startup_tests().unwrap();
 
     // Create the first process
+    printkln!("loading the first processs (/bin/sh) from elf binary file");
     let proc = create_process();
     loader::load_binary(proc.clone(), "/bin/sh").unwrap();
     proc.lock().files.open(None, "/dev/console0", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0).unwrap();
@@ -170,6 +171,8 @@ fn startup_tests() -> Result<(), KernelError> {
     let thing1: Result<_, KernelError> = cache.get(|item| item.0 == 1, || Ok(SpecialNumber(1)));
     cache.print();
     */
+
+    printkln!("\nFinished tests\n");
 
     Ok(())
 }

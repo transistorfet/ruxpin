@@ -80,9 +80,6 @@ impl BlockOperations for EmmcDevice {
         if self.size != 0 && offset + buffer.len() as u64 > self.size {
             buffer = &buffer[..(self.size - offset as u64) as usize];
         }
-unsafe {
-    crate::printk::printk_dump(buffer.as_ptr(), buffer.len());
-}
         EmmcDevice::write_data(buffer, self.base + offset)
     }
 }
@@ -265,7 +262,8 @@ impl EmmcHost {
             // In order to reset the interrupt flags, they must be set to 1 (not 0), so writing it to itself will do that
             EMMC1.set(registers::INTERRUPT_FLAGS, EMMC1.get(registers::INTERRUPT_FLAGS));
 
-            //printkln!("mmc: sending command {:?} {:x}", cmd, arg1);
+            // TODO without the print statement here, it times out on the raspi3 =/ 
+            printkln!("mmc: sending command {:?} {:x}", cmd, arg1);
             EMMC1.set(registers::ARG1, arg1);
             EMMC1.set(registers::COMMAND, command_code(cmd));
 
