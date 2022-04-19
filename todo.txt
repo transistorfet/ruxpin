@@ -1,15 +1,23 @@
 
-* goal is to get a shell-type program
-----
+* if you put separate locks on the fields of proc, or sub-arc<locks> on at least files and space, so that either can be manipulated
+  independently (so a syscall that locks the proc to write a file can still handle a page fault that tries to lock the same proc to
+  load the next page
 
-* add an events system for processes to wait on
+* sort out issues of copying to/from user space, and the page fault that in kernel mode that locks up
+
+* need to support command line arguments (see user/kernel copying)
+* need to add heap support to the applications
+* fix waitpid to actually get the process status, and to clean up the dead process as well
+* processes are never removed, which needs to be fixed
+* there might be something broken when waitpid returns (it shouldn't return an error, but seemed to return FileNotFound when exec'ing a file that doesn't exist)
+
+* add an events system for processes to wait on (IO blocking, process exit, select/poll, etc)
+* add threading support
+
+* add commands: cat, cp, echo, mkdir, mv, ps, pwd, rm, mount, umount
 
 
-* should you move KernelError to the api library and just use the same error everywhere?
-* you need to move DirEntry to api library, or have some kind of stand-in for interfacing
-
-* since there's no reference counting of the segments, it might free all the pages when destroying the translation table of the
-  first process to be destroyed (processes aren't actually destroyed yet though)
+* make it consistent whether you use a usize length or a start/end address, not both
 
 * can you separate the syscalls, maybe even based on permission levels as well as function, and require permission for each api to
   be granted explicitly
@@ -21,26 +29,12 @@
   updating the page address of the translation table, the granuale size is not a page!
 
 
-* implement fork
-* implement wait/wait_pid
 
-* this is at least the second time I've had an issues with the length of mapped segment not aligned to a page boundary, in the mmu
-  translation table code, which causes an infinite loop with no other indications.  I should fix this in a way that throws an error
-* make it consistent whether you use a usize length or a start/end address, not both
-
-
-* processes are never removed, which needs to be fixed
-* I'm not happy about how the process manager is going.  It's difficult to remove a process.  It's possible to use an Option and
-  reallocate old proc slots when needed, but that's unnecessarily slow, especially given that the process slots in the manager are
-  just Arcs.  Putting the linked list inside the Arc would be possible, but kind of clusmy, and it exposes the linked list node when
-  anything using the a Process shouldn't even know about it, let alone use it.  
-
-
-* there was an issue with the console driver when the raw device was wrapped in a spinlock.  It was causing a data abort to some
-  weird address, and then looping forever (no timeout)
 * need to sort out the tty devices. how irqs can access the device object. whether only the tty subsystem or the driver as well, has
   a reference to the devices as well. how the config will create the device object, and where it stores it (or does it assume each
   driver will register and save global references to the devices if needed?  Is there a better way than using so many global references?
+* there was an issue with the console driver when the raw device was wrapped in a spinlock.  It was causing a data abort to some
+  weird address, and then looping forever (no timeout)
 
 
 * there is no userspace/kernelspace copying in the api, which could cause a fatal error if the user program doesn't give a valid
@@ -57,7 +51,6 @@
   segments...
 
 
-* fix block allocation and tiered table lookups
 * add block truncation
 * allow for removing directory entries
 * add file renaming
