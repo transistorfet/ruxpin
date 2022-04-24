@@ -16,7 +16,7 @@ pub fn handle_syscall() {
     //printkln!("A SYSCALL for {:?}!", syscall.function);
 
     let mut syscall = Context::syscall_from_current_context();
-    get_current_process().lock().syscall = syscall.clone();
+    get_current_process().try_lock().unwrap().syscall = syscall.clone();
     process_syscall(&mut syscall);
 }
 

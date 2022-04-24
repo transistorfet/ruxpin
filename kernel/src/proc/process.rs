@@ -84,7 +84,7 @@ impl ProcessManager {
         let proc = self.create_process();
 
         {
-            let mut locked_proc = proc.lock();
+            let mut locked_proc = proc.try_lock().unwrap();
 
             // Allocate text segment
             locked_proc.space.add_memory_segment_allocated(MemoryPermissions::ReadExecute, VirtualAddress::from(0x77777000), 4096);
@@ -111,14 +111,14 @@ impl ProcessManager {
         let current_proc = self.scheduled.get_head().unwrap();
         let new_proc = self.create_process();
 
-        new_proc.lock().copy_resources(&*current_proc.lock());
+        new_proc.try_lock().unwrap().copy_resources(&*current_proc.try_lock().unwrap());
 
         new_proc
     }
 
     fn set_current_context(&mut self) -> Process {
         let new_current = self.get_current_process();
-        Context::switch_current_context(&mut new_current.lock().context);
+        Context::switch_current_context(&mut new_current.try_lock().unwrap().context);
         new_current
     }
 
@@ -146,7 +146,7 @@ impl ProcessManager {
 
     fn restart_blocked_by_syscall(&mut self, function: SyscallFunction) {
         for node in self.blocked.iter() {
-            if node.lock().syscall.function == function {
+            if node.try_lock().unwrap().syscall.function == function {
                 self.blocked.remove_node(node.clone());
                 self.scheduled.insert_head(node.clone());
                 node.lock().restart_syscall = true;
@@ -158,18 +158,18 @@ impl ProcessManager {
 
     fn exit_current_process(&mut self, status: isize) {
         let current = self.get_current_process();
-        crate::printkln!("Exiting process {}", current.lock().pid);
+        crate::printkln!("Exiting process {}", current.try_lock().unwrap().pid);
 
         self.scheduled.remove_node(current.clone());
 
-        current.lock().free_resources();
-        current.lock().exit_status = Some(status);
+        current.try_lock().unwrap().free_resources();
+        current.try_lock().unwrap().exit_status = Some(status);
 
         self.restart_blocked_by_syscall(SyscallFunction::WaitPid);
     }
 
     fn page_fault(&mut self, far: u64) {
-        self.get_current_process().lock().space.alloc_page_at(VirtualAddress::from(far)).unwrap();
+        self.get_current_process().try_lock().unwrap().space.alloc_page_at(VirtualAddress::from(far)).unwrap();
     }
 }
 
@@ -193,7 +193,7 @@ impl ProcessRecord {
 }
 
 fn next_pid() -> Pid {
-    let mut mutex = NEXT_PID.lock();
+    let mut mutex = NEXT_PID.try_lock().unwrap();
     let pid = *mutex;
     *mutex += 1;
     pid
@@ -204,7 +204,7 @@ const TEST_PROC1: &[u32] = &[0xd503205f, 0x17ffffff];
 //const TEST_PROC2: &[u32] = &[0xd10043ff, 0xf90003e0, 0xf90007e1, 0x14000001, 0xd4000021, 0x17ffffff];
 
 pub unsafe fn load_code(proc: Process, instructions: &[u32]) {
-    let code: *mut u32 = proc.lock().space.translate_addr(VirtualAddress::from(0x77777000)).unwrap().to_kernel_addr().as_mut();
+    let code: *mut u32 = proc.try_lock().unwrap().space.translate_addr(VirtualAddress::from(0x77777000)).unwrap().to_kernel_addr().as_mut();
     for i in 0..instructions.len() {
         *code.add(i) = instructions[i];
     }
@@ -212,7 +212,7 @@ pub unsafe fn load_code(proc: Process, instructions: &[u32]) {
 
 pub fn create_test_process() {
     unsafe {
-        let ptr = PROCESS_MANAGER.lock().create_test_process();
+        let ptr = PROCESS_MANAGER.try_lock().unwrap().create_test_process();
         load_code(ptr, TEST_PROC1);
 
         //let ptr = PROCESS_MANAGER.lock().create_test_process();

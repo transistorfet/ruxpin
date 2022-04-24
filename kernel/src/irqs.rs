@@ -45,9 +45,9 @@ pub fn disable_irq(irq: usize) {
 }
 
 pub(crate) fn handle_irqs() {
-    let handlers = IRQ_HANDLERS.lock();
+    let handlers = IRQ_HANDLERS.try_lock().unwrap();
 
-    if let Some(ctrl) = INTERRUPT_CONTROLLER.lock().as_mut() {
+    if let Some(ctrl) = INTERRUPT_CONTROLLER.try_lock().unwrap().as_mut() {
         let iter = ctrl.pending_irqs();
         while let Some(irq) = iter.next() {
             if let Some(handler) = handlers[irq] {

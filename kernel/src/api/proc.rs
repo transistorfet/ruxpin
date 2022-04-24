@@ -15,7 +15,7 @@ pub fn syscall_exit(status: isize) -> Result<(), KernelError> {
 
 pub fn syscall_fork() -> Result<Pid, KernelError> {
     let new_proc = fork_current_process();
-    let child_pid = new_proc.lock().pid;
+    let child_pid = new_proc.try_lock().unwrap().pid;
     Ok(child_pid)
 }
 
@@ -35,9 +35,9 @@ pub fn syscall_exec(path: &str, argv: &[&str], envp: &[&str]) -> Result<(), Kern
     //vfs::access(cwd, path, FileAccess::Exec.plus(FileAccess::Regular), current_uid)?;
 
     crate::printkln!("clearing old process space");
-    proc.lock().free_resources();
+    proc.try_lock().unwrap().free_resources();
 
-    proc.lock().files.open(None, "/dev/console0", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0)?;
+    proc.try_lock().unwrap().files.open(None, "/dev/console0", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0)?;
 
     crate::printkln!("executing a new process");
     let result = loader::load_binary(proc.clone(), saved_path.as_str(), &parsed_argv, &parsed_envp);
