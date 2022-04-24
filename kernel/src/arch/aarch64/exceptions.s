@@ -239,7 +239,7 @@ _loop:
 
 
 _save_kernel_context:
-	add	sp, sp, #160
+	sub	sp, sp, #160
 
 	// Integer Registers
 	stp	x0, x1, [sp, 0]
@@ -253,7 +253,7 @@ _save_kernel_context:
 	stp	x16, x17, [sp, 128]
 	stp	x18, x19, [sp, 144]
 
-	add	sp, sp, #320
+	sub	sp, sp, #320
 
 	// Floating Point Registers
 	stp	q0, q1, [sp, 0]
@@ -281,10 +281,10 @@ _restore_kernel_context:
 	ldp	q2, q3, [sp, 32]
 	ldp	q0, q1, [sp, 0]
 
-	sub	sp, sp, #320
+	add	sp, sp, #320
 
 	// Integer Registers
-	ldp	x18, x30, [sp, 144]
+	ldp	x18, x19, [sp, 144]
 	ldp	x16, x17, [sp, 128]
 	ldp	x14, x15, [sp, 112]
 	ldp	x12, x13, [sp, 96]
@@ -295,10 +295,10 @@ _restore_kernel_context:
 	ldp	x2, x3, [sp, 16]
 	ldp	x0, x1, [sp, 0]
 
-	sub	sp, sp, #160
+	add	sp, sp, #160
 
 	stp	x29, x30, [sp, 0]
-	sub	sp, sp, #16
+	add	sp, sp, #16
 
 	eret
 
@@ -306,15 +306,15 @@ _restore_kernel_context:
 // Handle an exception from EL1 to EL1 (ie. the kernel is already running,
 // save kernel registers on the stack instead of the process context).
 .macro HANDLE_KERNEL_EXCEPTION handler
-	add	sp, sp, #16
+	sub	sp, sp, #16
 	stp	x29, x30, [sp, 0]
 
 	bl	_save_kernel_context
 
 	// Print a $ character (for debugging when printing from rust causes exceptions)
-	ldr	x9, =0xFFFF00003F201000
-	mov	w8, #0x24
-	strb	w8, [x9]
+	//ldr	x9, =0xFFFF00003F201000
+	//mov	w8, #0x24
+	//strb	w8, [x9]
 
 	//mov	x0, x3
 	//bl	_debug_print_number

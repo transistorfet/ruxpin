@@ -18,7 +18,7 @@ use super::defs::*;
 
 
 pub fn load_binary(proc: Process, path: &str, argv: &StandardArrayOfStrings, envp: &StandardArrayOfStrings) -> Result<(), KernelError> {
-    let mut locked_proc = proc.lock();
+    let mut locked_proc = proc.try_lock().unwrap();
 
     //vfs::access(locked_proc.cwd.clone(), path, FileAccess::Exec.plus(FileAccess::Regular), locked_proc.current_uid)?;
 
@@ -62,7 +62,7 @@ pub fn load_binary(proc: Process, path: &str, argv: &StandardArrayOfStrings, env
             locked_proc.space.add_file_backed_segment(permissions, file.clone(), segment.p_offset as usize, segment.p_filesz as usize, vaddr, offset, segment.p_memsz as usize);
 
             // TODO this is a hack to forcefully load the page because the page fault in kernel space doesn't work
-            locked_proc.space.alloc_page_at(vaddr)?;
+            //locked_proc.space.alloc_page_at(vaddr)?;
 
         } else if segment.p_type == PT_GNU_RELRO {
             //char **data = proc->map.segments[M_TEXT].base + prog_headers[i].p_vaddr;

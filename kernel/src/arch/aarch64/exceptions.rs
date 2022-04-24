@@ -76,8 +76,8 @@ extern "C" fn handle_user_exception(_context: u64, elr: u64, esr: u64, far: u64,
 }
 
 #[no_mangle]
-extern "C" fn handle_kernel_exception(_context: u64, elr: u64, esr: u64, far: u64, sp: u64) {
-    printkln!("Handle a kernel exception of {:x} for sp {:x}", esr, sp);
+extern "C" fn handle_kernel_exception(_context: u64, elr: u64, esr: u64, far: u64) {
+    printkln!("Handle a kernel exception of {:x} for far {:x} at {:x}", esr, far, elr);
 
     match esr >> 26 {
         // Instruction or Data Abort from lower EL

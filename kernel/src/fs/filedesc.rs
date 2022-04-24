@@ -33,16 +33,21 @@ impl FileDescriptors {
     }
 
     pub fn open(&mut self, cwd: Option<Vnode>, path: &str, flags: OpenFlags, access: FileAccess, current_uid: UserID) -> Result<FileDesc, KernelError> {
-        let file_num = self.find_first()?;
+        let file_num = self.find_free_slot()?;
         let file = vfs::open(cwd, path, flags, access, current_uid)?;
-        self.list[file_num.as_usize() as usize] = Some(file);
+        self.list[file_num.as_usize()] = Some(file);
         Ok(file_num)
     }
 
-    pub fn close(&mut self, file_num: FileDesc) -> Result<(), KernelError> {
+    pub fn set_slot(&mut self, file_num: FileDesc, file: File) -> Result<(), KernelError> {
+        self.list[file_num.as_usize()] = Some(file);
+        Ok(())
+    }
+
+    pub fn clear_slot(&mut self, file_num: FileDesc) -> Result<(), KernelError> {
         //let file = self.get_file(file_num)?;
         //vfs::close(file)?;
-        self.list[file_num.as_usize() as usize] = None;
+        self.list[file_num.as_usize()] = None;
         Ok(())
     }
 
@@ -50,7 +55,7 @@ impl FileDescriptors {
         self.list.clear();
     }
 
-    fn find_first(&mut self) -> Result<FileDesc, KernelError> {
+    pub fn find_free_slot(&mut self) -> Result<FileDesc, KernelError> {
         let mut i = 0;
         while i < self.list.len() && self.list[i].is_some() {
             i += 1;
