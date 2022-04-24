@@ -2,7 +2,6 @@
 pub mod mmu;
 pub mod types;
 pub mod context;
-pub mod registers;
 pub mod exceptions;
 
 core::arch::global_asm!(include_str!("start.s"));

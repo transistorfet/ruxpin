@@ -1,14 +1,8 @@
 
-* if you put separate locks on the fields of proc, or sub-arc<locks> on at least files and space, so that either can be manipulated
-  independently (so a syscall that locks the proc to write a file can still handle a page fault that tries to lock the same proc to
-  load the next page
-
-* sort out issues of copying to/from user space
-
 * need to add heap support to the applications
-* fix waitpid to actually get the process status, and to clean up the dead process as well
-* processes are never removed, which needs to be fixed
-* there might be something broken when waitpid returns (it shouldn't return an error, but seemed to return FileNotFound when exec'ing a file that doesn't exist)
+* add backspace handling to shell (not sure why qemu is weird about backspace and arrows)
+* add cannonical input processing to the tty subsystem
+
 
 * add an events system for processes to wait on (IO blocking, process exit, select/poll, etc)
 * add threading support
@@ -17,6 +11,7 @@
 * add commands: cat, cp, echo, mkdir, mv, ps, pwd, rm, mount, umount
 
 
+* sort out issues of copying to/from user space
 * can you separate the syscalls, maybe even based on permission levels as well as function, and require permission for each api to
   be granted explicitly
 
@@ -43,6 +38,9 @@
   handler, the way it used to fail when the floating point unit was not enabled... but I don't think that's the actual problem here...
   It doesn't seem to cause any other exception, in that qemu doesn't log any exceptions, just seems to loop
 
+* if you put separate locks on the fields of proc, or sub-arc<locks> on at least files and space, so that either can be manipulated
+  independently (so a syscall that locks the proc to write a file can still handle a page fault that tries to lock the same proc to
+  load the next page
 
 
 * I still don't trust the file backed segment calculations.  If there's a better/easier way of loading the binaries and setting up
