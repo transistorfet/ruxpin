@@ -4,7 +4,7 @@ use ruxpin_api::types::{Pid, OpenFlags, FileAccess};
 use crate::fs::vfs;
 use crate::errors::KernelError;
 use crate::misc::strarray::{StrArray, StandardArrayOfStrings};
-use crate::proc::process::{get_current_process, fork_current_process, exit_current_process, suspend_current_process};
+use crate::proc::process::{get_current_process, fork_current_process, exit_current_process, find_exited_process, suspend_current_process, clean_up_process};
 use crate::proc::binaries::elf::loader;
 
 
@@ -51,18 +51,22 @@ pub fn syscall_exec(path: &str, argv: &[&str], envp: &[&str]) -> Result<(), Kern
     }
 }
 
-pub fn syscall_waitpid(pid: Pid, status: &mut usize, _options: usize) -> Result<Pid, KernelError> {
-    //let new_proc = fork_current_process();
-    //let child_pid = new_proc.lock().pid;
-    // TODO need to give a reason, an event
-    // TODO this is so super hacky, but it'll work for now.  We just need to allow the process to restart if *any* process exits
-    if *status != 0xdeadbeef {
-        suspend_current_process();
-        *status = 0xdeadbeef;
-    }
+pub fn syscall_waitpid(pid: Pid, status: &mut isize, _options: usize) -> Result<Pid, KernelError> {
+    let parent_id = get_current_process().lock().pid;
 
-    // TODO this should return the pid of the process that just exited, and also needs to use a proper status
-    let pid = 1;
-    Ok(pid)
+    let search_pid = if pid > 0 { Some(pid) } else { None };
+    let search_parent = if pid == 0 { Some(parent_id) } else { None };
+    let proc = find_exited_process(search_pid, search_parent, None);
+
+    if let Some(proc) = proc {
+        let pid = proc.try_lock().unwrap().pid;
+        *status = proc.try_lock().unwrap().exit_status.unwrap();
+        crate::printkln!("cleaning up process {}", pid);
+        clean_up_process(pid);
+        Ok(pid)
+    } else {
+        suspend_current_process();
+        Ok(0)
+    }
 }
 

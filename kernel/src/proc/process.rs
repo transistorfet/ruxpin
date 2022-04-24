@@ -18,6 +18,10 @@ use crate::sync::Spinlock;
 pub struct ProcessRecord {
     // TODO I don't like that these are all pub... I might need to either isolate this more or change how things interact with processes
     pub pid: Pid,
+    pub parent: Pid,
+    pub pgid: Pid,
+    pub session: Pid,
+
     pub exit_status: Option<isize>,
     pub current_uid: UserID,
     pub space: VirtualAddressSpace,
@@ -34,6 +38,8 @@ struct ProcessManager {
     scheduled: Queue<ProcessRecord>,
     blocked: Queue<ProcessRecord>,
 }
+
+const INIT_PID: Pid = 1;
 
 static NEXT_PID: Spinlock<Pid> = Spinlock::new(1);
 static PROCESS_MANAGER: Spinlock<ProcessManager> = Spinlock::new(ProcessManager::new());
@@ -59,11 +65,22 @@ impl ProcessManager {
         }
     }
 
-    pub fn create_process(&mut self) -> Process {
+    pub fn create_process(&mut self, parent: Option<Process>) -> Process {
         let pid = next_pid();
+
+        let (parent, pgid, session) = match parent {
+            Some(parent_proc) => {
+                let locked = parent_proc.try_lock().unwrap();
+                (locked.pid, locked.pgid, locked.session)
+            },
+            None => (INIT_PID, pid, pid),
+        };
 
         self.processes.push(QueueNode::new(ProcessRecord {
             pid,
+            parent,
+            pgid,
+            session,
             exit_status: None,
             current_uid: 0,
             space: VirtualAddressSpace::new_user_space(),
@@ -81,7 +98,7 @@ impl ProcessManager {
     }
 
     fn create_test_process(&mut self) -> Process {
-        let proc = self.create_process();
+        let proc = self.create_process(None);
 
         {
             let mut locked_proc = proc.try_lock().unwrap();
@@ -109,7 +126,7 @@ impl ProcessManager {
 
     pub fn fork_current_process(&mut self) -> Process {
         let current_proc = self.scheduled.get_head().unwrap();
-        let new_proc = self.create_process();
+        let new_proc = self.create_process(Some(current_proc.clone()));
 
         new_proc.try_lock().unwrap().copy_resources(&*current_proc.try_lock().unwrap());
 
@@ -122,13 +139,13 @@ impl ProcessManager {
         new_current
     }
 
-    fn schedule(&mut self) -> Process {
+    fn schedule(&mut self) {
         let current = self.scheduled.get_head().unwrap();
 
         self.scheduled.remove_node(current.clone());
         self.scheduled.insert_tail(current);
 
-        self.set_current_context()
+        self.set_current_context();
     }
 
     fn suspend(&mut self) {
@@ -166,6 +183,32 @@ impl ProcessManager {
         current.try_lock().unwrap().exit_status = Some(status);
 
         self.restart_blocked_by_syscall(SyscallFunction::WaitPid);
+    }
+
+    fn find_exited_process(&mut self, pid: Option<Pid>, parent: Option<Pid>, process_group: Option<Pid>) -> Option<Process> {
+        for process in self.processes.iter() {
+            let locked_proc = process.try_lock().unwrap();
+            if
+                locked_proc.exit_status.is_some()
+                && (pid.is_none() || locked_proc.pid == pid.unwrap())
+                && (parent.is_none() || locked_proc.parent == parent.unwrap())
+                && (process_group.is_none() || locked_proc.pgid == process_group.unwrap())
+            {
+                return Some(process.clone());
+            }
+        }
+
+        None
+    }
+
+    fn clean_up_process(&mut self, pid: Pid) {
+        for (i, process) in self.processes.iter().enumerate() {
+            if process.try_lock().unwrap().pid == pid {
+                self.processes.remove(i);
+                self.set_current_context();
+                return;
+            }
+        }
     }
 
     fn page_fault(&mut self, far: u64) {
@@ -221,8 +264,8 @@ pub fn create_test_process() {
 }
 
 
-pub fn create_process() -> Process {
-    PROCESS_MANAGER.try_lock().unwrap().create_process()
+pub fn create_process(parent: Option<Process>) -> Process {
+    PROCESS_MANAGER.try_lock().unwrap().create_process(parent)
 }
 
 pub fn get_current_process() -> Process {
@@ -237,12 +280,24 @@ pub fn exit_current_process(status: isize) {
     PROCESS_MANAGER.try_lock().unwrap().exit_current_process(status)
 }
 
-pub(crate) fn schedule() {
-    let new_current = PROCESS_MANAGER.try_lock().unwrap().schedule();
+pub fn find_exited_process(pid: Option<Pid>, parent: Option<Pid>, process_group: Option<Pid>) -> Option<Process> {
+    PROCESS_MANAGER.try_lock().unwrap().find_exited_process(pid, parent, process_group)
+}
 
-    if new_current.lock().restart_syscall {
-        new_current.lock().restart_syscall = false;
-        let mut syscall = new_current.lock().syscall.clone();
+pub fn clean_up_process(pid: Pid) {
+    PROCESS_MANAGER.try_lock().unwrap().clean_up_process(pid)
+}
+
+pub(crate) fn schedule() {
+    PROCESS_MANAGER.try_lock().unwrap().schedule();
+    check_restart_syscall();
+}
+
+pub(crate) fn check_restart_syscall() {
+    let current_proc = get_current_process();
+    if current_proc.lock().restart_syscall {
+        current_proc.lock().restart_syscall = false;
+        let mut syscall = current_proc.lock().syscall.clone();
         process_syscall(&mut syscall);
     }
 }

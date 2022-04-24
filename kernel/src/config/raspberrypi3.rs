@@ -57,7 +57,7 @@ pub fn register_devices() -> Result<(), KernelError> {
 
     // Create the first process
     printkln!("loading the first processs (/bin/sh) from elf binary file");
-    let proc = create_process();
+    let proc = create_process(None);
     let parsed_argv = StandardArrayOfStrings::new();
     let parsed_envp = StandardArrayOfStrings::new();
     loader::load_binary(proc.clone(), "/bin/sh", &parsed_argv, &parsed_envp).unwrap();

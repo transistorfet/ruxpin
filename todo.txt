@@ -3,9 +3,8 @@
   independently (so a syscall that locks the proc to write a file can still handle a page fault that tries to lock the same proc to
   load the next page
 
-* sort out issues of copying to/from user space, and the page fault that in kernel mode that locks up
+* sort out issues of copying to/from user space
 
-* need to support command line arguments (see user/kernel copying)
 * need to add heap support to the applications
 * fix waitpid to actually get the process status, and to clean up the dead process as well
 * processes are never removed, which needs to be fixed
@@ -17,8 +16,6 @@
 
 * add commands: cat, cp, echo, mkdir, mv, ps, pwd, rm, mount, umount
 
-
-* make it consistent whether you use a usize length or a start/end address, not both
 
 * can you separate the syscalls, maybe even based on permission levels as well as function, and require permission for each api to
   be granted explicitly

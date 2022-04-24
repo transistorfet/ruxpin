@@ -39,12 +39,12 @@ pub fn exec(path: &str, args: &[&str], envp: &[&str]) {
     execute_syscall(&mut syscall);
 }
 
-pub fn waitpid(pid: Pid, status: &mut usize, options: usize) -> Result<Pid, ApiError> {
+pub fn waitpid(pid: Pid, status: &mut isize, options: usize) -> Result<Pid, ApiError> {
     let mut i = 0;
     let mut syscall: SyscallRequest = Default::default();
     syscall.function = SyscallFunction::WaitPid;
     syscall_encode!(syscall, i, pid: Pid);
-    syscall_encode!(syscall, i, status: &usize);
+    syscall_encode!(syscall, i, status: &isize);
     syscall_encode!(syscall, i, options: usize);
     execute_syscall(&mut syscall);
     match syscall.error {
