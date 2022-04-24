@@ -13,12 +13,6 @@ use ruxpin_app::env;
 #[no_mangle]
 pub fn main() {
     let mut args = env::args();
-
-    while let Some(arg) = args.next() {
-        println!(">>> {:?}", arg);
-    }
-
-    let mut args = env::args();
     let dirname = args.nth(1).unwrap_or(".");
 
     let file = open(dirname, OpenFlags::ReadOnly, FileAccess::DefaultDir).unwrap();

@@ -48,6 +48,8 @@ load-image-contents: testapp sh coreutils
 	sudo cp bin/testapp/$(TARGETDIR)/testapp $(MOUNTPOINT)/bin
 	sudo cp bin/sh/$(TARGETDIR)/sh $(MOUNTPOINT)/bin
 	sudo cp bin/coreutils/$(TARGETDIR)/ls $(MOUNTPOINT)/bin
+	sudo cp bin/coreutils/$(TARGETDIR)/args $(MOUNTPOINT)/bin
+	sudo cp bin/coreutils/$(TARGETDIR)/cat $(MOUNTPOINT)/bin
 
 
 build-kernel:
