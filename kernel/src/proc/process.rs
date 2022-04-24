@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use ruxpin_api::types::{Pid, UserID};
 use ruxpin_api::syscalls::{SyscallRequest, SyscallFunction};
 
-use crate::api::handle_syscall;
+use crate::api::process_syscall;
 use crate::arch::Context;
 use crate::arch::types::VirtualAddress;
 use crate::errors::KernelError;
@@ -243,8 +243,7 @@ pub(crate) fn schedule() {
     if new_current.lock().restart_syscall {
         new_current.lock().restart_syscall = false;
         let mut syscall = new_current.lock().syscall.clone();
-        handle_syscall(&mut syscall);
-        Context::write_syscall_result_to_current_context(&syscall);
+        process_syscall(&mut syscall);
     }
 }
 

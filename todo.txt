@@ -13,6 +13,7 @@
 
 * add an events system for processes to wait on (IO blocking, process exit, select/poll, etc)
 * add threading support
+* add procfs
 
 * add commands: cat, cp, echo, mkdir, mv, ps, pwd, rm, mount, umount
 

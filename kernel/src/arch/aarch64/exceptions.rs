@@ -54,12 +54,8 @@ extern "C" fn handle_user_exception(_context: u64, elr: u64, esr: u64, far: u64,
     match esr >> 26 {
         // SVC from Aarch64
         0b010101 => {
-            //crate::proc::process::schedule();
             use crate::api::handle_syscall;
-            let mut syscall = Context::syscall_from_current_context();
-            //printkln!("A SYSCALL for {:?}!", syscall.function);
-            handle_syscall(&mut syscall);
-            Context::write_syscall_result_to_current_context(&syscall);
+            handle_syscall();
         },
 
         // Instruction or Data Abort from lower EL

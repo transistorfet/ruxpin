@@ -2,8 +2,8 @@
 use ruxpin_api::types::{Pid, OpenFlags, FileAccess};
 
 use crate::fs::vfs;
-use crate::misc::StrArray;
 use crate::errors::KernelError;
+use crate::misc::strarray::{StrArray, StandardArrayOfStrings};
 use crate::proc::process::{get_current_process, fork_current_process, exit_current_process, suspend_current_process};
 use crate::proc::binaries::elf::loader;
 
@@ -19,8 +19,11 @@ pub fn syscall_fork() -> Result<Pid, KernelError> {
     Ok(child_pid)
 }
 
-pub fn syscall_exec(path: &str /*, _args: &[&str], _evnp: &[&str] */) -> Result<(), KernelError> {
+pub fn syscall_exec(path: &str, argv: &[&str], envp: &[&str]) -> Result<(), KernelError> {
     let proc = get_current_process();
+
+    let parsed_argv = StandardArrayOfStrings::new_parsed(argv);
+    let parsed_envp = StandardArrayOfStrings::new_parsed(envp);
 
     // Need to copy the path out of user memory before we free it all, but this should eventually use a copy_from_user() function
     let mut saved_path: StrArray<100> = StrArray::new();
@@ -34,10 +37,10 @@ pub fn syscall_exec(path: &str /*, _args: &[&str], _evnp: &[&str] */) -> Result<
     crate::printkln!("clearing old process space");
     proc.lock().free_resources();
 
+    proc.lock().files.open(None, "/dev/console0", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0)?;
+
     crate::printkln!("executing a new process");
-    let result = loader::load_binary(proc.clone(), saved_path.as_str()).and_then(|_|
-        proc.lock().files.open(None, "/dev/console0", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0)
-    );
+    let result = loader::load_binary(proc.clone(), saved_path.as_str(), &parsed_argv, &parsed_envp);
 
     match result {
         Ok(_) => Ok(()),

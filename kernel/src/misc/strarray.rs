@@ -1,6 +1,10 @@
 
 use core::str;
+use core::mem;
 
+use crate::misc::align_up;
+use crate::arch::types::VirtualAddress;
+use crate::misc::memory::cast_to_slice_mut;
 use crate::errors::KernelError;
 
 pub struct StrArray<const LENGTH: usize> {
@@ -51,4 +55,70 @@ impl<const LENGTH: usize> TryInto<StrArray<LENGTH>> for &str {
         Ok(array)
     }
 }
+
+
+pub struct ArrayOfStrings<const LENGTH: usize, const WORDS: usize> {
+    buffer_len: usize,
+    buffer: [u8; LENGTH],
+    offsets_len: usize,
+    offsets: [usize; WORDS],
+}
+
+impl<const LENGTH: usize, const WORDS: usize> ArrayOfStrings<LENGTH, WORDS> {
+    pub fn new() -> Self {
+        Self {
+            buffer_len: 0,
+            buffer: [0; LENGTH],
+            offsets_len: 0,
+            offsets: [0; WORDS],
+        }
+    }
+
+    pub fn new_parsed(args: &[&str]) -> Self {
+        let mut strings = Self::new();
+        strings.copy_into(args);
+        strings
+    }
+
+    pub fn offset_len(&self) -> usize {
+        self.offsets_len
+    }
+
+    pub fn calculate_size(&self) -> usize {
+        align_up(self.buffer_len + ((self.offsets_len + 1) * mem::size_of::<*const u8>()), mem::size_of::<usize>())
+    }
+
+    pub fn copy_into(&mut self, args: &[&str]) {
+        let mut i = 0;
+        let mut j = 0;
+        for arg in args.iter() {
+            self.offsets[j] = i;
+            j += 1;
+
+            (&mut self.buffer[i..(i + arg.len())]).copy_from_slice(arg.as_bytes());
+            i += arg.len();
+            self.buffer[i] = 0;
+            i += 1;
+        }
+
+        self.buffer_len = i;
+        self.offsets_len = j;
+    }
+
+    pub fn marshall(&self, dest: &mut [u8], base_addr: VirtualAddress) {
+        let buffer_start = (self.offsets_len + 1) * mem::size_of::<usize>();
+        let dest_usize: &mut [usize] = unsafe { cast_to_slice_mut(dest) };
+
+        for i in 0..self.offsets_len {
+            dest_usize[i] = usize::from(base_addr.add(buffer_start).add(self.offsets[i]));
+        }
+        dest_usize[self.offsets_len] = 0;
+
+        for i in 0..self.buffer_len {
+            dest[buffer_start + i] = self.buffer[i];
+        }
+    }
+}
+
+pub type StandardArrayOfStrings = ArrayOfStrings<2048, 20>;
 

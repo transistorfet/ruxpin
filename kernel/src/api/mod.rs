@@ -6,13 +6,31 @@ use ruxpin_api::types::{Pid, FileDesc, OpenFlags, FileAccess, DirEntry, ApiError
 use crate::api::file::*;
 use crate::api::proc::*;
 use crate::errors::KernelError;
+use crate::arch::context::Context;
 use crate::proc::process::{get_current_process, suspend_current_process};
 
 mod file;
 mod proc;
 
-pub fn handle_syscall(syscall: &mut SyscallRequest) {
+pub fn handle_syscall() {
+    //printkln!("A SYSCALL for {:?}!", syscall.function);
+
+    let mut syscall = Context::syscall_from_current_context();
     get_current_process().lock().syscall = syscall.clone();
+    process_syscall(&mut syscall);
+}
+
+pub fn process_syscall(syscall: &mut SyscallRequest) {
+    if syscall.function == SyscallFunction::Exec {
+        let mut i = 0;
+        syscall_decode!(syscall, i, path: &str);
+        syscall_decode!(syscall, i, args: &[&str]);
+        syscall_decode!(syscall, i, envp: &[&str]);
+        syscall_exec(path, args, envp);
+        // Return without setting the return value, which would overwrite the
+        // command line arguments written to the context by the exec loader
+        return;
+    }
 
     match syscall.function {
         SyscallFunction::Exit => {
@@ -27,12 +45,14 @@ pub fn handle_syscall(syscall: &mut SyscallRequest) {
             store_result(syscall, result.map(|ret| ret as usize));
         },
 
-        SyscallFunction::Exec => {
-            let mut i = 0;
-            syscall_decode!(syscall, i, path: &str);
-            let result = syscall_exec(path);
-            store_result(syscall, result.map(|_| 0));
-        },
+        //SyscallFunction::Exec => {
+        //    let mut i = 0;
+        //    syscall_decode!(syscall, i, path: &str);
+        //    syscall_decode!(syscall, i, args: &[&str]);
+        //    syscall_decode!(syscall, i, envp: &[&str]);
+        //    let result = syscall_exec(path, args, envp);
+        //    store_result(syscall, result.map(|_| 0));
+        //},
 
         SyscallFunction::WaitPid => {
             let mut i = 0;
@@ -80,6 +100,8 @@ pub fn handle_syscall(syscall: &mut SyscallRequest) {
         },
         _ => panic!("syscall: invalid function number: {}", syscall.function as usize),
     }
+
+    Context::write_syscall_result_to_current_context(syscall);
 }
 
 pub fn store_result(syscall: &mut SyscallRequest, result: Result<usize, KernelError>) {

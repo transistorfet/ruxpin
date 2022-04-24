@@ -34,7 +34,7 @@ pub fn main() {
 
                 if &data[0..i] == b"run\n" {
                     println!("executing self");
-                    exec("/mnt/bin/testapp");
+                    exec("/mnt/bin/testapp", &[], &[]);
                 }
 
                 i = 0;

@@ -5,7 +5,6 @@ pub mod cache;
 pub mod circular;
 pub mod memory;
 pub mod strarray;
-pub use self::strarray::StrArray;
 
 pub mod deviceio;
 

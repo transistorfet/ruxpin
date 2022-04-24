@@ -10,6 +10,7 @@ use crate::fs::vfs;
 use crate::proc::process;
 use crate::proc::binaries::elf::loader;
 use crate::proc::process::create_process;
+use crate::misc::strarray::StandardArrayOfStrings;
 use crate::mm::kmalloc::init_kernel_heap;
 use crate::mm::vmalloc::init_virtual_memory;
 
@@ -57,7 +58,9 @@ pub fn register_devices() -> Result<(), KernelError> {
     // Create the first process
     printkln!("loading the first processs (/bin/sh) from elf binary file");
     let proc = create_process();
-    loader::load_binary(proc.clone(), "/bin/sh").unwrap();
+    let parsed_argv = StandardArrayOfStrings::new();
+    let parsed_envp = StandardArrayOfStrings::new();
+    loader::load_binary(proc.clone(), "/bin/sh", &parsed_argv, &parsed_envp).unwrap();
     proc.lock().files.open(None, "/dev/console0", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0).unwrap();
 
     SystemTimer::init(1);

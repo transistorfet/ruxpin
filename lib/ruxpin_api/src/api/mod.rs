@@ -29,10 +29,12 @@ pub fn fork() -> Result<Pid, ApiError> {
     }
 }
 
-pub fn exec(path: &str) {
+pub fn exec(path: &str, args: &[&str], envp: &[&str]) {
     let mut i = 0;
     let mut syscall: SyscallRequest = Default::default();
     syscall_encode!(syscall, i, path: &str);
+    syscall_encode!(syscall, i, args: &[&str]);
+    syscall_encode!(syscall, i, envp: &[&str]);
     syscall.function = SyscallFunction::Exec;
     execute_syscall(&mut syscall);
 }

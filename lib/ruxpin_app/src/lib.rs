@@ -1,18 +1,26 @@
 #![no_std]
 #![no_main]
 
+pub mod env;
+
 use core::panic::PanicInfo;
 
 use ruxpin_api::println;
 use ruxpin_api::types::FileDesc;
-use ruxpin_api::api::{exit, write};
+use ruxpin_api::api::exit;
+
+use crate::env::{Args, Vars};
 
 extern "Rust" {
     fn main();
 }
 
 #[no_mangle]
-pub extern "C" fn _start(_argc: isize, _argv: *const *const u8) -> ! {
+fn _start(argc: isize, argv: *const *const u8, envp: *const *const u8) -> ! {
+
+    Args::set_args(argc, argv);
+    Vars::set_vars(envp);
+
     unsafe {
         main();
     }

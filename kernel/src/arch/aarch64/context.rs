@@ -16,7 +16,7 @@ extern "C" {
 pub static mut CURRENT_CONTEXT: *mut Context = ptr::null_mut();
 
 #[repr(C)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Context {
     x_registers: [u64; 32],
     v_registers: [u64; 64],     // TODO this should be u128, but they don't have a stable ABI, so I'm avoiding them for safety
@@ -89,6 +89,12 @@ impl Context {
                 self.x_registers[1] = true as u64;
             },
         }
+    }
+
+    pub fn write_args(&mut self, argc: usize, argv: VirtualAddress, envp: VirtualAddress) {
+        self.x_registers[0] = argc as u64;
+        self.x_registers[1] = argv.into();
+        self.x_registers[2] = envp.into();
     }
 }
 

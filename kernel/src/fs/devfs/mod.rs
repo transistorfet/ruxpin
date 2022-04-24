@@ -6,7 +6,7 @@ use ruxpin_api::types::{OpenFlags, FileAccess, Seek, UserID, DeviceID, GroupID, 
 
 use crate::tty;
 use crate::sync::Spinlock;
-use crate::misc::StrArray;
+use crate::misc::strarray::StrArray;
 use crate::errors::KernelError;
 
 use super::types::{Filesystem, Mount, MountOperations, Vnode, VnodeOperations, FileAttributes, FilePointer};
