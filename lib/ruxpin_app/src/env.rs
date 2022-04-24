@@ -67,7 +67,7 @@ pub struct Vars {
 impl Vars {
     pub(crate) fn set_vars(envp: *const *const u8) {
         let mut envc = 0;
-        while unsafe { *(envp.add(envc)) }.is_null() {
+        while unsafe { envp.add(envc) }.is_null() {
             envc += 1;
         }
 
