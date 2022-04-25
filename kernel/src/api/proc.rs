@@ -1,7 +1,6 @@
 
 use ruxpin_api::types::{Pid, OpenFlags, FileAccess};
 
-use crate::fs::vfs;
 use crate::errors::KernelError;
 use crate::misc::strarray::{StrArray, StandardArrayOfStrings};
 use crate::proc::process::{get_current_process, fork_current_process, exit_current_process, find_exited_process, suspend_current_process, clean_up_process};

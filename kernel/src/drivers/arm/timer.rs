@@ -22,7 +22,7 @@ impl SystemTimer {
         irqs::enable_irq(irq);
 
         unsafe {
-            let value = SYS_TIMER.get(registers::COUNT_LOW) + 200000;
+            let value = SYS_TIMER.get(registers::COUNT_LOW) + 20000;
             SYS_TIMER.set(registers::COMPARE_1, value);
         }
     }
@@ -30,7 +30,7 @@ impl SystemTimer {
     pub fn reset() {
         unsafe {
             SYS_TIMER.set(registers::CONTROL, 1 << 1);
-            let value = SYS_TIMER.get(registers::COUNT_LOW) + 200000;
+            let value = SYS_TIMER.get(registers::COUNT_LOW) + 20000;
             SYS_TIMER.set(registers::COMPARE_1, value);
         }
     }

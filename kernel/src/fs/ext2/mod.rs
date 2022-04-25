@@ -4,7 +4,6 @@ use alloc::sync::Arc;
 use ruxpin_api::types::{OpenFlags, FileAccess, Seek, DeviceID, UserID, GroupID, DirEntry};
 
 use crate::block;
-use crate::printkln;
 use crate::sync::Spinlock;
 use crate::errors::KernelError;
 

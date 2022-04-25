@@ -276,10 +276,10 @@ impl EmmcHost {
                 Ok(0)
             } else {
                 let r0 = EMMC1.get(registers::RESPONSE0);
-                let r1 = EMMC1.get(registers::RESPONSE1);
-                let r2 = EMMC1.get(registers::RESPONSE2);
-                let r3 = EMMC1.get(registers::RESPONSE3);
-                //printkln!("mmc: received response {:x} {:x} {:x} {:x}", r0, r1, r2, r3);
+                let _r1 = EMMC1.get(registers::RESPONSE1);
+                let _r2 = EMMC1.get(registers::RESPONSE2);
+                let _r3 = EMMC1.get(registers::RESPONSE3);
+                //printkln!("mmc: received response {:x} {:x} {:x} {:x}", r0, _r1, _r2, _r3);
                 Ok(r0)
             }
         }
