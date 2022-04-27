@@ -7,6 +7,7 @@ use crate::arch::types::PhysicalAddress;
 
 use crate::irqs;
 use crate::fs::vfs;
+use crate::tasklets;
 use crate::proc::process;
 use crate::proc::binaries::elf::loader;
 use crate::proc::process::create_process;
@@ -36,6 +37,7 @@ pub fn register_devices() -> Result<(), KernelError> {
     init_virtual_memory(PhysicalAddress::from(0x100_0000), PhysicalAddress::from(0x1000_0000));
     irqs::register_interrupt_controller(Box::new(GenericInterruptController::new()));
 
+    tasklets::initialize()?;
     vfs::initialize()?;
     process::initialize()?;
 

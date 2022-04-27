@@ -4,8 +4,6 @@ use core::arch::asm;
 use crate::irqs;
 use crate::printkln;
 
-use super::context::Context;
-
 
 pub type IrqFlags = u64;
 
@@ -73,6 +71,7 @@ extern "C" fn handle_user_exception(_context: u64, elr: u64, esr: u64, far: u64,
             fatal_error(elr, esr, far);
         }
     }
+    crate::tasklets::run_tasklets();
 }
 
 #[no_mangle]
@@ -103,5 +102,6 @@ extern "C" fn handle_irq(_context: u64, _elr: u64, _esr: u64, _far: u64, _sp: u6
 
     irqs::handle_irqs();
     crate::proc::process::schedule();
+    crate::tasklets::run_tasklets();
 }
 

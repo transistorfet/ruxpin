@@ -1,4 +1,10 @@
 
+* adding tasklets to trigger handling of input
+* need to handle clearing of the tty line
+* need to change the shell program to just read in the whole line
+
+* circular buffer could probably be replaced with VecDeque?  Maybe some other things could be too
+
 * need to add heap support to the applications
 * add backspace handling to shell (not sure why qemu is weird about backspace and arrows)
 * add cannonical input processing to the tty subsystem

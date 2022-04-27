@@ -15,6 +15,7 @@ pub mod mm;
 pub mod printk;
 pub mod proc;
 pub mod sync;
+pub mod tasklets;
 pub mod tty;
 
 extern crate alloc;
