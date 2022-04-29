@@ -3,7 +3,7 @@ use ruxpin_api::types::{Pid, OpenFlags, FileAccess};
 
 use crate::errors::KernelError;
 use crate::misc::strarray::{StrArray, StandardArrayOfStrings};
-use crate::proc::process::{get_current_process, fork_current_process, exit_current_process, find_exited_process, suspend_current_process, clean_up_process};
+use crate::proc::process::{get_current_process, fork_current_process, exit_current_process, find_exited_process, suspend_process, clean_up_process};
 use crate::proc::binaries::elf::loader;
 
 
@@ -64,7 +64,7 @@ pub fn syscall_waitpid(pid: Pid, status: &mut isize, _options: usize) -> Result<
         clean_up_process(pid);
         Ok(pid)
     } else {
-        suspend_current_process();
+        suspend_process(get_current_process());
         Ok(0)
     }
 }

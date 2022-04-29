@@ -2,10 +2,16 @@
 use alloc::vec::Vec;
 use alloc::boxed::Box;
  
-use ruxpin_api::types::{OpenFlags, DeviceID, DriverID, SubDeviceID};
+use ruxpin_api::syscalls::SyscallFunction;
+use ruxpin_api::types::{OpenFlags, DeviceID, DriverID, MinorDeviceID};
 
+use crate::proc::process;
 use crate::sync::Spinlock;
 use crate::errors::KernelError;
+use crate::tasklets::schedule_tasklet;
+
+mod canonical;
+use self::canonical::CanonicalReader;
 
 
 pub trait CharOperations: Sync + Send {
@@ -18,7 +24,15 @@ pub trait CharOperations: Sync + Send {
     //offset_t (*seek)(devminor_t minor, offset_t position, int whence, offset_t offset);
 }
 
+pub struct CharDriver {
+    prefix: &'static str,
+    devices: Vec<TtyDevice>,
+}
 
+pub struct TtyDevice {
+    dev: Box<dyn CharOperations>,
+    reader: Option<CanonicalReader>,
+}
 
 static TTY_DRIVERS: Spinlock<Vec<CharDriver>> = Spinlock::new(Vec::new());
 
@@ -29,7 +43,7 @@ pub fn register_tty_driver(prefix: &'static str) -> Result<DriverID, KernelError
     Ok(driver_id)
 }
 
-pub fn register_tty_device(driver_id: DriverID, dev: Box<dyn CharOperations>) -> Result<SubDeviceID, KernelError> {
+pub fn register_tty_device(driver_id: DriverID, dev: Box<dyn CharOperations>) -> Result<MinorDeviceID, KernelError> {
     let mut drivers_list = TTY_DRIVERS.lock();
     let driver = drivers_list.get_mut(driver_id as usize).ok_or(KernelError::NoSuchDevice)?;
     driver.add_device(dev)
@@ -39,7 +53,7 @@ pub fn lookup_device(name: &str) -> Result<DeviceID, KernelError> {
     let drivers_list = TTY_DRIVERS.lock();
     for (driver_id, driver) in drivers_list.iter().enumerate() {
         if driver.prefix == &name[..driver.prefix.len()] {
-            let subdevice_id = name[driver.prefix.len()..].parse::<SubDeviceID>().map_err(|_| KernelError::NoSuchDevice)?;
+            let subdevice_id = name[driver.prefix.len()..].parse::<MinorDeviceID>().map_err(|_| KernelError::NoSuchDevice)?;
             if (subdevice_id as usize) < driver.devices.len() {
                 return Ok(DeviceID(driver_id as DriverID, subdevice_id));
             }
@@ -62,16 +76,59 @@ pub fn close(device_id: DeviceID) -> Result<(), KernelError> {
     device.dev.close()
 }
 
-pub fn read(device_id: DeviceID, buffer: &mut [u8]) -> Result<usize, KernelError> {
+pub(crate) fn read_raw(device_id: DeviceID, buffer: &mut [u8]) -> Result<usize, KernelError> {
     let mut drivers_list = TTY_DRIVERS.lock();
     let device = get_device(&mut *drivers_list, device_id)?;
     device.dev.read(buffer)
+}
+
+pub fn read(device_id: DeviceID, buffer: &mut [u8]) -> Result<usize, KernelError> {
+    let mut drivers_list = TTY_DRIVERS.lock();
+    let device = get_device(&mut *drivers_list, device_id)?;
+
+    let nbytes = if let Some(reader) = device.reader.as_mut() {
+        reader.read(buffer)?
+    } else {
+        device.dev.read(buffer)?
+    };
+
+    if nbytes == 0 {
+        let current = process::get_current_process();
+        schedule_tasklet(Box::new(move || {
+            process::suspend_process(current);
+            Ok(())
+        }));
+    }
+
+    Ok(nbytes)
 }
 
 pub fn write(device_id: DeviceID, buffer: &[u8]) -> Result<usize, KernelError> {
     let mut drivers_list = TTY_DRIVERS.lock();
     let device = get_device(&mut *drivers_list, device_id)?;
     device.dev.write(buffer)
+}
+
+pub fn schedule_update(device_id: DeviceID) -> Result<(), KernelError> {
+    //schedule_tasklet(Box::new(move || {
+        let mut drivers_list = TTY_DRIVERS.lock();
+        let device = get_device(&mut *drivers_list, device_id)?;
+        if let Some(reader) = device.reader.as_mut() {
+            let mut ch = [0; 1];
+            while device.dev.read(&mut ch)? > 0 {
+                let dev = &mut device.dev;
+                if reader.process_char(dev, ch[0])? {
+                    schedule_tasklet(Box::new(|| {
+                        process::restart_blocked(SyscallFunction::Read);
+                        Ok(())
+                    }));
+                }
+            }
+        }
+
+        //process::restart_blocked(SyscallFunction::Read);
+        Ok(())
+    //}));
 }
 
 fn get_device(drivers_list: &mut Vec<CharDriver>, device_id: DeviceID) -> Result<&mut TtyDevice, KernelError> {
@@ -82,11 +139,6 @@ fn get_device(drivers_list: &mut Vec<CharDriver>, device_id: DeviceID) -> Result
 }
 
 
-pub struct CharDriver {
-    prefix: &'static str,
-    devices: Vec<TtyDevice>,
-}
-
 impl CharDriver {
     pub const fn new(prefix: &'static str) -> Self {
         Self {
@@ -95,21 +147,18 @@ impl CharDriver {
         }
     }
 
-    pub fn add_device(&mut self, dev: Box<dyn CharOperations>) -> Result<SubDeviceID, KernelError> {
-        let device_id = self.devices.len() as SubDeviceID;
+    pub fn add_device(&mut self, dev: Box<dyn CharOperations>) -> Result<MinorDeviceID, KernelError> {
+        let device_id = self.devices.len() as MinorDeviceID;
         self.devices.push(TtyDevice::new(dev));
         Ok(device_id)
     }
-}
-
-pub struct TtyDevice {
-    dev: Box<dyn CharOperations>,
 }
 
 impl TtyDevice {
     pub fn new(dev: Box<dyn CharOperations>) -> Self {
         Self {
             dev,
+            reader: Some(CanonicalReader::new()),
         }
     }
 }

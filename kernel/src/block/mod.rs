@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use alloc::sync::Arc;
 use alloc::boxed::Box;
  
-use ruxpin_api::types::{OpenFlags, DeviceID, DriverID, SubDeviceID};
+use ruxpin_api::types::{OpenFlags, DeviceID, DriverID, MinorDeviceID};
 
 use crate::sync::Spinlock;
 use crate::errors::KernelError;
@@ -47,7 +47,7 @@ pub fn register_block_driver(prefix: &'static str) -> Result<DriverID, KernelErr
     Ok(driver_id)
 }
 
-pub fn register_block_device(driver_id: DriverID, dev: Box<dyn BlockOperations>) -> Result<SubDeviceID, KernelError> {
+pub fn register_block_device(driver_id: DriverID, dev: Box<dyn BlockOperations>) -> Result<MinorDeviceID, KernelError> {
     let mut drivers_list = BLOCK_DRIVERS.lock();
     let driver = drivers_list.get_mut(driver_id as usize).ok_or(KernelError::NoSuchDevice)?;
     driver.add_device(driver_id, dev)
@@ -57,7 +57,7 @@ pub fn lookup_device(name: &str) -> Result<DeviceID, KernelError> {
     let drivers_list = BLOCK_DRIVERS.lock();
     for (driver_id, driver) in drivers_list.iter().enumerate() {
         if driver.prefix == &name[..driver.prefix.len()] {
-            let subdevice_id = name[driver.prefix.len()..].parse::<SubDeviceID>().map_err(|_| KernelError::NoSuchDevice)?;
+            let subdevice_id = name[driver.prefix.len()..].parse::<MinorDeviceID>().map_err(|_| KernelError::NoSuchDevice)?;
             if (subdevice_id as usize) < driver.devices.len() {
                 return Ok(DeviceID(driver_id as DriverID, subdevice_id));
             }
@@ -141,8 +141,8 @@ impl BlockDriver {
         }
     }
 
-    pub fn add_device(&mut self, driver_id: DriverID, dev: Box<dyn BlockOperations>) -> Result<SubDeviceID, KernelError> {
-        let device_id = self.devices.len() as SubDeviceID;
+    pub fn add_device(&mut self, driver_id: DriverID, dev: Box<dyn BlockOperations>) -> Result<MinorDeviceID, KernelError> {
+        let device_id = self.devices.len() as MinorDeviceID;
         self.devices.push(Arc::new(BlockDevice::new(DeviceID(driver_id, device_id), dev)));
         Ok(device_id)
     }

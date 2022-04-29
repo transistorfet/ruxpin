@@ -89,7 +89,9 @@ impl CharOperations for PL011Device {
                 buffer[i] = byte;
             } else {
                 if i == 0 {
-                    process::suspend_current_process();
+                    //use crate::tasklets::schedule_tasklet;
+                    //schedule_tasklet(Box::new(|| { process::suspend_current_process(); Ok(()) }));
+                    //process::suspend_current_process();
                     //return Err(KernelError::SuspendProcess);
                 }
                 break;
@@ -118,6 +120,7 @@ mod registers {
     pub const LINE_CONTROL: usize       = 0x2C;
     pub const CONTROL: usize            = 0x30;
     pub const INTERRUPT_MASK: usize     = 0x38;
+    pub const INTERRUPT_STATUS: usize   = 0x3C;
     pub const INTERRUPT_CLEAR: usize    = 0x44;
 }
 
@@ -225,7 +228,10 @@ pub fn handle_irq_pl011() {
         while let Some(ch) = RAW_CONSOLE.get_char_unbuffered() {
             //crate::printkln!(">>> {}", ch);
             RAW_CONSOLE.buffer.insert(ch);
-            process::restart_blocked(SyscallFunction::Read);
+            //process::restart_blocked(SyscallFunction::Read);
+            if let Some(device_id) = TTY_CONSOLE {
+                tty::schedule_update(device_id);
+            }
         }
     }
 }

@@ -7,13 +7,13 @@ use crate::api::file::*;
 use crate::api::proc::*;
 use crate::errors::KernelError;
 use crate::arch::context::Context;
-use crate::proc::process::{get_current_process, suspend_current_process, check_restart_syscall};
+use crate::proc::process::{get_current_process, suspend_process, check_restart_syscall};
 
 mod file;
 mod proc;
 
 pub fn handle_syscall() {
-    //printkln!("A SYSCALL for {:?}!", syscall.function);
+    //crate::printkln!("A SYSCALL for {:?}!", syscall.function);
 
     let mut syscall = Context::syscall_from_current_context();
     get_current_process().try_lock().unwrap().syscall = syscall.clone();
@@ -113,7 +113,7 @@ pub fn store_result(syscall: &mut SyscallRequest, result: Result<usize, KernelEr
         },
         Err(value) => {
             if value == KernelError::SuspendProcess {
-                suspend_current_process();
+                suspend_process(get_current_process());
             }
 
             syscall.error = true;

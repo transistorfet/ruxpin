@@ -15,6 +15,13 @@ use crate::mm::vmalloc::VirtualAddressSpace;
 use crate::sync::Spinlock;
 
 
+#[derive(Copy, Clone, PartialEq)]
+pub enum ProcessState {
+    Exited,
+    Running,
+    Blocked,
+}
+
 pub struct ProcessRecord {
     // TODO I don't like that these are all pub... I might need to either isolate this more or change how things interact with processes
     pub pid: Pid,
@@ -22,6 +29,7 @@ pub struct ProcessRecord {
     pub pgid: Pid,
     pub session: Pid,
 
+    pub state: ProcessState,
     pub exit_status: Option<isize>,
     pub current_uid: UserID,
     pub space: VirtualAddressSpace,
@@ -81,6 +89,7 @@ impl ProcessManager {
             parent,
             pgid,
             session,
+            state: ProcessState::Running,
             exit_status: None,
             current_uid: 0,
             space: VirtualAddressSpace::new_user_space(),
@@ -148,15 +157,18 @@ impl ProcessManager {
         self.set_current_context();
     }
 
-    fn suspend(&mut self) {
+    fn suspend(&mut self, proc: Process) {
         // also take an "event" arg
         // TODO actually you need an event to block on, and you could just put it in the process, but you... I supposed... could just
         // allocate the list nodes as needed and not have a vec (would mean a bunch of boxes, but that's ok... but also kinda implies the alloc::linked_list impl
 
-        let current = self.scheduled.get_head().unwrap();
+        //let current = self.scheduled.get_head().unwrap();
 
-        self.scheduled.remove_node(current.clone());
-        self.blocked.insert_head(current);
+        if proc.try_lock().unwrap().state == ProcessState::Running {
+            self.scheduled.remove_node(proc.clone());
+            self.blocked.insert_head(proc.clone());
+            proc.try_lock().unwrap().state = ProcessState::Blocked;
+        }
 
         self.set_current_context();
     }
@@ -164,8 +176,11 @@ impl ProcessManager {
     fn restart_blocked_by_syscall(&mut self, function: SyscallFunction) {
         for node in self.blocked.iter() {
             if node.try_lock().unwrap().syscall.function == function {
-                self.blocked.remove_node(node.clone());
-                self.scheduled.insert_head(node.clone());
+                if node.try_lock().unwrap().state == ProcessState::Blocked {
+                    self.blocked.remove_node(node.clone());
+                    self.scheduled.insert_head(node.clone());
+                    node.try_lock().unwrap().state = ProcessState::Running;
+                }
                 node.lock().restart_syscall = true;
             }
         }
@@ -179,8 +194,12 @@ impl ProcessManager {
 
         self.scheduled.remove_node(current.clone());
 
-        current.try_lock().unwrap().free_resources();
-        current.try_lock().unwrap().exit_status = Some(status);
+        {
+            let mut locked = current.try_lock().unwrap();
+            locked.free_resources();
+            locked.exit_status = Some(status);
+            locked.state = ProcessState::Exited;
+        }
 
         self.restart_blocked_by_syscall(SyscallFunction::WaitPid);
     }
@@ -302,8 +321,8 @@ pub(crate) fn check_restart_syscall() {
     }
 }
 
-pub(crate) fn suspend_current_process() {
-    PROCESS_MANAGER.try_lock().unwrap().suspend();
+pub(crate) fn suspend_process(proc: Process) {
+    PROCESS_MANAGER.try_lock().unwrap().suspend(proc);
 }
 
 pub(crate) fn restart_blocked(function: SyscallFunction) {

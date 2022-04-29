@@ -71,7 +71,10 @@ extern "C" fn handle_user_exception(_context: u64, elr: u64, esr: u64, far: u64,
             fatal_error(elr, esr, far);
         }
     }
+
+    enable_all_irq();
     crate::tasklets::run_tasklets();
+    disable_all_irq();
 }
 
 #[no_mangle]
@@ -101,7 +104,11 @@ extern "C" fn handle_irq(_context: u64, _elr: u64, _esr: u64, _far: u64, _sp: u6
     //printkln!("Handle an irq of {:x} for sp {:x}", _esr, _sp);
 
     irqs::handle_irqs();
-    crate::proc::process::schedule();
+
+    enable_all_irq();
     crate::tasklets::run_tasklets();
+    disable_all_irq();
+
+    crate::proc::process::schedule();
 }
 

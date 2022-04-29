@@ -15,9 +15,9 @@ pub enum Seek {
 
 
 pub type DriverID = u8;
-pub type SubDeviceID = u8;
+pub type MinorDeviceID = u8;
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd)]
-pub struct DeviceID(pub DriverID, pub SubDeviceID);
+pub struct DeviceID(pub DriverID, pub MinorDeviceID);
 
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
