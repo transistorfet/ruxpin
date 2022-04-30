@@ -1,11 +1,5 @@
 
-use alloc::boxed::Box;
-
-use ruxpin_api::syscalls::SyscallFunction;
-
-use crate::proc::process;
 use crate::errors::KernelError;
-use crate::tasklets::schedule_tasklet;
 
 use super::CharOperations;
 
@@ -33,25 +27,30 @@ impl CanonicalReader {
             return Ok(true);
         }
 
-        if ch < 0x20 {
-            match ch as char {
-                '\n' | '\r' => {
-                    dev.write(b"\n")?;
-                    //process::restart_blocked(SyscallFunction::Read);
-                    //schedule_tasklet(Box::new(|| {
-                    //    process::restart_blocked(SyscallFunction::Read);
-                    //    Ok(())
-                    //}));
-
-                    self.ready = true;
-                    //dev.write(b"entered")?;
-                }
-                _ => { },
-            }
-        } else {
+        if ch >= 0x20 && ch <= 0x7E {
             self.buffer[self.in_pos] = ch;
             self.in_pos += 1;
             dev.write(&[ch])?;
+        } else {
+
+            match ch as char {
+                '\n' | '\r' => {
+                    dev.write(b"\n")?;
+                    self.ready = true;
+                },
+                '\x08' | '\x7f' => {
+                    dev.write(b"\x08 \x08")?;
+                    self.in_pos -= 1;
+                    self.buffer[self.in_pos] = ' ' as u8;
+                },
+                _ => {
+                    // TODO this is for debugging
+                    //let mut data = [0; 2];
+                    //data[0] = (ch / 10) + 0x30;
+                    //data[1] = (ch % 10) + 0x30;
+                    //dev.write(&data)?;
+                },
+            }
         }
         Ok(self.ready)
     }
