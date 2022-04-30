@@ -39,9 +39,11 @@ impl CanonicalReader {
                     self.ready = true;
                 },
                 '\x08' | '\x7f' => {
-                    dev.write(b"\x08 \x08")?;
-                    self.in_pos -= 1;
-                    self.buffer[self.in_pos] = ' ' as u8;
+                    if self.in_pos > 0 {
+                        dev.write(b"\x08 \x08")?;
+                        self.in_pos -= 1;
+                        self.buffer[self.in_pos] = ' ' as u8;
+                    }
                 },
                 _ => {
                     // TODO this is for debugging

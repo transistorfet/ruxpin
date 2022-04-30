@@ -1,17 +1,14 @@
 
-use alloc::vec::Vec;
 use alloc::sync::Arc;
 
-use ruxpin_api::types::{OpenFlags, FileAccess, Seek, UserID, GroupID, DeviceID, DirEntry};
+use ruxpin_api::types::{FileAccess, DeviceID};
 
 use crate::sync::Spinlock;
-use crate::misc::strarray::StrArray;
 use crate::errors::KernelError;
 
-use super::types::{Filesystem, Mount, MountOperations, Vnode, VnodeOperations, FileAttributes, FilePointer};
+use super::generic::GenericDirectoryVnode;
+use super::types::{Filesystem, Mount, MountOperations, Vnode};
 
-
-const TMPFS_MAX_FILENAME: usize = 32;
 
 pub struct TmpFilesystem {
     
@@ -20,22 +17,6 @@ pub struct TmpFilesystem {
 pub struct TmpMount {
     root_node: Vnode,
     mounted_on: Option<Vnode>,
-}
-
-pub struct TmpDirEntry {
-    name: StrArray<TMPFS_MAX_FILENAME>,
-    vnode: Vnode,
-}
-
-pub struct TmpVnodeFile {
-    attrs: FileAttributes,
-    contents: Vec<u8>,
-}
-
-pub struct TmpVnodeDirectory {
-    attrs: FileAttributes,
-    contents: Vec<TmpDirEntry>,
-    mounted_vnode: Option<Vnode>,
 }
 
 impl Filesystem for TmpFilesystem {
@@ -49,7 +30,7 @@ impl Filesystem for TmpFilesystem {
     }
 
     fn mount(&mut self, parent: Option<Vnode>, _device_id: Option<DeviceID>) -> Result<Mount, KernelError> {
-        let root_node = Arc::new(Spinlock::new(TmpVnodeDirectory::new(FileAccess::DefaultDir, 0, 0)));
+        let root_node = Arc::new(Spinlock::new(GenericDirectoryVnode::new(FileAccess::DefaultDir, 0, 0)));
 
         let mount = Arc::new(Spinlock::new(TmpMount {
             root_node,
@@ -82,166 +63,4 @@ impl MountOperations for TmpMount {
     }
 }
 
-impl VnodeOperations for TmpVnodeDirectory {
-    fn get_mount_mut<'a>(&'a mut self) -> Result<&'a mut Option<Vnode>, KernelError> {
-        Ok(&mut self.mounted_vnode)
-    }
-
-    fn create(&mut self, filename: &str, access: FileAccess, uid: UserID, gid: GroupID) -> Result<Vnode, KernelError> {
-        let entry = TmpDirEntry::new(filename, access, uid, gid);
-        let vnode = entry.vnode.clone();
-        self.contents.push(entry);
-        Ok(vnode)
-    }
-
-    fn lookup(&mut self, filename: &str) -> Result<Vnode, KernelError> {
-        for entry in &self.contents {
-            if entry.name.as_str() == filename {
-                return Ok(entry.vnode.clone());
-            }
-        }
-        Err(KernelError::FileNotFound)
-    }
-
-
-    //fn link(&mut self, _newparent: Vnode, _filename: &str) -> Result<Vnode, KernelError> {
-    //    Err(KernelError::OperationNotPermitted)
-    //}
-
-    //fn unlink(&mut self, _target: Vnode, _filename: &str) -> Result<Vnode, KernelError> {
-    //    Err(KernelError::OperationNotPermitted)
-    //}
-
-    //fn rename(&mut self, _filename: &str) -> Result<Vnode, KernelError> {
-    //    Err(KernelError::OperationNotPermitted)
-    //}
-
-
-    fn attributes<'a>(&'a mut self) -> Result<&'a FileAttributes, KernelError> {
-        Ok(&mut self.attrs)
-    }
-
-    //fn attributes_mut(&mut self, f: &mut dyn FnMut(&mut FileAttributes)) -> Result<(), KernelError> {
-    //    Err(KernelError::OperationNotPermitted)
-    //}
-
-    fn open(&mut self, _file: &mut FilePointer, _flags: OpenFlags) -> Result<(), KernelError> {
-        Ok(())
-    }
-
-    fn close(&mut self, _file: &mut FilePointer) -> Result<(), KernelError> {
-        Ok(())
-    }
-
-    fn readdir(&mut self, file: &mut FilePointer) -> Result<Option<DirEntry>, KernelError> {
-        if file.position >= self.contents.len() {
-            return Ok(None);
-        }
-
-        let result = DirEntry::new(0, self.contents[file.position].name.as_str().as_bytes());
-
-        file.position += 1;
-
-        Ok(Some(result))
-    }
-}
-
-impl VnodeOperations for TmpVnodeFile {
-    fn truncate(&mut self) -> Result<(), KernelError> {
-        self.contents.clear();
-        Ok(())
-    }
-
-    fn attributes<'a>(&'a mut self) -> Result<&'a FileAttributes, KernelError> {
-        Ok(&mut self.attrs)
-    }
-
-    //fn attributes_mut<'a>(&'a mut self) -> Result<&'a mut FileAttributes, KernelError> {
-    //    // TODO this isn't right because you need to update
-    //    Ok(&mut self.attrs)
-    //}
-
-    fn open(&mut self, _file: &mut FilePointer, _flags: OpenFlags) -> Result<(), KernelError> {
-        Ok(())
-    }
-
-    fn close(&mut self, _file: &mut FilePointer) -> Result<(), KernelError> {
-        Ok(())
-    }
-
-    fn read(&mut self, file: &mut FilePointer, buffer: &mut [u8]) -> Result<usize, KernelError> {
-        let start = file.position;
-        for byte in buffer {
-            if file.position >= self.contents.len() {
-                break;
-            }
-            *byte = self.contents[file.position];
-            file.position += 1;
-        }
-        Ok(file.position - start)
-    }
-
-    fn write(&mut self, file: &mut FilePointer, buffer: &[u8]) -> Result<usize, KernelError> {
-        let start = file.position;
-        for byte in buffer {
-            if file.position >= self.contents.len() {
-                for _ in self.contents.len()..=file.position {
-                    self.contents.push(0);
-                }
-            }
-            self.contents[file.position] = *byte;
-            file.position += 1;
-        }
-        Ok(file.position - start)
-    }
-
-    fn seek(&mut self, file: &mut FilePointer, offset: usize, whence: Seek) -> Result<usize, KernelError> {
-        let position = match whence {
-            Seek::FromStart => offset,
-            Seek::FromCurrent => file.position + offset,
-            Seek::FromEnd => self.attrs.size + offset,
-        };
-
-        if position >= self.attrs.size {
-            file.position = self.attrs.size;
-        } else {
-            file.position = position;
-        }
-        Ok(file.position)
-    }
-}
-
-impl TmpDirEntry {
-    pub fn new(name: &str, access: FileAccess, uid: UserID, gid: GroupID) -> Self {
-        let vnode: Vnode = if access.is_dir() {
-            Arc::new(Spinlock::new(TmpVnodeDirectory::new(access, uid, gid)))
-        } else {
-            Arc::new(Spinlock::new(TmpVnodeFile::new(access, uid, gid)))
-        };
-
-        Self {
-            name: name.try_into().unwrap(),
-            vnode,
-        }
-    }
-}
-
-impl TmpVnodeDirectory {
-    pub fn new(access: FileAccess, uid: UserID, gid: GroupID) -> Self {
-        Self {
-            attrs: FileAttributes::new(access, uid, gid),
-            contents: Vec::new(),
-            mounted_vnode: None,
-        }
-    }
-}
-
-impl TmpVnodeFile {
-    pub fn new(access: FileAccess, uid: UserID, gid: GroupID) -> Self {
-        Self {
-            attrs: FileAttributes::new(access, uid, gid),
-            contents: Vec::new(),
-        }
-    }
-}
 

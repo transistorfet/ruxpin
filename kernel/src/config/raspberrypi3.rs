@@ -45,6 +45,8 @@ pub fn register_devices() -> Result<(), KernelError> {
     vfs::register_filesystem(TmpFilesystem::new())?;
     use crate::fs::devfs::DevFilesystem;
     vfs::register_filesystem(DevFilesystem::new())?;
+    use crate::fs::procfs::ProcFilesystem;
+    vfs::register_filesystem(ProcFilesystem::new())?;
     use crate::fs::ext2::Ext2Filesystem;
     vfs::register_filesystem(Ext2Filesystem::new())?;
 
@@ -54,6 +56,8 @@ pub fn register_devices() -> Result<(), KernelError> {
     vfs::mount(None, "/", "ext2", Some(DeviceID(0, 2)), 0).unwrap();
     vfs::open(None, "/dev", OpenFlags::Create, FileAccess::DefaultDir, 0).unwrap();
     vfs::mount(None, "/dev", "devfs", None, 0).unwrap();
+    vfs::open(None, "/proc", OpenFlags::Create, FileAccess::DefaultDir, 0).unwrap();
+    vfs::mount(None, "/proc", "procfs", None, 0).unwrap();
 
     startup_tests().unwrap();
 

@@ -1,5 +1,6 @@
 
 use alloc::vec::Vec;
+use alloc::string::String;
 
 use ruxpin_api::types::{Pid, UserID};
 use ruxpin_api::syscalls::{SyscallRequest, SyscallFunction};
@@ -29,6 +30,7 @@ pub struct ProcessRecord {
     pub pgid: Pid,
     pub session: Pid,
 
+    pub cmd: String,
     pub state: ProcessState,
     pub exit_status: Option<isize>,
     pub current_uid: UserID,
@@ -89,6 +91,7 @@ impl ProcessManager {
             parent,
             pgid,
             session,
+            cmd: String::new(),
             state: ProcessState::Running,
             exit_status: None,
             current_uid: 0,
@@ -123,6 +126,27 @@ impl ProcessManager {
         }
 
         proc
+    }
+
+    pub fn get_process(&mut self, pid: Pid) -> Option<Process> {
+        for proc in self.processes.iter() {
+            if proc.try_lock().unwrap().pid == pid {
+                return Some(proc.clone());
+            }
+        }
+        None
+    }
+
+    pub fn get_slot(&mut self, slot: usize) -> Option<Process> {
+        if slot < self.processes.len() {
+            Some(self.processes[slot].clone())
+        } else {
+            None
+        }
+    }
+
+    pub fn slot_len(&mut self) -> usize {
+        self.processes.len()
     }
 
     pub fn get_current_process(&mut self) -> Process {
@@ -285,6 +309,18 @@ pub fn create_test_process() {
 
 pub fn create_process(parent: Option<Process>) -> Process {
     PROCESS_MANAGER.try_lock().unwrap().create_process(parent)
+}
+
+pub fn get_process(pid: Pid) -> Option<Process> {
+    PROCESS_MANAGER.try_lock().unwrap().get_process(pid)
+}
+
+pub fn get_slot(slot: usize) -> Option<Process> {
+    PROCESS_MANAGER.try_lock().unwrap().get_slot(slot)
+}
+
+pub fn slot_len() -> usize {
+    PROCESS_MANAGER.try_lock().unwrap().slot_len()
 }
 
 pub fn get_current_process() -> Process {

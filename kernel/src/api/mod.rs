@@ -27,10 +27,12 @@ pub fn process_syscall(syscall: &mut SyscallRequest) {
         syscall_decode!(syscall, i, path: &str);
         syscall_decode!(syscall, i, args: &[&str]);
         syscall_decode!(syscall, i, envp: &[&str]);
-        syscall_exec(path, args, envp);
-        // Return without setting the return value, which would overwrite the
-        // command line arguments written to the context by the exec loader
-        return;
+        match syscall_exec(path, args, envp) {
+            // Return without setting the return value, which would overwrite the
+            // command line arguments written to the context by the exec loader
+            Ok(()) => return,
+            Err(err) => store_result(syscall, Err(err)),
+        }
     }
 
     match syscall.function {

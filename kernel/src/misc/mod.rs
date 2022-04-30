@@ -4,6 +4,7 @@ pub mod byteorder;
 pub mod cache;
 pub mod memory;
 pub mod strarray;
+pub mod writer;
 
 pub mod deviceio;
 

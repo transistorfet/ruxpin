@@ -59,39 +59,40 @@ pub struct FileAccess(pub u16);
 #[allow(dead_code)]
 #[allow(non_upper_case_globals)]
 impl FileAccess {
-    pub const FileTypeMask: FileAccess  = FileAccess(0o170000);
+    pub const FileTypeMask: FileAccess          = FileAccess(0o170000);
 
-    pub const Socket: FileAccess        = FileAccess(0o140000);
-    pub const SymbolicLink: FileAccess  = FileAccess(0o120000);
-    pub const Regular: FileAccess       = FileAccess(0o100000);
+    pub const Socket: FileAccess                = FileAccess(0o140000);
+    pub const SymbolicLink: FileAccess          = FileAccess(0o120000);
+    pub const Regular: FileAccess               = FileAccess(0o100000);
 
-    pub const BlockDevice: FileAccess   = FileAccess(0o060000);
-    pub const Directory: FileAccess     = FileAccess(0o040000);
-    pub const CharDevice: FileAccess    = FileAccess(0o020000);
-    pub const Fifo: FileAccess          = FileAccess(0o010000);
+    pub const BlockDevice: FileAccess           = FileAccess(0o060000);
+    pub const Directory: FileAccess             = FileAccess(0o040000);
+    pub const CharDevice: FileAccess            = FileAccess(0o020000);
+    pub const Fifo: FileAccess                  = FileAccess(0o010000);
 
-    pub const SUID: FileAccess          = FileAccess(0o004000);
-    pub const SGID: FileAccess          = FileAccess(0o002000);
-    pub const StickBit: FileAccess      = FileAccess(0o001000);
+    pub const SUID: FileAccess                  = FileAccess(0o004000);
+    pub const SGID: FileAccess                  = FileAccess(0o002000);
+    pub const StickBit: FileAccess              = FileAccess(0o001000);
 
-    pub const OwnerRead: FileAccess     = FileAccess(0o000400);
-    pub const OwnerWrite: FileAccess    = FileAccess(0o000200);
-    pub const OwnerExec: FileAccess     = FileAccess(0o000100);
+    pub const OwnerRead: FileAccess             = FileAccess(0o000400);
+    pub const OwnerWrite: FileAccess            = FileAccess(0o000200);
+    pub const OwnerExec: FileAccess             = FileAccess(0o000100);
 
-    pub const GroupRead: FileAccess     = FileAccess(0o000040);
-    pub const GroupWrite: FileAccess    = FileAccess(0o000020);
-    pub const GroupExec: FileAccess     = FileAccess(0o000010);
+    pub const GroupRead: FileAccess             = FileAccess(0o000040);
+    pub const GroupWrite: FileAccess            = FileAccess(0o000020);
+    pub const GroupExec: FileAccess             = FileAccess(0o000010);
 
-    pub const EveryoneRead: FileAccess  = FileAccess(0o000004);
-    pub const EveryoneWrite: FileAccess = FileAccess(0o000002);
-    pub const EveryoneExec: FileAccess  = FileAccess(0o000001);
+    pub const EveryoneRead: FileAccess          = FileAccess(0o000004);
+    pub const EveryoneWrite: FileAccess         = FileAccess(0o000002);
+    pub const EveryoneExec: FileAccess          = FileAccess(0o000001);
 
-    pub const Read: FileAccess          = FileAccess(0o000004);
-    pub const Write: FileAccess         = FileAccess(0o000002);
-    pub const Exec: FileAccess          = FileAccess(0o000001);
+    pub const Read: FileAccess                  = FileAccess(0o000004);
+    pub const Write: FileAccess                 = FileAccess(0o000002);
+    pub const Exec: FileAccess                  = FileAccess(0o000001);
 
-    pub const DefaultFile: FileAccess   = FileAccess(0o000644);
-    pub const DefaultDir: FileAccess    = FileAccess(0o040755);
+    pub const DefaultFile: FileAccess           = FileAccess(0o000644);
+    pub const DefaultDir: FileAccess            = FileAccess(0o040755);
+    pub const DefaultReadOnlyFile: FileAccess   = FileAccess(0o000444);
 
     pub fn plus(self, flag: Self) -> Self {
         FileAccess(self.0 | flag.0)
@@ -170,10 +171,12 @@ impl FileDesc {
     }
 }
 
+const DIR_ENTRY_MAX_LEN: usize = 256;
+
 pub struct DirEntry {
     pub inode: InodeNum,
     pub name_len: u8,
-    pub name: [u8; 256],
+    pub name: [u8; DIR_ENTRY_MAX_LEN],
 }
 
 impl DirEntry {
@@ -181,7 +184,7 @@ impl DirEntry {
         Self {
             inode: 0,
             name_len: 0,
-            name: [0; 256],
+            name: [0; DIR_ENTRY_MAX_LEN],
         }
     }
 
@@ -193,7 +196,7 @@ impl DirEntry {
     }
 
     pub fn copy_into(&mut self, source: &[u8]) {
-        let name_len = if source.len() < 256 { source.len() } else { 256 };
+        let name_len = if source.len() < DIR_ENTRY_MAX_LEN { source.len() } else { DIR_ENTRY_MAX_LEN };
         self.name[..name_len].copy_from_slice(&source[..name_len]);
         self.name_len = name_len as u8;
     }
@@ -202,6 +205,10 @@ impl DirEntry {
         unsafe {
             core::str::from_utf8_unchecked(&self.name[..self.name_len as usize])
         }
+    }
+
+    pub unsafe fn set_len(&mut self, len: usize) {
+        self.name_len = if len < DIR_ENTRY_MAX_LEN { len } else { DIR_ENTRY_MAX_LEN } as u8;
     }
 }
 

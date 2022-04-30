@@ -35,9 +35,7 @@ pub fn set_safe_console() {
 }
 
 fn safe_console_print(s: &str) {
-    unsafe {
-        print(s);
-    }
+    print(s);
 }
 
 pub fn set_normal_console(device: DeviceID) {
@@ -224,15 +222,18 @@ impl PL011Rx {
 
 pub fn handle_irq_pl011() {
     unsafe {
+        let status = PL011.get(registers::INTERRUPT_STATUS);
         PL011.set(registers::INTERRUPT_CLEAR, PL011_INT_ALL);
 
-        while let Some(ch) = get_char() {
-            //crate::printkln!(">>> {}", ch);
+        if status & PL011_INT_RX_READY != 0 {
+            while let Some(ch) = get_char() {
+                //crate::printkln!(">>> {}", ch);
 
-            PL011_RX.as_mut().unwrap().buffer.push_back(ch);
+                PL011_RX.as_mut().unwrap().buffer.push_back(ch);
 
-            if let Some(device_id) = TTY_CONSOLE {
-                tty::schedule_update(device_id);
+                if let Some(device_id) = TTY_CONSOLE {
+                    tty::schedule_update(device_id);
+                }
             }
         }
     }

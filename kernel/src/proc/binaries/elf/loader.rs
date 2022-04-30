@@ -1,5 +1,6 @@
 
 use core::mem;
+use alloc::string::ToString;
 
 use ruxpin_api::types::{OpenFlags, FileAccess, Seek};
 
@@ -19,6 +20,7 @@ use super::defs::*;
 
 pub fn load_binary(proc: Process, path: &str, argv: &StandardArrayOfStrings, envp: &StandardArrayOfStrings) -> Result<(), KernelError> {
     let mut locked_proc = proc.try_lock().unwrap();
+    locked_proc.cmd = path.to_string();
 
     //vfs::access(locked_proc.cwd.clone(), path, FileAccess::Exec.plus(FileAccess::Regular), locked_proc.current_uid)?;
 
