@@ -109,7 +109,7 @@ pub fn write(device_id: DeviceID, buffer: &[u8]) -> Result<usize, KernelError> {
     device.dev.write(buffer)
 }
 
-pub fn schedule_update(device_id: DeviceID) -> Result<(), KernelError> {
+pub fn schedule_update(device_id: DeviceID) {
     schedule_tasklet(Box::new(move || {
         let mut drivers_list = TTY_DRIVERS.lock();
         let device = get_device(&mut *drivers_list, device_id)?;
@@ -118,7 +118,6 @@ pub fn schedule_update(device_id: DeviceID) -> Result<(), KernelError> {
         }
         Ok(())
     }));
-    Ok(())
 }
 
 fn process_input(reader: &mut CanonicalReader, dev: &mut dyn CharOperations) -> Result<(), KernelError> {

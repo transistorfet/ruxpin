@@ -2,7 +2,6 @@
 pub mod bitmap;
 pub mod byteorder;
 pub mod cache;
-pub mod circular;
 pub mod memory;
 pub mod strarray;
 
