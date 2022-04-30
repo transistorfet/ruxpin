@@ -40,6 +40,7 @@ pub enum KernelError {
     NotExecutable,
     InvalidArgument,
     InvalidSegmentType,
+    BadSystemCall,
 
     SuspendProcess,
 }
@@ -77,6 +78,7 @@ impl From<KernelError> for ApiError {
             KernelError::NotExecutable                  => ApiError::NotExecutable,
             KernelError::InvalidArgument                => ApiError::InvalidArgument,
             KernelError::InvalidSegmentType             => ApiError::InvalidSegmentType,
+            KernelError::BadSystemCall                  => ApiError::BadSystemCall,
 
             _ => ApiError::UnknownError,
         }

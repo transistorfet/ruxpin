@@ -22,7 +22,7 @@ pub fn load_binary(proc: Process, path: &str, argv: &StandardArrayOfStrings, env
     let mut locked_proc = proc.try_lock().unwrap();
     locked_proc.cmd = path.to_string();
 
-    //vfs::access(locked_proc.cwd.clone(), path, FileAccess::Exec.plus(FileAccess::Regular), locked_proc.current_uid)?;
+    vfs::access(locked_proc.files.get_cwd(), path, FileAccess::Exec.plus(FileAccess::Regular), locked_proc.current_uid)?;
 
     let file = vfs::open(None, path, OpenFlags::ReadOnly, FileAccess::DefaultFile, locked_proc.current_uid)?;
 

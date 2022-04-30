@@ -119,11 +119,13 @@ impl FileAccess {
     }
 
     pub fn require_owner(self, required_access: Self) -> bool {
-        ((self.0 >> 6) & 0o7 & required_access.0) == required_access.0
+        let required_rwx = required_access.0 & 0o7;
+        ((self.0 >> 6) & 0o7 & required_rwx) == required_rwx
     }
 
     pub fn require_everyone(self, required_access: Self) -> bool {
-        (self.0 & 0o7 & required_access.0) == required_access.0
+        let required_rwx = required_access.0 & 0o7;
+        (self.0 & 0o7 & required_rwx) == required_rwx
     }
 }
 
@@ -252,8 +254,9 @@ pub enum ApiError {
     NotExecutable               = 27,
     InvalidArgument             = 28,
     InvalidSegmentType          = 29,
+    BadSystemCall               = 30,
 
-    UnknownError                = 30,
+    UnknownError                = 31,
 }
 
 impl From<usize> for ApiError {
@@ -291,6 +294,7 @@ impl From<usize> for ApiError {
             27 => ApiError::NotExecutable,
             28 => ApiError::InvalidArgument,
             29 => ApiError::InvalidSegmentType,
+            20 => ApiError::BadSystemCall,
 
             _ => ApiError::UnknownError,
         }

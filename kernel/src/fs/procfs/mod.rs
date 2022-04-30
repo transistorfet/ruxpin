@@ -87,7 +87,7 @@ impl ProcFsRootVnode {
 
 impl VnodeOperations for ProcFsRootVnode {
     fn lookup(&mut self, filename: &str) -> Result<Vnode, KernelError> {
-        let pid = filename.parse::<Pid>().unwrap();
+        let pid = filename.parse::<Pid>().map_err(|_| KernelError::FileNotFound)?;
         Ok(Arc::new(Spinlock::new(GenericStaticDirectoryVnode::new(FileAccess::DefaultReadOnlyFile, 0, 0, PROCESS_ENTRIES, pid))))
     }
 

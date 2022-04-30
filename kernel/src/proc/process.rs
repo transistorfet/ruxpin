@@ -224,8 +224,10 @@ impl ProcessManager {
             locked.exit_status = Some(status);
             locked.state = ProcessState::Exited;
         }
+        self.set_current_context();
 
         self.restart_blocked_by_syscall(SyscallFunction::WaitPid);
+
     }
 
     fn find_exited_process(&mut self, pid: Option<Pid>, parent: Option<Pid>, process_group: Option<Pid>) -> Option<Process> {

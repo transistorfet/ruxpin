@@ -7,7 +7,7 @@
 * add threading support
 * add procfs
 
-* add commands: cat, cp, echo, mkdir, mv, ps, pwd, rm, mount, umount
+* add commands: cp, echo, mkdir, mv, ps, pwd, rm, mount, umount
 
 
 * sort out issues of copying to/from user space

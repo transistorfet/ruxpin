@@ -28,17 +28,10 @@ pub fn syscall_exec(path: &str, argv: &[&str], envp: &[&str]) -> Result<(), Kern
     let mut saved_path: StrArray<100> = StrArray::new();
     saved_path.copy_into(path);
 
-    // TODO this causes a spinlock timeout
-    //let cwd = proc.lock().files.get_cwd();
-    //let current_uid = proc.lock().current_uid;
-    //vfs::access(cwd, path, FileAccess::Exec.plus(FileAccess::Regular), current_uid)?;
-
-    crate::printkln!("clearing old process space");
     proc.try_lock().unwrap().free_resources();
 
     proc.try_lock().unwrap().files.open(None, "/dev/console0", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0)?;
 
-    crate::printkln!("executing a new process");
     let result = loader::load_binary(proc.clone(), saved_path.as_str(), &parsed_argv, &parsed_envp);
 
     match result {
@@ -60,7 +53,6 @@ pub fn syscall_waitpid(pid: Pid, status: &mut isize, _options: usize) -> Result<
     if let Some(proc) = proc {
         let pid = proc.try_lock().unwrap().pid;
         *status = proc.try_lock().unwrap().exit_status.unwrap();
-        crate::printkln!("cleaning up process {}", pid);
         clean_up_process(pid);
         Ok(pid)
     } else {

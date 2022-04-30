@@ -1,5 +1,6 @@
 
 TARGETDIR = target/aarch64-unknown-none/release
+COREUTILS = ls args cat ps
 
 
 MOUNTPOINT = build
@@ -47,9 +48,7 @@ load-image-contents: testapp sh coreutils
 	sudo mkdir -p $(MOUNTPOINT)/bin
 	sudo cp bin/testapp/$(TARGETDIR)/testapp $(MOUNTPOINT)/bin
 	sudo cp bin/sh/$(TARGETDIR)/sh $(MOUNTPOINT)/bin
-	sudo cp bin/coreutils/$(TARGETDIR)/ls $(MOUNTPOINT)/bin
-	sudo cp bin/coreutils/$(TARGETDIR)/args $(MOUNTPOINT)/bin
-	sudo cp bin/coreutils/$(TARGETDIR)/cat $(MOUNTPOINT)/bin
+	sudo cp $(foreach CMD, $(COREUTILS), bin/coreutils/$(TARGETDIR)/$(CMD)) $(MOUNTPOINT)/bin
 
 
 build-kernel:

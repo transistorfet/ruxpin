@@ -3,6 +3,7 @@ use ruxpin_api::syscall_decode;
 use ruxpin_api::syscalls::{SyscallRequest, SyscallFunction};
 use ruxpin_api::types::{Pid, FileDesc, OpenFlags, FileAccess, DirEntry, ApiError};
 
+use crate::printkln;
 use crate::api::file::*;
 use crate::api::proc::*;
 use crate::errors::KernelError;
@@ -27,12 +28,13 @@ pub fn process_syscall(syscall: &mut SyscallRequest) {
         syscall_decode!(syscall, i, path: &str);
         syscall_decode!(syscall, i, args: &[&str]);
         syscall_decode!(syscall, i, envp: &[&str]);
-        match syscall_exec(path, args, envp) {
-            // Return without setting the return value, which would overwrite the
-            // command line arguments written to the context by the exec loader
-            Ok(()) => return,
-            Err(err) => store_result(syscall, Err(err)),
+        if let Err(err) = syscall_exec(path, args, envp) {
+            store_result(syscall, Err(err));
+            Context::write_syscall_result_to_current_context(syscall);
         }
+        // Return without setting the return value, which would overwrite the
+        // command line arguments written to the context by the exec loader
+        return;
     }
 
     match syscall.function {
@@ -101,7 +103,10 @@ pub fn process_syscall(syscall: &mut SyscallRequest) {
             let result = syscall_readdir(file, dirent);
             store_result(syscall, result.map(|r| r as usize));
         },
-        _ => panic!("syscall: invalid function number: {}", syscall.function as usize),
+        _ => {
+            printkln!("syscall: invalid function number: {}", syscall.function as usize);
+            store_result(syscall, Err(KernelError::BadSystemCall));
+        }
     }
 
     Context::write_syscall_result_to_current_context(syscall);
