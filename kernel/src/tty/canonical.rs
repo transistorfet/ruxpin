@@ -27,7 +27,7 @@ impl CanonicalReader {
         }
     }
 
-    pub fn process_char(&mut self, dev: &mut Box<dyn CharOperations>, ch: u8) -> Result<bool, KernelError> {
+    pub fn process_char(&mut self, dev: &mut dyn CharOperations, ch: u8) -> Result<bool, KernelError> {
         // TODO this is a hack for now to stop input when a full line is buffered
         if self.ready {
             return Ok(true);

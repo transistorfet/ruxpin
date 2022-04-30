@@ -180,8 +180,8 @@ impl ProcessManager {
                     self.blocked.remove_node(node.clone());
                     self.scheduled.insert_head(node.clone());
                     node.try_lock().unwrap().state = ProcessState::Running;
+                    node.lock().restart_syscall = true;
                 }
-                node.lock().restart_syscall = true;
             }
         }
 

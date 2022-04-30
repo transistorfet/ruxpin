@@ -108,7 +108,5 @@ extern "C" fn handle_irq(_context: u64, _elr: u64, _esr: u64, _far: u64, _sp: u6
     enable_all_irq();
     crate::tasklets::run_tasklets();
     disable_all_irq();
-
-    crate::proc::process::schedule();
 }
 

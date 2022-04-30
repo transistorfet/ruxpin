@@ -27,7 +27,7 @@ pub fn schedule_tasklet(func: Box<dyn FnOnce() -> Result<(), KernelError>>) {
 }
 
 pub fn run_tasklets() {
-    while let Some(task) = TASKLET_QUEUE.lock().as_mut().unwrap().pop_back() {
+    while let Some(task) = TASKLET_QUEUE.lock().as_mut().unwrap().pop_front() {
         match (task.func)() {
             Ok(()) => { },
             Err(err) => { printkln!("tasklets: error {:?}", err); },

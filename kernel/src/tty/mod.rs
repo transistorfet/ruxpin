@@ -110,25 +110,26 @@ pub fn write(device_id: DeviceID, buffer: &[u8]) -> Result<usize, KernelError> {
 }
 
 pub fn schedule_update(device_id: DeviceID) -> Result<(), KernelError> {
-    //schedule_tasklet(Box::new(move || {
+    schedule_tasklet(Box::new(move || {
         let mut drivers_list = TTY_DRIVERS.lock();
         let device = get_device(&mut *drivers_list, device_id)?;
         if let Some(reader) = device.reader.as_mut() {
-            let mut ch = [0; 1];
-            while device.dev.read(&mut ch)? > 0 {
-                let dev = &mut device.dev;
-                if reader.process_char(dev, ch[0])? {
-                    schedule_tasklet(Box::new(|| {
-                        process::restart_blocked(SyscallFunction::Read);
-                        Ok(())
-                    }));
-                }
-            }
+            process_input(reader, &mut *device.dev)?;
         }
-
-        //process::restart_blocked(SyscallFunction::Read);
         Ok(())
-    //}));
+    }));
+    Ok(())
+}
+
+fn process_input(reader: &mut CanonicalReader, dev: &mut dyn CharOperations) -> Result<(), KernelError> {
+    let mut ch = [0; 1];
+    while dev.read(&mut ch)? > 0 {
+        if reader.process_char(dev, ch[0])? {
+            process::restart_blocked(SyscallFunction::Read);
+            break;
+        }
+    }
+    Ok(())
 }
 
 fn get_device(drivers_list: &mut Vec<CharDriver>, device_id: DeviceID) -> Result<&mut TtyDevice, KernelError> {

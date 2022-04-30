@@ -9,7 +9,6 @@ use crate::printkln;
 use crate::errors::KernelError;
 use crate::tty::{self, CharOperations};
 use crate::printk::set_console_device;
-use crate::proc::process;
 use crate::arch::types::KernelVirtualAddress;
 use crate::misc::deviceio::DeviceRegisters;
 use crate::misc::circular::CircularBuffer;

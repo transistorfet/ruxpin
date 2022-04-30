@@ -72,7 +72,7 @@ pub fn main() {
     let mut fullpath = [0; 256];
     loop {
         //let length = read_input(&mut data).unwrap();
-        print!("% ");
+        print!("\n% ");
         let length = read(FileDesc(0), &mut data).unwrap();
         let (argc, mut words) = parse_words(&data[..length]);
 
