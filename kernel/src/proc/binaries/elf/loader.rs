@@ -14,6 +14,7 @@ use crate::misc::memory::read_struct;
 use crate::proc::process::{Process, ProcessRecord};
 use crate::arch::types::VirtualAddress;
 use crate::mm::MemoryPermissions;
+use crate::mm::segments::SegmentType;
 
 use super::defs::*;
 
@@ -61,7 +62,8 @@ pub fn load_binary(proc: Process, path: &str, argv: &StandardArrayOfStrings, env
             let offset = VirtualAddress::from(segment.p_vaddr).offset_from_align(4096);
 
             let permissions = flags_to_permissions(segment.p_flags)?;
-            locked_proc.space.add_file_backed_segment(permissions, file.clone(), segment.p_offset as usize, segment.p_filesz as usize, vaddr, offset, segment.p_memsz as usize);
+            let stype = if permissions == MemoryPermissions::ReadWrite { SegmentType::Data } else { SegmentType::Text };
+            locked_proc.space.add_file_backed_segment(stype, permissions, file.clone(), segment.p_offset as usize, segment.p_filesz as usize, vaddr, offset, segment.p_memsz as usize);
 
             // TODO this is a hack to forcefully load the page because the page fault in kernel space doesn't work
             //locked_proc.space.alloc_page_at(vaddr)?;
@@ -113,7 +115,7 @@ fn set_up_stack(locked_proc: &mut ProcessRecord, entrypoint: VirtualAddress, arg
     let stack_size = page_size * page_size;
     let stack_start = 0x1_0000_0000 as u64;
 
-    locked_proc.space.add_memory_segment(MemoryPermissions::ReadWrite, VirtualAddress::from(stack_start - stack_size as u64), stack_size);
+    locked_proc.space.add_memory_segment(SegmentType::Stack, MemoryPermissions::ReadWrite, VirtualAddress::from(stack_start - stack_size as u64), stack_size);
 
     let argv_size = argv.calculate_size();
     let envp_size = envp.calculate_size();

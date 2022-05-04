@@ -1,7 +1,9 @@
 #![no_std]
 #![no_main]
+#![feature(alloc_error_handler)]
 
 pub mod env;
+pub mod allocator;
 
 use core::panic::PanicInfo;
 

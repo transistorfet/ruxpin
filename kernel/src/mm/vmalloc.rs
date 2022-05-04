@@ -6,12 +6,13 @@ use alloc::sync::Arc;
 
 use crate::mm::pages;
 use crate::misc::align_up;
+use crate::sync::Spinlock;
 use crate::fs::types::File;
-use crate::mm::segments::Segment;
+use crate::errors::KernelError;
 use crate::mm::{MemoryType, MemoryPermissions};
+use crate::mm::segments::{Segment, ArcSegment, SegmentType};
 use crate::arch::mmu::{self, TranslationTable};
 use crate::arch::types::{VirtualAddress, PhysicalAddress};
-use crate::errors::KernelError;
 
 
 const MAX_SEGMENTS: usize = 6;
@@ -23,7 +24,8 @@ pub fn init_virtual_memory(start: PhysicalAddress, end: PhysicalAddress) {
 
 pub struct VirtualAddressSpace {
     table: TranslationTable,
-    segments: Vec<Arc<Segment>>,
+    segments: Vec<ArcSegment>,
+    data: Option<ArcSegment>,
 }
 
 impl VirtualAddressSpace {
@@ -34,31 +36,40 @@ impl VirtualAddressSpace {
         Self {
             table,
             segments: Vec::with_capacity(MAX_SEGMENTS),
+            data: None,
         }
     }
 
-    pub fn add_memory_segment(&mut self, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) {
-        let segment = Segment::new_memory(permissions, vaddr, vaddr.add(len));
-        self.segments.push(Arc::new(segment));
+    pub fn add_memory_segment(&mut self, stype: SegmentType, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) {
+        let segment = Arc::new(Spinlock::new(Segment::new_memory(stype, permissions, vaddr, vaddr.add(len))));
+        if stype != SegmentType::Stack && (self.data.is_none() || vaddr > self.data.as_mut().unwrap().lock().start) {
+            self.data = Some(segment.clone());
+        }
+        self.segments.push(segment);
         self.map_on_demand(permissions, vaddr, align_up(len, mmu::page_size()));
     }
 
-    pub fn add_file_backed_segment(&mut self, permissions: MemoryPermissions, file: File, file_offset: usize, file_size: usize, vaddr: VirtualAddress, mem_offset: usize, mem_size: usize) {
-        let segment = Segment::new_file_backed(file, file_offset, file_size, permissions, mem_offset, vaddr, vaddr.add(mem_size).add(mem_offset));
-        self.segments.push(Arc::new(segment));
+    pub fn add_file_backed_segment(&mut self, stype: SegmentType, permissions: MemoryPermissions, file: File, file_offset: usize, file_size: usize, vaddr: VirtualAddress, mem_offset: usize, mem_size: usize) {
+        let segment = Arc::new(Spinlock::new(Segment::new_file_backed(file, file_offset, file_size, stype, permissions, mem_offset, vaddr, vaddr.add(mem_size).add(mem_offset).align_up(mmu::page_size()))));
+        if stype != SegmentType::Stack && (self.data.is_none() || vaddr > self.data.as_mut().unwrap().lock().start) {
+            self.data = Some(segment.clone());
+        }
+        self.segments.push(segment);
         self.map_on_demand(permissions, vaddr, align_up(mem_size + mem_offset, mmu::page_size()));
     }
 
-    pub fn add_memory_segment_allocated(&mut self, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) {
-        let segment = Segment::new_memory(permissions, vaddr, vaddr.add(len));
-        self.segments.push(Arc::new(segment));
+    pub fn add_memory_segment_allocated(&mut self, stype: SegmentType, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) {
+        let segment = Arc::new(Spinlock::new(Segment::new_memory(stype, permissions, vaddr, vaddr.add(len))));
+        self.segments.push(segment);
         self.alloc_mapped(permissions, vaddr, align_up(len, mmu::page_size()));
     }
 
     pub fn clear_segments(&mut self) {
         for i in 0..self.segments.len() {
             let free_pages = Arc::strong_count(&self.segments[i]) == 1;
-            self.unmap_range(self.segments[i].start, self.segments[i].page_aligned_len(), free_pages);
+            let start = self.segments[i].lock().start;
+            let len = self.segments[i].lock().page_aligned_len();
+            self.unmap_range(start, len, free_pages);
         }
         self.segments.clear();
     }
@@ -67,8 +78,19 @@ impl VirtualAddressSpace {
         for segment in parent.segments.iter() {
             //crate::printkln!("cloning segment {:x} to {:x}", usize::from(segment.start), usize::from(segment.end));
             self.segments.push(segment.clone());
-            self.copy_segment_map(&parent.table, segment);
+            self.copy_segment_map(&parent.table, &*segment.lock());
         }
+    }
+
+    // TODO technically increment should be isize, and can be negative to shrink the size
+    pub fn adjust_stack_break(&mut self, increment: usize) -> Result<VirtualAddress, KernelError> {
+        let inc_aligned = align_up(increment, mmu::page_size());
+        let segment = self.data.clone().unwrap();
+        let mut locked_seg = segment.try_lock().unwrap();
+        let previous_end = locked_seg.end;
+        locked_seg.end = locked_seg.end.add(inc_aligned);
+        self.map_on_demand(locked_seg.permissions, previous_end, inc_aligned);
+        Ok(previous_end)
     }
 
 
@@ -137,7 +159,8 @@ impl VirtualAddressSpace {
 
     pub(crate) fn alloc_page_at(&mut self, far: VirtualAddress) -> Result<(), KernelError> {
         for segment in &self.segments {
-            if segment.match_range(far) {
+            let locked_seg = segment.try_lock().unwrap();
+            if locked_seg.match_range(far) {
                 let pages = pages::get_page_area();
 
                 // Allocate new page
@@ -149,7 +172,7 @@ impl VirtualAddressSpace {
                 let page_buffer = unsafe {
                     slice::from_raw_parts_mut(page.to_kernel_addr().as_mut(), mmu::page_size())
                 };
-                segment.load_page_at(segment, page_vaddr, page_buffer).unwrap();
+                locked_seg.load_page_at(&*locked_seg, page_vaddr, page_buffer).unwrap();
 
                 return Ok(());
             }

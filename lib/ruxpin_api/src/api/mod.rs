@@ -53,6 +53,18 @@ pub fn waitpid(pid: Pid, status: &mut isize, options: usize) -> Result<Pid, ApiE
     }
 }
 
+pub fn sbrk(increment: usize) -> Result<*const u8, ApiError> {
+    let mut i = 0;
+    let mut syscall: SyscallRequest = Default::default();
+    syscall.function = SyscallFunction::Sbrk;
+    syscall_encode!(syscall, i, increment: usize);
+    execute_syscall(&mut syscall);
+    match syscall.error {
+        false => Ok(syscall.result as *const u8),
+        true => Err(ApiError::from(syscall.result)),
+    }
+}
+
 pub fn open(path: &str, flags: OpenFlags, access: FileAccess) -> Result<FileDesc, ApiError> {
     let mut i = 0;
     let mut syscall: SyscallRequest = Default::default();

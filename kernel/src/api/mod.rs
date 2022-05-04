@@ -68,6 +68,13 @@ pub fn process_syscall(syscall: &mut SyscallRequest) {
             store_result(syscall, result.map(|ret| ret as usize));
         },
 
+        SyscallFunction::Sbrk => {
+            let mut i = 0;
+            syscall_decode!(syscall, i, increment: usize);
+            let result = syscall_sbrk(increment);
+            store_result(syscall, result.map(|ret| ret as usize));
+        },
+
         SyscallFunction::Open => {
             let mut i = 0;
             syscall_decode!(syscall, i, path: &str);

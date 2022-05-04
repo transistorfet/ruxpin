@@ -1,6 +1,8 @@
 
 use core::fmt;
 
+use crate::misc::align_up;
+
 //extern "C" {
 //    static __KERNEL_VIRTUAL_BASE_ADDR: u64;
 //}
@@ -99,6 +101,10 @@ impl VirtualAddress {
 
     pub fn align_down(self, align: usize) -> Self  {
         Self(self.0 & !(align - 1) as u64)
+    }
+
+    pub fn align_up(self, align: usize) -> Self  {
+        Self(align_up(self.0 as usize, align) as u64)
     }
 
     pub fn offset_from_align(self, align: usize) -> usize {

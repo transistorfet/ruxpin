@@ -13,7 +13,7 @@ pub enum MemoryType {
 }
 
 #[allow(dead_code)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum MemoryPermissions {
     ReadOnly,
     ReadExecute,

@@ -61,3 +61,10 @@ pub fn syscall_waitpid(pid: Pid, status: &mut isize, _options: usize) -> Result<
     }
 }
 
+pub fn syscall_sbrk(increment: usize) -> Result<*const u8, KernelError> {
+    let proc = get_current_process();
+    let old_break = proc.try_lock().unwrap().space.adjust_stack_break(increment)?;
+
+    Ok(usize::from(old_break) as *const u8)
+}
+

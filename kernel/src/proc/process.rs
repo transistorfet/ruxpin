@@ -13,6 +13,7 @@ use crate::fs::filedesc::FileDescriptors;
 use crate::misc::queue::{Queue, QueueNode, QueueNodeRef};
 use crate::mm::MemoryPermissions;
 use crate::mm::vmalloc::VirtualAddressSpace;
+use crate::mm::segments::SegmentType;
 use crate::sync::Spinlock;
 
 
@@ -31,11 +32,13 @@ pub struct ProcessRecord {
     pub session: Pid,
 
     pub cmd: String,
-    pub state: ProcessState,
     pub exit_status: Option<isize>,
     pub current_uid: UserID,
     pub space: VirtualAddressSpace,
     pub files: FileDescriptors,
+
+    // TODO these would belong in Thread
+    pub state: ProcessState,
     pub syscall: SyscallRequest,
     pub restart_syscall: bool,
     pub context: Context,
@@ -91,12 +94,14 @@ impl ProcessManager {
             parent,
             pgid,
             session,
+
             cmd: String::new(),
-            state: ProcessState::Running,
             exit_status: None,
             current_uid: 0,
             space: VirtualAddressSpace::new_user_space(),
             files: FileDescriptors::new(),
+
+            state: ProcessState::Running,
             syscall: Default::default(),
             restart_syscall: false,
             context: Default::default(),
@@ -116,10 +121,10 @@ impl ProcessManager {
             let mut locked_proc = proc.try_lock().unwrap();
 
             // Allocate text segment
-            locked_proc.space.add_memory_segment_allocated(MemoryPermissions::ReadExecute, VirtualAddress::from(0x77777000), 4096);
+            locked_proc.space.add_memory_segment_allocated(SegmentType::Text, MemoryPermissions::ReadExecute, VirtualAddress::from(0x77777000), 4096);
 
             // Allocate stack segment
-            locked_proc.space.add_memory_segment(MemoryPermissions::ReadWrite, VirtualAddress::from(0xFF000000), 4096 * 4096);
+            locked_proc.space.add_memory_segment(SegmentType::Stack, MemoryPermissions::ReadWrite, VirtualAddress::from(0xFF000000), 4096 * 4096);
 
             let ttrb = locked_proc.space.get_ttbr();
             locked_proc.context.init(VirtualAddress::from(0x77777000), VirtualAddress::from(0x1_0000_0000), ttrb);

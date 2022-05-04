@@ -6,26 +6,9 @@ use core::str;
 extern crate ruxpin_app;
 
 use ruxpin_api::{print, println};
-use ruxpin_api::api::{fork, exec, read, write, waitpid};
-use ruxpin_api::types::{FileDesc, ApiError};
+use ruxpin_api::api::{fork, exec, read, waitpid};
+use ruxpin_api::types::{FileDesc};
 
-
-fn read_input(data: &mut [u8]) -> Result<usize, ApiError> {
-    let mut i = 0;
-    print!("% ");
-    loop {
-        let nbytes = read(FileDesc(0), &mut data[i..])?;
-        if nbytes > 0 {
-            write(FileDesc(0), &data[i..i + nbytes])?;
-            i += nbytes;
-            if data[i - 1] == '\r' as u8 {
-                data[i - 1] = '\n' as u8;
-                println!("");
-                return Ok(i);
-            }
-        }
-    }
-}
 
 fn get_next_word<'a>(input: &'a [u8]) -> (&'a [u8], &'a [u8]) {
     for i in 0..input.len() {

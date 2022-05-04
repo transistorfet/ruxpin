@@ -3,6 +3,7 @@ pub type UserID = u16;
 pub type GroupID = u16;
 pub type InodeNum = u32;
 pub type Pid = i32;
+pub type Tid = i32;
 
 
 #[repr(u16)]
@@ -294,7 +295,7 @@ impl From<usize> for ApiError {
             27 => ApiError::NotExecutable,
             28 => ApiError::InvalidArgument,
             29 => ApiError::InvalidSegmentType,
-            20 => ApiError::BadSystemCall,
+            30 => ApiError::BadSystemCall,
 
             _ => ApiError::UnknownError,
         }

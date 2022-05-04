@@ -14,6 +14,8 @@ pub enum SyscallFunction {
     Read,
     Write,
     ReadDir,
+
+    Sbrk,
 }
 
 #[derive(Clone, Debug)]

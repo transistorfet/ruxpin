@@ -1,55 +1,69 @@
 
-* need to add heap support to the applications
-* add arrow key support to canonical input
+WHAT IFS:
 
-
-* add an events system for processes to wait on (IO blocking, process exit, select/poll, etc)
-* add threading support
-* add procfs
-
-* add commands: cp, echo, mkdir, mv, ps, pwd, rm, mount, umount
-
-
-* sort out issues of copying to/from user space
+* what if you added json for procfs's data, to make it easier to parse?  What if you made json and/or unixstd file formats a compile
+  time feature flag?  What if procfs (and all the others) where their own crates with their own feature flags, that are tied together
+  by a toplevel config crate (ie. the breakup into crates)
 * can you separate the syscalls, maybe even based on permission levels as well as function, and require permission for each api to
-  be granted explicitly
-
-* there is a bug with translation tables where, when mapping the stack, it asks for page_size * page_size, so gets mapped as a 2MiB
-  granuale instead of individual pages, even though the memory is backed by the page fault allocator, which expects to have single
-  pages.
-* in fact, since there might already be a page fault that occurs to load the first stack page, it should cause an error if, when
-  updating the page address of the translation table, the granuale size is not a page!
+  be granted explicitly, so that APIs security-wise are opt-in, kind of like a web api, or like WASI
 
 
+HIGH PRIORITY ISSUES:
+
+* need to rethink segments a bit, since they now need to be changed.  Currently, vmalloc controls the
+  memory mapping, and segments are Arcs which are cloned when a process is forked
+* share_segement function isn't being used, because we're using Arcs instead
 
 * need to sort out the tty devices. how irqs can access the device object. whether only the tty subsystem or the driver as well, has
   a reference to the devices as well. how the config will create the device object, and where it stores it (or does it assume each
   driver will register and save global references to the devices if needed?  Is there a better way than using so many global references?
-* there was an issue with the console driver when the raw device was wrapped in a spinlock.  It was causing a data abort to some
-  weird address, and then looping forever (no timeout)
+
+* need a way to configure, including only the drivers needed for a specific platform (eg. raspberry pi).  Is there a way to not compile in
+  driver modules without defining a feature for each one?
 
 
+
+TODO:
+
+* need to add heap support to the applications
+* add threading support
+
+* add more data to procfs
+* add . and .. to procfs, as well as devfs and tmpfs
+* add mounts to procfs (and make mount command)
+* add arrow key support to canonical input
+* add an events system for processes to wait on (IO blocking, process exit, select/poll, etc)
+* need to handle the case of accessing ".." on a mounted vnode.  It must correctly fetch the parent node
+
+* add commands: cp, echo, mkdir, mv, ps, pwd, rm, mount, umount
+
+
+LOWER PRIORITY ISSUES:
+
+* syscall macros need to be more automatic, the entire marshal/unmarshal should be based only on types.  The macros need a lot of
+  work to improve, possibly even using proc macros (eg. an attribute on a syscall function that automagically generates the decoding
+  and calling for that function
+
+* sort out issues of copying to/from user space
 * there is no userspace/kernelspace copying in the api, which could cause a fatal error if the user program doesn't give a valid
   input, so at some point this needs to be added
 * does the linux copy user/kernel function do manual page lookups, including triggering page loading?  Or does it do soemthing else?
-* why does saving the floating point regs cause a null pointer exception?  Are we overflowing the stack?
-* the page fault doesn't work when in kernel space.  When enabling an EL1 to EL1 sync expception, it fails before getting into the
-  handler, the way it used to fail when the floating point unit was not enabled... but I don't think that's the actual problem here...
-  It doesn't seem to cause any other exception, in that qemu doesn't log any exceptions, just seems to loop
 
 * if you put separate locks on the fields of proc, or sub-arc<locks> on at least files and space, so that either can be manipulated
   independently (so a syscall that locks the proc to write a file can still handle a page fault that tries to lock the same proc to
   load the next page
 
+* there is an issue with the emmc driver such that when the image used with qemu is below 2GB or less, the Read command gives a byte
+  offset, but when it's 4GB or larger, it gives a sector offset (byte offset / 512).  I'm not sure if this happens with the pi as well
+  since I only have an 8GB card.  If there was a way to detect the card size, this could be solved
 
-* I still don't trust the file backed segment calculations.  If there's a better/easier way of loading the binaries and setting up
-  segments...
 
+
+FILESYSTEM TODO:
 
 * add block truncation
 * allow for removing directory entries
 * add file renaming
-
 
 
 * I've tested:
@@ -63,39 +77,17 @@
     - superblock and group free count being updated correctly
     - everything to do with blocks.rs/zones
 
-
-
-
 * there's a lot of inconsistency between Ext2BlockNumber and BlockNum in ext2 which should be resolved somehow
+
+
+LOW PRIORITY TODO:
+
 * it turns out there's a from_le and from_be function for u32 and others, so maybe you can simplify the byteorder stuff using them
-
-
-* syscall macros need to be more automatic, the entire marshal/unmarshal should be based only on types
-* need to handle the case of accessing ".." on a mounted vnode.  It must correctly fetch the parent node
-* need a way to maintain a queue for scheduling
-
-* need a way to record memory segment information in the Process/VirtualAddressSpace to distinguish between areas
-  that are mapped to static memory vs areas that are mapped to page data (which would need to be freed)
-
-
 * can you use a weak reference of some kind for the mount link, instead of NonNull?
-* there is an issue with the emmc driver such that when the image used with qemu is below 2GB or less, the Read command gives a byte
-  offset, but when it's 4GB or larger, it gives a sector offset (byte offset / 512).  I'm not sure if this happens with the pi as well
-  since I only have an 8GB card.
-
-
-
-* need a way to configure, including only the drivers needed for a specific platform (eg. raspberry pi).  Is there a way to not compile in
-  driver modules without defining a feature for each one?
-* need a way to configure the GIC and timer in a generic way, for other systems.  Especially the IRQ handler tie-in (directly calls GIC atm)
-
-
 
 * add a proper timer driver (ie. fix the hackish ARM timer driver)
-* implement the GIC driver/module
-* add functions to delay by a set number of microseconds (might need to use the internal counter)
+* add functions to delay by a set number of microseconds (might need to use the internal counter), for use by drivers
 
 * get the app linker script working better (can you align to 4KB instead of 64KB)
 * can you make an improvement on DeviceRegisters, or should you just use tock-registers
-
 

@@ -11,6 +11,7 @@ PARTITION_OFFSET = 272629760	# Partition 2: 0x8200 * 512
 PARTITION_BLOCKS = 982016
 LOOPBACK = /dev/loop8
 
+COREUTILS_OUTPUTS = $(foreach CMD, $(COREUTILS), bin/coreutils/$(TARGETDIR)/$(CMD))
 
 all: build-kernel
 
@@ -48,7 +49,7 @@ load-image-contents: testapp sh coreutils
 	sudo mkdir -p $(MOUNTPOINT)/bin
 	sudo cp bin/testapp/$(TARGETDIR)/testapp $(MOUNTPOINT)/bin
 	sudo cp bin/sh/$(TARGETDIR)/sh $(MOUNTPOINT)/bin
-	sudo cp $(foreach CMD, $(COREUTILS), bin/coreutils/$(TARGETDIR)/$(CMD)) $(MOUNTPOINT)/bin
+	sudo cp $(COREUTILS_OUTPUTS) $(MOUNTPOINT)/bin
 
 
 build-kernel:

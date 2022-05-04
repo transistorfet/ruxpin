@@ -1,4 +1,5 @@
 
+use alloc::sync::Arc;
 use alloc::boxed::Box;
 
 use ruxpin_api::types::Seek;
@@ -6,28 +7,39 @@ use ruxpin_api::types::Seek;
 use crate::fs::vfs;
 use crate::arch::mmu;
 use crate::misc::align_up;
+use crate::sync::Spinlock;
 use crate::fs::types::File;
 use crate::mm::MemoryPermissions;
 use crate::errors::KernelError;
 use crate::arch::types::VirtualAddress;
 
 
+#[derive(Copy, Clone, PartialEq)]
+pub enum SegmentType {
+    Text,
+    Data,
+    Stack,
+}
+
 pub trait SegmentOperations: Sync + Send {
-    fn share_segment(&self) -> Box<dyn SegmentOperations>;
     // This assumes the page would be allocated automatically by the page fault handler, and this would just populate the data
     fn load_page_at(&self, segment: &Segment, vaddr: VirtualAddress, page: &mut [u8]) -> Result<(), KernelError>;
 }
 
 pub struct Segment {
+    pub(super) stype: SegmentType,
     pub(super) permissions: MemoryPermissions,
     pub(super) start: VirtualAddress,
     pub(super) end: VirtualAddress,
     ops: Box<dyn SegmentOperations>,
 }
 
+pub type ArcSegment = Arc<Spinlock<Segment>>;
+
 impl Segment {
-    pub fn new(permissions: MemoryPermissions, start: VirtualAddress, end: VirtualAddress, ops: Box<dyn SegmentOperations>) -> Self {
+    pub fn new(stype: SegmentType, permissions: MemoryPermissions, start: VirtualAddress, end: VirtualAddress, ops: Box<dyn SegmentOperations>) -> Self {
         Self {
+            stype,
             permissions,
             start,
             end,
@@ -35,23 +47,14 @@ impl Segment {
         }
     }
 
-    pub fn new_memory(permissions: MemoryPermissions, start: VirtualAddress, end: VirtualAddress) -> Self {
+    pub fn new_memory(stype: SegmentType, permissions: MemoryPermissions, start: VirtualAddress, end: VirtualAddress) -> Self {
         let ops = Box::new(MemorySegment::new());
-        Self::new(permissions, start, end, ops)
+        Self::new(stype, permissions, start, end, ops)
     }
 
-    pub fn new_file_backed(file: File, file_offset: usize, file_size: usize, permissions: MemoryPermissions, mem_offset: usize, start: VirtualAddress, end: VirtualAddress) -> Self {
+    pub fn new_file_backed(file: File, file_offset: usize, file_size: usize, stype: SegmentType, permissions: MemoryPermissions, mem_offset: usize, start: VirtualAddress, end: VirtualAddress) -> Self {
         let ops = Box::new(FileBackedSegment::new(file, file_offset, file_size, mem_offset));
-        Self::new(permissions, start, end, ops)
-    }
-
-    pub fn share_segment(&self) -> Self {
-        Self {
-            permissions: self.permissions,
-            start: self.start,
-            end: self.end,
-            ops: self.ops.share_segment(),
-        }
+        Self::new(stype, permissions, start, end, ops)
     }
 
     pub fn page_aligned_len(&self) -> usize {
@@ -79,10 +82,6 @@ impl MemorySegment {
 }
 
 impl SegmentOperations for MemorySegment {
-    fn share_segment(&self) -> Box<dyn SegmentOperations> {
-        Box::new(self.clone())
-    }
-
     fn load_page_at(&self, _segment: &Segment, _vaddr: VirtualAddress, _page: &mut [u8]) -> Result<(), KernelError> {
         Ok(())
     }
@@ -109,10 +108,6 @@ impl FileBackedSegment {
 }
 
 impl SegmentOperations for FileBackedSegment {
-    fn share_segment(&self) -> Box<dyn SegmentOperations> {
-        Box::new(self.clone())
-    }
-
     fn load_page_at(&self, segment: &Segment, vaddr: VirtualAddress, page: &mut [u8]) -> Result<(), KernelError> {
         //crate::printkln!("swapping {:?} for segment from {:?}", vaddr, segment.start);
 
