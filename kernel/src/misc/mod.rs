@@ -24,3 +24,7 @@ pub fn align_down(length: usize, alignment: usize) -> usize {
     length & !(alignment - 1)
 }
 
+pub fn offset_from_align(length: usize, alignment: usize) -> usize {
+    length & (alignment - 1)
+}
+
