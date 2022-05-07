@@ -54,7 +54,7 @@ impl TaskManager {
 
     pub fn get_task(&mut self, pid: Pid) -> Option<Task> {
         for proc in self.tasks.iter() {
-            if proc.try_lock().unwrap().pid == pid {
+            if proc.try_lock().unwrap().process_id == pid {
                 return Some(proc.clone());
             }
         }
@@ -134,7 +134,7 @@ impl TaskManager {
 
     fn exit_current(&mut self, status: isize) {
         let current = self.get_current();
-        crate::printkln!("Exiting process {}", current.try_lock().unwrap().pid);
+        crate::printkln!("Exiting process {}", current.try_lock().unwrap().process_id);
 
         self.detach(current.clone());
         current.try_lock().unwrap().exit_and_free_resources(status);
@@ -146,9 +146,9 @@ impl TaskManager {
             let locked_proc = process.try_lock().unwrap();
             if
                 locked_proc.exit_status.is_some()
-                && (pid.is_none() || locked_proc.pid == pid.unwrap())
-                && (parent.is_none() || locked_proc.parent == parent.unwrap())
-                && (process_group.is_none() || locked_proc.pgid == process_group.unwrap())
+                && (pid.is_none() || locked_proc.process_id == pid.unwrap())
+                && (parent.is_none() || locked_proc.parent_id == parent.unwrap())
+                && (process_group.is_none() || locked_proc.process_group_id == process_group.unwrap())
             {
                 return Some(process.clone());
             }
@@ -159,7 +159,7 @@ impl TaskManager {
 
     fn clean_up(&mut self, pid: Pid) -> Result<(), KernelError> {
         for (i, process) in self.tasks.iter().enumerate() {
-            if process.try_lock().unwrap().pid == pid {
+            if process.try_lock().unwrap().process_id == pid {
                 if process.try_lock().unwrap().state != TaskState::Exited {
                     return Err(KernelError::NotExited);
                 }

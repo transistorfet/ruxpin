@@ -16,7 +16,7 @@ pub fn syscall_exit(status: isize) -> Result<(), KernelError> {
 pub fn syscall_fork() -> Result<Pid, KernelError> {
     let args = TaskCloneArgs::new();
     let new_proc = clone_current(args);
-    let child_pid = new_proc.try_lock().unwrap().pid;
+    let child_pid = new_proc.try_lock().unwrap().process_id;
     Ok(child_pid)
 }
 
@@ -46,14 +46,14 @@ pub fn syscall_exec(path: &str, argv: &[&str], envp: &[&str]) -> Result<(), Kern
 }
 
 pub fn syscall_waitpid(pid: Pid, status: &mut isize, _options: usize) -> Result<Pid, KernelError> {
-    let parent_id = get_current().lock().pid;
+    let parent_id = get_current().lock().process_id;
 
     let search_pid = if pid > 0 { Some(pid) } else { None };
     let search_parent = if pid == 0 { Some(parent_id) } else { None };
     let proc = find_exited(search_pid, search_parent, None);
 
     if let Some(proc) = proc {
-        let pid = proc.try_lock().unwrap().pid;
+        let pid = proc.try_lock().unwrap().process_id;
         *status = proc.try_lock().unwrap().exit_status.unwrap();
         clean_up(pid)?;
         Ok(pid)

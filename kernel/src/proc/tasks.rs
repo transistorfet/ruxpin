@@ -15,11 +15,11 @@ const INIT_PID: Pid = 1;
 
 static NEXT_TID: Spinlock<Tid> = Spinlock::new(1);
 
-fn next_tid() -> Tid {
+fn next_task_id() -> Tid {
     let mut mutex = NEXT_TID.try_lock().unwrap();
-    let tid = *mutex;
+    let task_id = *mutex;
     *mutex += 1;
-    tid
+    task_id
 }
 
 pub struct TaskCloneArgs {
@@ -44,13 +44,13 @@ pub enum TaskState {
 // TODO I don't like that these are all pub... I might need to either isolate this more or change how things interact with tasks
 pub struct TaskRecord {
     // Immutable Data
-    pub tid: Tid,
-    pub pid: Pid,
+    pub task_id: Tid,
+    pub process_id: Pid,
 
     // Process Data, Shared Amongs Threads
-    pub parent: Pid,
-    pub pgid: Pid,
-    pub session: Pid,
+    pub parent_id: Pid,
+    pub process_group_id: Pid,
+    pub session_id: Pid,
     pub cmd: String,
     pub exit_status: Option<isize>,
     pub current_uid: UserID,
@@ -68,23 +68,23 @@ pub struct TaskRecord {
 
 impl TaskRecord {
     pub(super) fn new(parent: Option<Task>) -> Self {
-        let tid = next_tid();
+        let task_id = next_task_id();
 
-        let pid = tid;
-        let (parent, pgid, session) = match parent {
+        let process_id = task_id;
+        let (parent_id, process_group_id, session_id) = match parent {
             Some(parent_proc) => {
                 let locked = parent_proc.try_lock().unwrap();
-                (locked.pid, locked.pgid, locked.session)
+                (locked.process_id, locked.process_group_id, locked.session_id)
             },
-            None => (INIT_PID, pid, pid),
+            None => (INIT_PID, process_id, process_id),
         };
 
         Self {
-            tid,
-            pid,
-            parent,
-            pgid,
-            session,
+            task_id,
+            process_id,
+            parent_id,
+            process_group_id,
+            session_id,
 
             cmd: String::new(),
             exit_status: None,

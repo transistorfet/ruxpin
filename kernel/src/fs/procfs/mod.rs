@@ -88,8 +88,8 @@ impl ProcFsRootVnode {
 
 impl VnodeOperations for ProcFsRootVnode {
     fn lookup(&mut self, filename: &str) -> Result<Vnode, KernelError> {
-        let pid = filename.parse::<Pid>().map_err(|_| KernelError::FileNotFound)?;
-        Ok(Arc::new(Spinlock::new(GenericStaticDirectoryVnode::new(FileAccess::DefaultReadOnlyFile, 0, 0, PROCESS_ENTRIES, pid))))
+        let process_id = filename.parse::<Pid>().map_err(|_| KernelError::FileNotFound)?;
+        Ok(Arc::new(Spinlock::new(GenericStaticDirectoryVnode::new(FileAccess::DefaultReadOnlyFile, 0, 0, PROCESS_ENTRIES, process_id))))
     }
 
     fn attributes<'a>(&'a mut self) -> Result<&'a FileAttributes, KernelError> {
@@ -120,7 +120,7 @@ impl VnodeOperations for ProcFsRootVnode {
 
         let mut result = DirEntry::new(0, b"");
         let mut writer = SliceWriter::new(&mut result.name);
-        write!(writer, "{}", proc.lock().pid).map_err(|_| KernelError::InvalidArgument)?;
+        write!(writer, "{}", proc.lock().process_id).map_err(|_| KernelError::InvalidArgument)?;
         let len = writer.len();
         unsafe { result.set_len(len); }
 
@@ -134,20 +134,20 @@ const PROCESS_ENTRIES: &'static [(&'static str, GenericStaticFileData<Pid>)] = &
     ("statm", file_data_statm),
 ];
 
-fn file_data_stat(pid: &Pid) -> Result<Vec<u8>, KernelError> {
-    let proc = scheduler::get_task(*pid).ok_or(KernelError::FileNotFound)?;
+fn file_data_stat(process_id: &Pid) -> Result<Vec<u8>, KernelError> {
+    let proc = scheduler::get_task(*process_id).ok_or(KernelError::FileNotFound)?;
     let locked_proc = proc.try_lock().unwrap();
 
     let mut data = vec![0; 128];
     let mut writer = SliceWriter::new(data.as_mut_slice());
     write!(writer,
         "{} {} {} {} {} {}",
-        locked_proc.pid,
+        locked_proc.process_id,
         locked_proc.cmd,
         proc_state(locked_proc.state),
-        locked_proc.parent,
-        locked_proc.pgid,
-        locked_proc.session,
+        locked_proc.parent_id,
+        locked_proc.process_group_id,
+        locked_proc.session_id,
     ).map_err(|_| KernelError::FileNotFound)?;
     let len = writer.len();
     unsafe { data.set_len(len); }
@@ -155,7 +155,7 @@ fn file_data_stat(pid: &Pid) -> Result<Vec<u8>, KernelError> {
     Ok(data)
 }
 
-fn file_data_statm(pid: &Pid) -> Result<Vec<u8>, KernelError> {
+fn file_data_statm(process_id: &Pid) -> Result<Vec<u8>, KernelError> {
     Ok(vec![])
 }
 
