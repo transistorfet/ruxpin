@@ -47,7 +47,7 @@ impl VirtualAddressSpace {
     }
 
     pub fn add_memory_segment(&mut self, stype: SegmentType, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) {
-        let segment = Arc::new(Spinlock::new(Segment::new_memory(stype, permissions, vaddr, vaddr.add(len))));
+        let segment = Arc::new(Spinlock::new(Segment::new_memory(permissions, vaddr, vaddr.add(len))));
         if stype != SegmentType::Stack && (self.data.is_none() || vaddr > self.data.as_mut().unwrap().lock().start) {
             self.data = Some(segment.clone());
         }
@@ -56,7 +56,7 @@ impl VirtualAddressSpace {
     }
 
     pub fn add_file_backed_segment(&mut self, stype: SegmentType, permissions: MemoryPermissions, file: File, file_offset: usize, file_size: usize, vaddr: VirtualAddress, mem_offset: usize, mem_size: usize) {
-        let segment = Arc::new(Spinlock::new(Segment::new_file_backed(file, file_offset, file_size, stype, permissions, mem_offset, vaddr, vaddr.add(mem_size).add(mem_offset).align_up(mmu::page_size()))));
+        let segment = Arc::new(Spinlock::new(Segment::new_file_backed(file, file_offset, file_size, permissions, mem_offset, vaddr, vaddr.add(mem_size).add(mem_offset).align_up(mmu::page_size()))));
         if stype != SegmentType::Stack && (self.data.is_none() || vaddr > self.data.as_mut().unwrap().lock().start) {
             self.data = Some(segment.clone());
         }
@@ -64,8 +64,8 @@ impl VirtualAddressSpace {
         self.map_on_demand(permissions, vaddr, align_up(mem_size + mem_offset, mmu::page_size()));
     }
 
-    pub fn add_memory_segment_allocated(&mut self, stype: SegmentType, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) {
-        let segment = Arc::new(Spinlock::new(Segment::new_memory(stype, permissions, vaddr, vaddr.add(len))));
+    pub fn add_memory_segment_allocated(&mut self, _stype: SegmentType, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) {
+        let segment = Arc::new(Spinlock::new(Segment::new_memory(permissions, vaddr, vaddr.add(len))));
         self.segments.push(segment);
         self.alloc_mapped(permissions, vaddr, align_up(len, mmu::page_size()));
     }

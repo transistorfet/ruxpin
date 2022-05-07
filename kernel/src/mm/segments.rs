@@ -27,7 +27,6 @@ pub trait SegmentOperations: Sync + Send {
 }
 
 pub struct Segment {
-    pub(super) stype: SegmentType,
     pub(super) permissions: MemoryPermissions,
     pub(super) start: VirtualAddress,
     pub(super) end: VirtualAddress,
@@ -37,9 +36,8 @@ pub struct Segment {
 pub type ArcSegment = Arc<Spinlock<Segment>>;
 
 impl Segment {
-    pub fn new(stype: SegmentType, permissions: MemoryPermissions, start: VirtualAddress, end: VirtualAddress, ops: Box<dyn SegmentOperations>) -> Self {
+    pub fn new(permissions: MemoryPermissions, start: VirtualAddress, end: VirtualAddress, ops: Box<dyn SegmentOperations>) -> Self {
         Self {
-            stype,
             permissions,
             start,
             end,
@@ -47,14 +45,14 @@ impl Segment {
         }
     }
 
-    pub fn new_memory(stype: SegmentType, permissions: MemoryPermissions, start: VirtualAddress, end: VirtualAddress) -> Self {
+    pub fn new_memory(permissions: MemoryPermissions, start: VirtualAddress, end: VirtualAddress) -> Self {
         let ops = Box::new(MemorySegment::new());
-        Self::new(stype, permissions, start, end, ops)
+        Self::new(permissions, start, end, ops)
     }
 
-    pub fn new_file_backed(file: File, file_offset: usize, file_size: usize, stype: SegmentType, permissions: MemoryPermissions, mem_offset: usize, start: VirtualAddress, end: VirtualAddress) -> Self {
+    pub fn new_file_backed(file: File, file_offset: usize, file_size: usize, permissions: MemoryPermissions, mem_offset: usize, start: VirtualAddress, end: VirtualAddress) -> Self {
         let ops = Box::new(FileBackedSegment::new(file, file_offset, file_size, mem_offset));
-        Self::new(stype, permissions, start, end, ops)
+        Self::new(permissions, start, end, ops)
     }
 
     pub fn page_aligned_len(&self) -> usize {

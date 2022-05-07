@@ -69,7 +69,7 @@ Once the image has been created, the kernel can be compiled and run in qemu,
 using:
 
 ```sh
-cd kernel/
+cd config/raspberrypi3/
 make
 ./qemu.sh
 ```

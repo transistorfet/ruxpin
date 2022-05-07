@@ -52,13 +52,18 @@ impl TaskManager {
         task
     }
 
-    pub fn get_task(&mut self, pid: Pid) -> Option<Task> {
+    pub fn get_task(&mut self, tid: Tid) -> Option<Task> {
         for proc in self.tasks.iter() {
-            if proc.try_lock().unwrap().process_id == pid {
+            if proc.try_lock().unwrap().task_id == tid {
                 return Some(proc.clone());
             }
         }
         None
+    }
+
+    pub fn get_process(&mut self, pid: Pid) -> Option<Task> {
+        // The main thread will have tid == pid
+        self.get_task(pid)
     }
 
     pub fn get_slot(&mut self, slot: usize) -> Option<Task> {
@@ -180,8 +185,12 @@ pub fn clean_up(pid: Pid) -> Result<(), KernelError> {
     TASK_MANAGER.try_lock().unwrap().clean_up(pid)
 }
 
-pub fn get_task(pid: Pid) -> Option<Task> {
-    TASK_MANAGER.try_lock().unwrap().get_task(pid)
+pub fn get_task(tid: Tid) -> Option<Task> {
+    TASK_MANAGER.try_lock().unwrap().get_task(tid)
+}
+
+pub fn get_process(pid: Pid) -> Option<Task> {
+    TASK_MANAGER.try_lock().unwrap().get_process(pid)
 }
 
 pub fn get_slot(slot: usize) -> Option<Task> {
@@ -214,7 +223,7 @@ pub fn find_exited(pid: Option<Pid>, parent: Option<Pid>, process_group: Option<
     TASK_MANAGER.try_lock().unwrap().find_exited(pid, parent, process_group)
 }
 
-pub(crate) fn schedule() {
+pub fn schedule() {
     TASK_MANAGER.try_lock().unwrap().schedule();
     check_restart_syscall();
 }

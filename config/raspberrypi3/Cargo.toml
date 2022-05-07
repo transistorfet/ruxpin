@@ -1,0 +1,22 @@
+[package]
+name = "ruxpin_config_raspberrypi3"
+version = "0.1.0"
+authors = ["transistor <trans@jabberwocky.ca>"]
+edition = "2021"
+
+[dependencies]
+ruxpin_kernel = { path = "../../kernel", features = ["arch-aarch64"] }
+ruxpin_api = { path = "../../lib/api" }
+
+ruxpin_drivers_arm = { path = "../../drivers/arm" }
+ruxpin_drivers_raspberrypi = { path = "../../drivers/raspberrypi" }
+
+ruxpin_filesystems_devfs = { path = "../../filesystems/devfs" }
+ruxpin_filesystems_procfs = { path = "../../filesystems/procfs" }
+ruxpin_filesystems_tmpfs = { path = "../../filesystems/tmpfs" }
+ruxpin_filesystems_ext2 = { path = "../../filesystems/ext2" }
+
+[[bin]]
+name = "ruxpin"
+path = "src/main.rs"
+

@@ -111,7 +111,7 @@ impl TaskRecord {
         self.space.try_lock().unwrap().clear_segments();
     }
 
-    pub fn clone_resources(&mut self, source: &TaskRecord, args: TaskCloneArgs) {
+    pub fn clone_resources(&mut self, source: &TaskRecord, _args: TaskCloneArgs) {
         self.current_uid = source.current_uid;
         self.files = source.files.try_lock().unwrap().duplicate_table();
         self.space.try_lock().unwrap().copy_segments(&source.space.try_lock().unwrap());

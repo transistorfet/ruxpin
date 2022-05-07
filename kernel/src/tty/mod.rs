@@ -76,6 +76,7 @@ pub fn close(device_id: DeviceID) -> Result<(), KernelError> {
     device.dev.close()
 }
 
+#[allow(dead_code)]
 pub(crate) fn read_raw(device_id: DeviceID, buffer: &mut [u8]) -> Result<usize, KernelError> {
     let mut drivers_list = TTY_DRIVERS.lock();
     let device = get_device(&mut *drivers_list, device_id)?;

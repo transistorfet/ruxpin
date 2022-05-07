@@ -1,0 +1,10 @@
+[package]
+name = "ruxpin_filesystems_procfs"
+version = "0.1.0"
+authors = ["transistor <trans@jabberwocky.ca>"]
+edition = "2021"
+
+[dependencies]
+ruxpin_kernel = { path = "../../kernel" }
+ruxpin_api = { path = "../../lib/api" }
+

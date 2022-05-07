@@ -108,12 +108,12 @@ pub struct FileAttributes {
 }
 
 
-pub(super) type Mount = Arc<Spinlock<dyn MountOperations>>;
+pub type Mount = Arc<Spinlock<dyn MountOperations>>;
 pub type Vnode = Arc<Spinlock<dyn VnodeOperations>>;
 
 pub struct FilePointer {
-    pub(super) vnode: Vnode,
-    pub(super) position: usize,
+    pub vnode: Vnode,
+    pub position: usize,
 }
 
 pub type File = Arc<Spinlock<FilePointer>>;

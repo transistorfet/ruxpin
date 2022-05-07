@@ -3,7 +3,10 @@
 target/
 ruxpin.img
 ruxpin-ext2-image.bin
+drivers/*/Cargo.lock
+filesystems/*/Cargo.lock
 kernel/Cargo.lock
+lib/*/Cargo.lock
 
 # Editor Files
 .*.sw?
