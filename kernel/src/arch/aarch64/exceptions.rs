@@ -3,6 +3,7 @@ use core::arch::asm;
 
 use crate::irqs;
 use crate::printkln;
+use super::types::VirtualAddress;
 
 
 pub type IrqFlags = u64;
@@ -60,7 +61,6 @@ extern "C" fn handle_user_exception(_context: u64, elr: u64, esr: u64, far: u64,
         0b100000 | 0b100100 => {
             if esr & 0b111100 == 0b001000 {
                 printkln!("Instruction or Data Abort caused by Access Flag at address {:x} (allocating new page)", far);
-                use crate::proc::scheduler::page_fault_handler;
                 page_fault_handler(far);
             } else {
                 fatal_error(elr, esr, far);
@@ -86,7 +86,6 @@ extern "C" fn handle_kernel_exception(_context: u64, elr: u64, esr: u64, far: u6
         0b100000 | 0b100100 | 0b100101 => {
             if esr & 0b111100 == 0b001000 {
                 printkln!("Instruction or Data Abort caused by Access Flag at address {:x} (allocating new page)", far);
-                use crate::proc::scheduler::page_fault_handler;
                 page_fault_handler(far);
             } else {
                 fatal_error(elr, esr, far);
@@ -108,5 +107,10 @@ extern "C" fn handle_irq(_context: u64, _elr: u64, _esr: u64, _far: u64, _sp: u6
     enable_all_irq();
     crate::tasklets::run_tasklets();
     disable_all_irq();
+}
+
+fn page_fault_handler(far: u64) {
+    let current = crate::proc::scheduler::get_current();
+    current.try_lock().unwrap().space.try_lock().unwrap().alloc_page_at(VirtualAddress::from(far)).unwrap();
 }
 

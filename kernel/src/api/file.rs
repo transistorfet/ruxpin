@@ -10,7 +10,7 @@ pub fn syscall_open(path: &str, flags: OpenFlags, access: FileAccess) -> Result<
     let proc = get_current();
 
     let (cwd, current_uid, file_num) = {
-        let mut locked_proc = proc.try_lock().unwrap();
+        let locked_proc = proc.try_lock().unwrap();
 
         let cwd = locked_proc.files.try_lock().unwrap().get_cwd();
         let current_uid = locked_proc.current_uid;

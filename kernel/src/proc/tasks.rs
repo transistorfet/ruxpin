@@ -2,7 +2,7 @@
 use alloc::string::String;
 
 use ruxpin_api::types::{Tid, Pid, UserID};
-use ruxpin_api::syscalls::{SyscallRequest, SyscallFunction};
+use ruxpin_api::syscalls::{SyscallRequest};
 
 use crate::arch::Context;
 use crate::fs::filedesc::{FileDescriptors, SharableFileDescriptors};
@@ -24,6 +24,7 @@ fn next_task_id() -> Tid {
 
 pub struct TaskCloneArgs {
     // TODO this is for the arguments telling what resources to clone
+    //flags: TaskCloneFlags,
 }
 
 impl TaskCloneArgs {
@@ -52,7 +53,6 @@ pub struct TaskRecord {
     pub process_group_id: Pid,
     pub session_id: Pid,
     pub cmd: String,
-    pub exit_status: Option<isize>,
     pub current_uid: UserID,
 
     // Other Module's Data
@@ -60,6 +60,7 @@ pub struct TaskRecord {
     pub files: SharableFileDescriptors,
 
     // Thread-Specific
+    pub exit_status: Option<isize>,
     pub state: TaskState,
     pub syscall: SyscallRequest,
     pub restart_syscall: bool,
@@ -82,16 +83,17 @@ impl TaskRecord {
         Self {
             task_id,
             process_id,
+
             parent_id,
             process_group_id,
             session_id,
-
             cmd: String::new(),
-            exit_status: None,
             current_uid: 0,
+
             space: VirtualAddressSpace::new_sharable_user_space(),
             files: FileDescriptors::new_sharable(),
 
+            exit_status: None,
             state: TaskState::Running,
             syscall: Default::default(),
             restart_syscall: false,
@@ -113,8 +115,8 @@ impl TaskRecord {
         self.current_uid = source.current_uid;
         self.files = source.files.try_lock().unwrap().duplicate_table();
         self.space.try_lock().unwrap().copy_segments(&source.space.try_lock().unwrap());
-        self.context = source.context.clone();
         let ttbr = self.space.try_lock().unwrap().get_ttbr();
+        self.context = source.context.clone();
         self.context.set_ttbr(ttbr);
 
         // The return result will be 0 to indicate it's the child process

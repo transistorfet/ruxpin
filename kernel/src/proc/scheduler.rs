@@ -236,11 +236,6 @@ pub(crate) fn restart_blocked(function: SyscallFunction) {
     TASK_MANAGER.try_lock().unwrap().restart_blocked_by_syscall(function);
 }
 
-pub(crate) fn page_fault_handler(far: u64) {
-    let current = get_current();
-    current.try_lock().unwrap().space.try_lock().unwrap().alloc_page_at(VirtualAddress::from(far)).unwrap();
-}
-
 
 // TODO this is aarch64 specific and will eventually be removed
 

@@ -1,6 +1,10 @@
 
 * make a proc macro if necessary, to encode all the members of an enum, into a usize and back, for the errors enums in particular,
   complete with mapping between ApiError and KernelError
+* proc macro to decorate syscalls with
+* think about multicore and what that would mean for everything
+* i kind of want to change the name of ruxpin_api
+
 
 
 WHAT IFS:
