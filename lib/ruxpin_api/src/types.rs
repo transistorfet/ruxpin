@@ -230,15 +230,15 @@ pub enum ApiError {
     NoSegmentFound              = 7,
 
     // Device Errors
-    OperationNotPermitted       = 8,
-    DeviceTimeout               = 9,
-    IOError                     = 10,
-    InvalidIrq                  = 11,
+    NoSuchDevice                = 8,
+    OperationNotPermitted       = 9,
+    DeviceTimeout               = 10,
+    IOError                     = 11,
+    InvalidIrq                  = 12,
 
     // File System Errors
-    FileNotOpen                 = 12,
-    FileNotFound                = 13,
-    NoSuchDevice                = 14,
+    FileNotOpen                 = 13,
+    FileNotFound                = 14,
     NotAFile                    = 15,
     NotADirectory               = 16,
     IsADirectory                = 17,
@@ -252,12 +252,14 @@ pub enum ApiError {
     OutOfDiskSpace              = 25,
     ReadOnlyFilesystem          = 26,
 
-    NotExecutable               = 27,
-    InvalidArgument             = 28,
-    InvalidSegmentType          = 29,
-    BadSystemCall               = 30,
+    NoSuchTask                  = 27,
+    NotExecutable               = 28,
+    InvalidArgument             = 29,
+    InvalidSegmentType          = 30,
+    BadSystemCall               = 31,
+    NotExited                   = 32,
 
-    UnknownError                = 31,
+    UnknownError                = 9999,
 }
 
 impl From<usize> for ApiError {
@@ -271,14 +273,14 @@ impl From<usize> for ApiError {
              6 => ApiError::OutOfMemory,
              7 => ApiError::NoSegmentFound,
 
-             8 => ApiError::OperationNotPermitted,
-             9 => ApiError::DeviceTimeout,
-            10 => ApiError::IOError,
-            11 => ApiError::InvalidIrq,
+             8 => ApiError::NoSuchDevice,
+             9 => ApiError::OperationNotPermitted,
+            10 => ApiError::DeviceTimeout,
+            11 => ApiError::IOError,
+            12 => ApiError::InvalidIrq,
 
-            12 => ApiError::FileNotOpen,
-            13 => ApiError::FileNotFound,
-            14 => ApiError::NoSuchDevice,
+            13 => ApiError::FileNotOpen,
+            14 => ApiError::FileNotFound,
             15 => ApiError::NotAFile,
             16 => ApiError::NotADirectory,
             17 => ApiError::IsADirectory,
@@ -292,10 +294,12 @@ impl From<usize> for ApiError {
             25 => ApiError::OutOfDiskSpace,
             26 => ApiError::ReadOnlyFilesystem,
 
-            27 => ApiError::NotExecutable,
-            28 => ApiError::InvalidArgument,
-            29 => ApiError::InvalidSegmentType,
-            30 => ApiError::BadSystemCall,
+            27 => ApiError::NoSuchTask,
+            28 => ApiError::NotExecutable,
+            29 => ApiError::InvalidArgument,
+            30 => ApiError::InvalidSegmentType,
+            31 => ApiError::BadSystemCall,
+            32 => ApiError::NotExited,
 
             _ => ApiError::UnknownError,
         }

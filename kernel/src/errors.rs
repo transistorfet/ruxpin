@@ -15,6 +15,7 @@ pub enum KernelError {
     NoSegmentFound,
 
     // Device Errors
+    NoSuchDevice,
     OperationNotPermitted,
     DeviceTimeout,
     IOError,
@@ -23,7 +24,6 @@ pub enum KernelError {
     // File System Errors
     FileNotOpen,
     FileNotFound,
-    NoSuchDevice,
     NotAFile,
     NotADirectory,
     IsADirectory,
@@ -37,10 +37,13 @@ pub enum KernelError {
     OutOfDiskSpace,
     ReadOnlyFilesystem,
 
+    // Task Errors
+    NoSuchTask,
     NotExecutable,
     InvalidArgument,
     InvalidSegmentType,
     BadSystemCall,
+    NotExited,
 
     SuspendProcess,
 }
@@ -55,13 +58,15 @@ impl From<KernelError> for ApiError {
             KernelError::CorruptTranslationTable        => ApiError::CorruptTranslationTable,
             KernelError::OutOfMemory                    => ApiError::OutOfMemory,
             KernelError::NoSegmentFound                 => ApiError::NoSegmentFound,
+
+            KernelError::NoSuchDevice                   => ApiError::NoSuchDevice,
             KernelError::OperationNotPermitted          => ApiError::OperationNotPermitted,
             KernelError::DeviceTimeout                  => ApiError::DeviceTimeout,
             KernelError::IOError                        => ApiError::IOError,
             KernelError::InvalidIrq                     => ApiError::InvalidIrq,
+
             KernelError::FileNotOpen                    => ApiError::FileNotOpen,
             KernelError::FileNotFound                   => ApiError::FileNotFound,
-            KernelError::NoSuchDevice                   => ApiError::NoSuchDevice,
             KernelError::NotAFile                       => ApiError::NotAFile,
             KernelError::NotADirectory                  => ApiError::NotADirectory,
             KernelError::IsADirectory                   => ApiError::IsADirectory,
@@ -75,10 +80,12 @@ impl From<KernelError> for ApiError {
             KernelError::OutOfDiskSpace                 => ApiError::OutOfDiskSpace,
             KernelError::ReadOnlyFilesystem             => ApiError::ReadOnlyFilesystem,
 
+            KernelError::NoSuchTask                     => ApiError::NoSuchTask,
             KernelError::NotExecutable                  => ApiError::NotExecutable,
             KernelError::InvalidArgument                => ApiError::InvalidArgument,
             KernelError::InvalidSegmentType             => ApiError::InvalidSegmentType,
             KernelError::BadSystemCall                  => ApiError::BadSystemCall,
+            KernelError::NotExited                      => ApiError::NotExited,
 
             _ => ApiError::UnknownError,
         }

@@ -5,7 +5,7 @@ use alloc::boxed::Box;
 use ruxpin_api::syscalls::SyscallFunction;
 use ruxpin_api::types::{OpenFlags, DeviceID, DriverID, MinorDeviceID};
 
-use crate::proc::process;
+use crate::proc::scheduler;
 use crate::sync::Spinlock;
 use crate::errors::KernelError;
 use crate::tasklets::schedule_tasklet;
@@ -93,9 +93,9 @@ pub fn read(device_id: DeviceID, buffer: &mut [u8]) -> Result<usize, KernelError
     };
 
     if nbytes == 0 {
-        let current = process::get_current_process();
+        let current = scheduler::get_current();
         schedule_tasklet(Box::new(move || {
-            process::suspend_process(current);
+            scheduler::suspend(current);
             Ok(())
         }));
     }
@@ -124,7 +124,7 @@ fn process_input(reader: &mut CanonicalReader, dev: &mut dyn CharOperations) -> 
     let mut ch = [0; 1];
     while dev.read(&mut ch)? > 0 {
         if reader.process_char(dev, ch[0])? {
-            process::restart_blocked(SyscallFunction::Read);
+            scheduler::restart_blocked(SyscallFunction::Read);
             break;
         }
     }

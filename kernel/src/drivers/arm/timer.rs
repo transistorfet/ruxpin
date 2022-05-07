@@ -1,7 +1,7 @@
 
 use crate::irqs;
 use crate::printkln;
-use crate::proc::process;
+use crate::proc::scheduler;
 use crate::arch::types::KernelVirtualAddress;
 use crate::misc::deviceio::DeviceRegisters;
 
@@ -38,7 +38,7 @@ impl SystemTimer {
 
     fn handle_irq() {
         SystemTimer::reset();
-        process::schedule();
+        scheduler::schedule();
     }
 }
 

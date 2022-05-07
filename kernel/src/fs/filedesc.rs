@@ -1,14 +1,18 @@
 
 use alloc::vec::Vec;
+use alloc::sync::Arc;
 
 use ruxpin_api::types::{OpenFlags, FileAccess, UserID, FileDesc};
 
+use crate::sync::Spinlock;
 use crate::errors::KernelError;
 
 use super::vfs;
 use super::types::{File, Vnode};
 
 const MAX_OPEN_FILES: usize = 100;
+
+pub type SharableFileDescriptors = Arc<Spinlock<FileDescriptors>>;
 
 #[derive(Clone)]
 pub struct FileDescriptors {
@@ -22,6 +26,14 @@ impl FileDescriptors {
             cwd: None,
             list: Vec::with_capacity(10)
         }
+    }
+
+    pub fn new_sharable() -> SharableFileDescriptors {
+        Arc::new(Spinlock::new(Self::new()))
+    }
+
+    pub fn duplicate_table(&self) -> SharableFileDescriptors {
+        Arc::new(Spinlock::new(self.clone()))
     }
 
     pub fn get_cwd(&self) -> Option<Vnode> {

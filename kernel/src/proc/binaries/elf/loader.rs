@@ -11,7 +11,8 @@ use crate::fs::types::File;
 use crate::errors::KernelError;
 use crate::misc::strarray::StandardArrayOfStrings;
 use crate::misc::memory::read_struct;
-use crate::proc::process::{Process, ProcessRecord};
+use crate::proc::scheduler::Task;
+use crate::proc::tasks::TaskRecord;
 use crate::arch::types::VirtualAddress;
 use crate::mm::MemoryPermissions;
 use crate::mm::segments::SegmentType;
@@ -19,11 +20,11 @@ use crate::mm::segments::SegmentType;
 use super::defs::*;
 
 
-pub fn load_binary(proc: Process, path: &str, argv: &StandardArrayOfStrings, envp: &StandardArrayOfStrings) -> Result<(), KernelError> {
+pub fn load_binary(proc: Task, path: &str, argv: &StandardArrayOfStrings, envp: &StandardArrayOfStrings) -> Result<(), KernelError> {
     let mut locked_proc = proc.try_lock().unwrap();
     locked_proc.cmd = path.to_string();
 
-    vfs::access(locked_proc.files.get_cwd(), path, FileAccess::Exec.plus(FileAccess::Regular), locked_proc.current_uid)?;
+    vfs::access(locked_proc.files.try_lock().unwrap().get_cwd(), path, FileAccess::Exec.plus(FileAccess::Regular), locked_proc.current_uid)?;
 
     let file = vfs::open(None, path, OpenFlags::ReadOnly, FileAccess::DefaultFile, locked_proc.current_uid)?;
 
@@ -63,10 +64,10 @@ pub fn load_binary(proc: Process, path: &str, argv: &StandardArrayOfStrings, env
 
             let permissions = flags_to_permissions(segment.p_flags)?;
             let stype = if permissions == MemoryPermissions::ReadWrite { SegmentType::Data } else { SegmentType::Text };
-            locked_proc.space.add_file_backed_segment(stype, permissions, file.clone(), segment.p_offset as usize, segment.p_filesz as usize, vaddr, offset, segment.p_memsz as usize);
+            locked_proc.space.try_lock().unwrap().add_file_backed_segment(stype, permissions, file.clone(), segment.p_offset as usize, segment.p_filesz as usize, vaddr, offset, segment.p_memsz as usize);
 
             // TODO this is a hack to forcefully load the page because the page fault in kernel space doesn't work
-            //locked_proc.space.alloc_page_at(vaddr)?;
+            //locked_proc.space.try_lock().unwrap().alloc_page_at(vaddr)?;
 
         } else if segment.p_type == PT_GNU_RELRO {
             //char **data = proc->map.segments[M_TEXT].base + prog_headers[i].p_vaddr;
@@ -108,14 +109,14 @@ fn flags_to_permissions(flags: Elf64Word) -> Result<MemoryPermissions, KernelErr
     }
 }
 
-fn set_up_stack(locked_proc: &mut ProcessRecord, entrypoint: VirtualAddress, argv: &StandardArrayOfStrings, envp: &StandardArrayOfStrings) -> Result<(), KernelError> {
+fn set_up_stack(locked_proc: &mut TaskRecord, entrypoint: VirtualAddress, argv: &StandardArrayOfStrings, envp: &StandardArrayOfStrings) -> Result<(), KernelError> {
     let page_size = mmu::page_size();
 
     // TODO the size here is wrong, it needs to use the brk as the stack size, it needs to start higher (0x0001_0000_0000_0000 or 0x0000_8000_0000_0000)
     let stack_size = page_size * page_size;
     let stack_start = 0x1_0000_0000 as u64;
 
-    locked_proc.space.add_memory_segment(SegmentType::Stack, MemoryPermissions::ReadWrite, VirtualAddress::from(stack_start - stack_size as u64), stack_size);
+    locked_proc.space.try_lock().unwrap().add_memory_segment(SegmentType::Stack, MemoryPermissions::ReadWrite, VirtualAddress::from(stack_start - stack_size as u64), stack_size);
 
     let argv_size = argv.calculate_size();
     let envp_size = envp.calculate_size();
@@ -126,8 +127,8 @@ fn set_up_stack(locked_proc: &mut ProcessRecord, entrypoint: VirtualAddress, arg
     let argv_base = VirtualAddress::from(stack_start - page_size as u64 + argv_start as u64);
     let envp_base = VirtualAddress::from(stack_start - page_size as u64 + envp_start as u64);
 
-    locked_proc.space.alloc_page_at(VirtualAddress::from(stack_start - page_size as u64))?;
-    let page_addr = locked_proc.space.translate_addr(VirtualAddress::from(stack_start - page_size as u64))?;
+    locked_proc.space.try_lock().unwrap().alloc_page_at(VirtualAddress::from(stack_start - page_size as u64))?;
+    let page_addr = locked_proc.space.try_lock().unwrap().translate_addr(VirtualAddress::from(stack_start - page_size as u64))?;
     let page_data: &mut [u8] = unsafe {
         core::slice::from_raw_parts_mut(page_addr.to_kernel_addr().as_mut(), page_size)
     };
@@ -137,7 +138,7 @@ fn set_up_stack(locked_proc: &mut ProcessRecord, entrypoint: VirtualAddress, arg
 
     let starting_sp = VirtualAddress::from(stack_start - argv_size as u64 - envp_size as u64);
 
-    let ttrb = locked_proc.space.get_ttbr();
+    let ttrb = locked_proc.space.try_lock().unwrap().get_ttbr();
     locked_proc.context.init(entrypoint, starting_sp, ttrb);
     locked_proc.context.write_args(argv.offset_len(), argv_base, envp_base);
 

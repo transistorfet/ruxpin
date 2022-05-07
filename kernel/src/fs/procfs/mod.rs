@@ -10,7 +10,8 @@ use ruxpin_api::types::{OpenFlags, FileAccess, DeviceID, Pid, DirEntry};
 use crate::sync::Spinlock;
 use crate::errors::KernelError;
 use crate::misc::writer::SliceWriter;
-use crate::proc::process::{self, ProcessState};
+use crate::proc::scheduler;
+use crate::proc::tasks::TaskState;
 
 use super::generic::{GenericStaticDirectoryVnode, GenericStaticFileData};
 use super::types::{Filesystem, Mount, MountOperations, Vnode, VnodeOperations, FileAttributes, FilePointer};
@@ -108,11 +109,11 @@ impl VnodeOperations for ProcFsRootVnode {
     }
 
     fn readdir(&mut self, file: &mut FilePointer) -> Result<Option<DirEntry>, KernelError> {
-        if file.position >= process::slot_len() {
+        if file.position >= scheduler::slot_len() {
             return Ok(None);
         }
 
-        let proc = match process::get_slot(file.position) {
+        let proc = match scheduler::get_slot(file.position) {
             None => { return Ok(None) },
             Some(proc) => proc,
         };
@@ -134,7 +135,7 @@ const PROCESS_ENTRIES: &'static [(&'static str, GenericStaticFileData<Pid>)] = &
 ];
 
 fn file_data_stat(pid: &Pid) -> Result<Vec<u8>, KernelError> {
-    let proc = process::get_process(*pid).ok_or(KernelError::FileNotFound)?;
+    let proc = scheduler::get_task(*pid).ok_or(KernelError::FileNotFound)?;
     let locked_proc = proc.try_lock().unwrap();
 
     let mut data = vec![0; 128];
@@ -158,11 +159,11 @@ fn file_data_statm(pid: &Pid) -> Result<Vec<u8>, KernelError> {
     Ok(vec![])
 }
 
-fn proc_state(state: ProcessState) -> char {
+fn proc_state(state: TaskState) -> char {
     match state {
-        ProcessState::Exited => 'Z',
-        ProcessState::Running => 'R',
-        ProcessState::Blocked => 'S',
+        TaskState::Exited => 'Z',
+        TaskState::Running => 'R',
+        TaskState::Blocked => 'S',
     }
 }
 

@@ -8,9 +8,9 @@ use crate::arch::types::PhysicalAddress;
 use crate::irqs;
 use crate::fs::vfs;
 use crate::tasklets;
-use crate::proc::process;
+use crate::proc::scheduler;
 use crate::proc::binaries::elf::loader;
-use crate::proc::process::create_process;
+use crate::proc::scheduler::create_task;
 use crate::misc::strarray::StandardArrayOfStrings;
 use crate::mm::kmalloc::init_kernel_heap;
 use crate::mm::vmalloc::init_virtual_memory;
@@ -39,7 +39,7 @@ pub fn register_devices() -> Result<(), KernelError> {
 
     tasklets::initialize()?;
     vfs::initialize()?;
-    process::initialize()?;
+    scheduler::initialize()?;
 
     use crate::fs::tmpfs::TmpFilesystem;
     vfs::register_filesystem(TmpFilesystem::new())?;
@@ -63,11 +63,11 @@ pub fn register_devices() -> Result<(), KernelError> {
 
     // Create the first process
     printkln!("loading the first processs (/bin/sh) from elf binary file");
-    let proc = create_process(None);
+    let proc = create_task(None);
     let parsed_argv = StandardArrayOfStrings::new();
     let parsed_envp = StandardArrayOfStrings::new();
     loader::load_binary(proc.clone(), "/bin/sh", &parsed_argv, &parsed_envp).unwrap();
-    proc.lock().files.open(None, "/dev/console0", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0).unwrap();
+    proc.lock().files.try_lock().unwrap().open(None, "/dev/console0", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0).unwrap();
 
     SystemTimer::init(1);
 

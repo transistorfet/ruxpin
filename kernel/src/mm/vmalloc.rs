@@ -22,6 +22,8 @@ pub fn init_virtual_memory(start: PhysicalAddress, end: PhysicalAddress) {
     pages::init_pages_area(start, end);
 }
 
+pub type SharableVirtualAddressSpace = Arc<Spinlock<VirtualAddressSpace>>;
+
 pub struct VirtualAddressSpace {
     table: TranslationTable,
     segments: Vec<ArcSegment>,
@@ -38,6 +40,10 @@ impl VirtualAddressSpace {
             segments: Vec::with_capacity(MAX_SEGMENTS),
             data: None,
         }
+    }
+
+    pub fn new_sharable_user_space() -> SharableVirtualAddressSpace {
+        Arc::new(Spinlock::new(Self::new_user_space()))
     }
 
     pub fn add_memory_segment(&mut self, stype: SegmentType, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) {
