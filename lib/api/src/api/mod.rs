@@ -2,11 +2,47 @@
 use core::fmt;
 use core::fmt::Write;
 
-use crate::syscall_encode;
-use crate::arch::execute_syscall;
 use crate::types::{Pid, FileDesc, ApiError, OpenFlags, FileAccess, DirEntry};
-use crate::syscalls::{SyscallRequest, SyscallFunction};
 
+use crate::syscall_encode;
+use crate::syscalls::{execute_syscall, SyscallRequest, SyscallFunction};
+
+
+//pub static STDIN: UnbufferedFile = UnbufferedFile(FileDesc(0));
+//pub static STDOUT: UnbufferedFile = UnbufferedFile(FileDesc(1));
+//pub static STDERR: UnbufferedFile = UnbufferedFile(FileDesc(2));
+
+pub struct UnbufferedFile(pub FileDesc);
+
+impl UnbufferedFile {
+    pub fn stdout() -> UnbufferedFile {
+        UnbufferedFile(FileDesc(0))
+    }
+}
+
+impl Write for UnbufferedFile {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        write(self.0, s.as_bytes()).unwrap();
+        Ok(())
+    }
+}
+
+#[macro_export]
+macro_rules! print {
+    ($($args:tt)*) => ({
+        use core::fmt::Write;
+        $crate::api::UnbufferedFile::stdout().write_fmt(format_args!($($args)*)).unwrap();
+    })
+}
+
+#[macro_export]
+macro_rules! println {
+    ($($args:tt)*) => ({
+        use core::fmt::Write;
+        $crate::api::UnbufferedFile::stdout().write_fmt(format_args!($($args)*)).unwrap();
+        $crate::api::UnbufferedFile::stdout().write_str("\n").unwrap();
+    })
+}
 
 
 pub fn exit(status: isize) -> ! {
@@ -128,43 +164,5 @@ pub fn readdir(file: FileDesc, dirent: &mut DirEntry) -> Result<bool, ApiError> 
         false => Ok(syscall.result != 0),
         true => Err(ApiError::from(syscall.result)),
     }
-}
-
-
-
-//pub static STDIN: UnbufferedFile = UnbufferedFile(FileDesc(0));
-//pub static STDOUT: UnbufferedFile = UnbufferedFile(FileDesc(1));
-//pub static STDERR: UnbufferedFile = UnbufferedFile(FileDesc(2));
-
-pub struct UnbufferedFile(pub FileDesc);
-
-impl UnbufferedFile {
-    pub fn stdout() -> UnbufferedFile {
-        UnbufferedFile(FileDesc(0))
-    }
-}
-
-impl Write for UnbufferedFile {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        write(self.0, s.as_bytes()).unwrap();
-        Ok(())
-    }
-}
-
-#[macro_export]
-macro_rules! print {
-    ($($args:tt)*) => ({
-        use core::fmt::Write;
-        $crate::api::UnbufferedFile::stdout().write_fmt(format_args!($($args)*)).unwrap();
-    })
-}
-
-#[macro_export]
-macro_rules! println {
-    ($($args:tt)*) => ({
-        use core::fmt::Write;
-        $crate::api::UnbufferedFile::stdout().write_fmt(format_args!($($args)*)).unwrap();
-        $crate::api::UnbufferedFile::stdout().write_str("\n").unwrap();
-    })
 }
 

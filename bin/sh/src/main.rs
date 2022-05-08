@@ -7,7 +7,7 @@ extern crate ruxpin_app;
 
 use ruxpin_api::{print, println};
 use ruxpin_api::api::{fork, exec, read, waitpid};
-use ruxpin_api::types::{FileDesc};
+use ruxpin_api::types::FileDesc;
 
 
 fn get_next_word<'a>(input: &'a [u8]) -> (&'a [u8], &'a [u8]) {

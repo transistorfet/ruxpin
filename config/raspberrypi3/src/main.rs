@@ -118,7 +118,7 @@ fn startup_tests() -> Result<(), KernelError> {
 
 
     printkln!("\nOpening the testapp binary through the vfs interface and reading some data");
-    let file = vfs::open(None, "/bin/testapp", OpenFlags::ReadOnly, FileAccess::DefaultFile, 0).unwrap();
+    let file = vfs::open(None, "/bin/sh", OpenFlags::ReadOnly, FileAccess::DefaultFile, 0).unwrap();
     let mut data = [0; 1024];
     loop {
         let nbytes = vfs::read(file.clone(), &mut data).unwrap();

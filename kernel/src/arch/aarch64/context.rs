@@ -2,7 +2,7 @@
 use core::ptr;
 use core::arch::asm;
 
-use ruxpin_syscall::{SyscallRequest, SyscallFunction};
+use ruxpin_api::syscalls::{SyscallRequest, SyscallFunction};
 
 use super::types::VirtualAddress;
 

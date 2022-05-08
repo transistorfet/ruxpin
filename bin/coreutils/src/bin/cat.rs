@@ -7,7 +7,7 @@ extern crate ruxpin_app;
 
 use ruxpin_api::{print, println};
 use ruxpin_api::api::{exit, open, close, read};
-use ruxpin_api::types::{FileDesc, OpenFlags, FileAccess};
+use ruxpin_api::types::{OpenFlags, FileAccess};
 
 use ruxpin_app::env;
 

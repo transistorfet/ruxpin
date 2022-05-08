@@ -4,7 +4,6 @@
 extern crate ruxpin_app;
 
 use ruxpin_api::println;
-use ruxpin_api::types::FileDesc;
 
 use ruxpin_app::env;
 

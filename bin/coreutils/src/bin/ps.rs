@@ -9,7 +9,7 @@ extern crate ruxpin_app;
 
 use ruxpin_api::println;
 use ruxpin_api::api::{open, close, read, readdir};
-use ruxpin_api::types::{FileDesc, OpenFlags, FileAccess, DirEntry};
+use ruxpin_api::types::{OpenFlags, FileAccess, DirEntry};
 
 
 fn print_stat(filename: &str) {

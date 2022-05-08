@@ -1,4 +1,6 @@
 
+pub use crate::arch::execute_syscall;
+
 #[repr(usize)]
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum SyscallFunction {

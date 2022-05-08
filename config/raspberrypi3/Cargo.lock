@@ -91,15 +91,7 @@ name = "ruxpin_kernel"
 version = "0.1.0"
 dependencies = [
  "ruxpin_api",
- "ruxpin_syscall",
  "ruxpin_syscall_proc",
-]
-
-[[package]]
-name = "ruxpin_syscall"
-version = "0.1.0"
-dependencies = [
- "ruxpin_api",
 ]
 
 [[package]]

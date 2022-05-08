@@ -9,13 +9,11 @@ use crate::proc::scheduler::{get_current, clone_current, exit_current, find_exit
 use crate::proc::binaries::elf::loader;
 
 
-#[syscall_handler]
 pub fn syscall_exit(status: isize) -> Result<(), KernelError> {
     exit_current(status);
     Ok(())
 }
 
-#[syscall_handler]
 pub fn syscall_fork() -> Result<Pid, KernelError> {
     let args = TaskCloneArgs::new();
     let new_proc = clone_current(args);

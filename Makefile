@@ -1,6 +1,7 @@
 
 TARGETDIR = target/aarch64-unknown-none/release
 COREUTILS = ls args cat ps
+WORKSPACE_MEMBERS = bin/coreutils bin/sh config/raspberrypi3 kernel lib/api lib/app lib/syscall_proc
 
 
 MOUNTPOINT = build
@@ -37,10 +38,10 @@ load-image:
 	make umount-image
 
 coreutils:
-	cd bin/coreutils && cargo build --release
+	cd bin/$@ && cargo build --release && cd ../../ && rust-strip $(COREUTILS_OUTPUTS)
 
 sh:
-	cd bin/sh && cargo build --release
+	cd bin/$@ && cargo build --release && rust-strip $(TARGETDIR)/$@
 
 load-image-contents: sh coreutils
 	sudo mkdir -p $(MOUNTPOINT)/bin
@@ -50,5 +51,8 @@ load-image-contents: sh coreutils
 
 build-kernel:
 	cd kernel && make
+
+clean:
+	rm -r $(foreach member, $(WORKSPACE_MEMBERS), $(member)/target)
 
 

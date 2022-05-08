@@ -1,7 +1,7 @@
 
 use alloc::string::String;
 
-use ruxpin_syscall::SyscallRequest;
+use ruxpin_api::syscalls::SyscallRequest;
 use ruxpin_api::types::{Tid, Pid, UserID};
 
 use crate::arch::Context;

@@ -1,9 +1,0 @@
-[package]
-name = "ruxpin_syscall"
-version = "0.1.0"
-authors = ["transistor <trans@jabberwocky.ca>"]
-edition = "2021"
-
-[dependencies]
-ruxpin_api = { path = "../../lib/api" }
-
