@@ -13,10 +13,8 @@ use ruxpin_kernel::arch::types::PhysicalAddress;
 use ruxpin_kernel::irqs;
 use ruxpin_kernel::fs::vfs;
 use ruxpin_kernel::tasklets;
+use ruxpin_kernel::proc::binaries;
 use ruxpin_kernel::proc::scheduler;
-use ruxpin_kernel::proc::binaries::elf::loader;
-use ruxpin_kernel::proc::scheduler::create_task;
-use ruxpin_kernel::misc::strarray::StandardArrayOfStrings;
 use ruxpin_kernel::mm::kmalloc::init_kernel_heap;
 use ruxpin_kernel::mm::vmalloc::init_virtual_memory;
 
@@ -65,11 +63,7 @@ pub fn register_devices() -> Result<(), KernelError> {
 
     // Create the first process
     printkln!("loading the first processs (/bin/sh) from elf binary file");
-    let proc = create_task(None);
-    let parsed_argv = StandardArrayOfStrings::new();
-    let parsed_envp = StandardArrayOfStrings::new();
-    loader::load_binary(proc.clone(), "/bin/sh", &parsed_argv, &parsed_envp).unwrap();
-    proc.lock().files.try_lock().unwrap().open(None, "/dev/console0", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0).unwrap();
+    binaries::load_process("/bin/sh").unwrap();
 
     SystemTimer::init(1);
 

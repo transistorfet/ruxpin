@@ -132,10 +132,21 @@ pub fn readdir(file: FileDesc, dirent: &mut DirEntry) -> Result<bool, ApiError> 
 
 
 
+//pub static STDIN: UnbufferedFile = UnbufferedFile(FileDesc(0));
+//pub static STDOUT: UnbufferedFile = UnbufferedFile(FileDesc(1));
+//pub static STDERR: UnbufferedFile = UnbufferedFile(FileDesc(2));
 
-impl Write for FileDesc {
+pub struct UnbufferedFile(pub FileDesc);
+
+impl UnbufferedFile {
+    pub fn stdout() -> UnbufferedFile {
+        UnbufferedFile(FileDesc(0))
+    }
+}
+
+impl Write for UnbufferedFile {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        write(*self, s.as_bytes()).unwrap();
+        write(self.0, s.as_bytes()).unwrap();
         Ok(())
     }
 }
@@ -144,7 +155,7 @@ impl Write for FileDesc {
 macro_rules! print {
     ($($args:tt)*) => ({
         use core::fmt::Write;
-        FileDesc(0).write_fmt(format_args!($($args)*)).unwrap();
+        $crate::api::UnbufferedFile::stdout().write_fmt(format_args!($($args)*)).unwrap();
     })
 }
 
@@ -152,8 +163,8 @@ macro_rules! print {
 macro_rules! println {
     ($($args:tt)*) => ({
         use core::fmt::Write;
-        FileDesc(0).write_fmt(format_args!($($args)*)).unwrap();
-        FileDesc(0).write_str("\n").unwrap();
+        $crate::api::UnbufferedFile::stdout().write_fmt(format_args!($($args)*)).unwrap();
+        $crate::api::UnbufferedFile::stdout().write_str("\n").unwrap();
     })
 }
 
