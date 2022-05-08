@@ -53,6 +53,6 @@ build-kernel:
 	cd kernel && make
 
 clean:
-	rm -r $(foreach member, $(WORKSPACE_MEMBERS), $(member)/target)
+	rm -rf $(foreach member, $(WORKSPACE_MEMBERS), $(member)/target)
 
 
