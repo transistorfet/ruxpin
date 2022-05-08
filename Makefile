@@ -39,15 +39,11 @@ load-image:
 coreutils:
 	cd bin/coreutils && cargo build --release
 
-testapp:
-	cd bin/testapp && cargo build --release
-
 sh:
 	cd bin/sh && cargo build --release
 
-load-image-contents: testapp sh coreutils
+load-image-contents: sh coreutils
 	sudo mkdir -p $(MOUNTPOINT)/bin
-	sudo cp bin/testapp/$(TARGETDIR)/testapp $(MOUNTPOINT)/bin
 	sudo cp bin/sh/$(TARGETDIR)/sh $(MOUNTPOINT)/bin
 	sudo cp $(COREUTILS_OUTPUTS) $(MOUNTPOINT)/bin
 
