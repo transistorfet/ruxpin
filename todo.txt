@@ -1,4 +1,11 @@
 
+* there's a problem with the stack upon returning to the process after a fork and/or waitpid, in the shell.  It was previously working,
+  but after upgrading the compiler, it now has a fatal error when trying to print the result from waitpid.  If I comment out the printing,
+  it works without issue.  If I comment out the printing but print the status var which is stack allocated after the fork, then it fails,
+  but if i move the decl to before the fork, it works without issue.  Moving the result var to before the fork, but still printing it after
+  fails.  So something weird is going on with the stack.
+  It seemed like the values made sense when checking them in restore_context
+
 * make a proc macro if necessary, to encode all the members of an enum, into a usize and back, for the errors enums in particular,
   complete with mapping between ApiError and KernelError
 * proc macro to decorate syscalls with

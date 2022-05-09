@@ -46,17 +46,26 @@ macro_rules! printkln {
     })
 }
 
-pub unsafe fn printk_dump(mut ptr: *const u8, mut size: usize) {
+pub fn printk_dump_slice<T>(data: &[T]) {
+    let ptr = data.as_ptr() as *const u8 as u64;
+    let len = data.len();
+    unsafe {
+        printk_dump(ptr, len);
+    }
+}
+
+pub unsafe fn printk_dump(mut addr: u64, mut size: usize) {
     while size > 0 {
-        printk!("{:#010x}: ", ptr as u64);
+        printk!("{:#010x}: ", addr);
+        let ptr = addr as *const u8;
         for i in 0..16 {
-            printk!("{:02x} ", *ptr.offset(i));
+            printk!("{:02x} ", unsafe { *ptr.add(i) });
             size -= 1;
             if size == 0 {
                 break;
             }
         }
-        ptr = ptr.offset(16);
+        addr += 16;
         printkln!("");
     }
 }

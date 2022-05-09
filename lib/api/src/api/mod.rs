@@ -80,7 +80,7 @@ pub fn waitpid(pid: Pid, status: &mut isize, options: usize) -> Result<Pid, ApiE
     let mut syscall: SyscallRequest = Default::default();
     syscall.function = SyscallFunction::WaitPid;
     syscall_encode!(syscall, i, pid: Pid);
-    syscall_encode!(syscall, i, status: &isize);
+    syscall_encode!(syscall, i, status: &mut isize);
     syscall_encode!(syscall, i, options: usize);
     execute_syscall(&mut syscall);
     match syscall.error {

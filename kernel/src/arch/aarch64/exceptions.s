@@ -349,6 +349,9 @@ _debug_print_number:
 	cmp	x1, xzr
 	b.ne	L_debug_loop
 
+	mov	x2, #10
+	strb	w2, [x8]
+
 	ret
 
 /*

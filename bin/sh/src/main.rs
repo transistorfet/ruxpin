@@ -73,10 +73,12 @@ pub fn main() {
             } else {
                 println!("child pid is {}", pid);
                 let mut status = 0;
-                match waitpid(pid, &mut status, 0) {
+                let result = waitpid(pid, &mut status, 0);
+                match result {
                     Ok(pid) => { println!("pid {} exited with {}", pid, status); },
                     Err(err) => { println!("Error while waiting for process: {:?}", err); },
                 }
+                println!("child pid is {}", status);
             }
         }
     }

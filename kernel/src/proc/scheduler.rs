@@ -135,6 +135,8 @@ impl TaskManager {
             proc.try_lock().unwrap().state = TaskState::Exited;
             self.scheduled.remove_node(proc.clone());
         }
+
+        self.set_current_context();
     }
 
     fn exit_current(&mut self, status: isize) {

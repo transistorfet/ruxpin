@@ -55,7 +55,9 @@ pub fn syscall_waitpid(pid: Pid, status: &mut isize, _options: usize) -> Result<
 
     if let Some(proc) = proc {
         let pid = proc.try_lock().unwrap().process_id;
-        *status = proc.try_lock().unwrap().exit_status.unwrap();
+        if status as *mut isize as usize != 0 {
+            *status = proc.try_lock().unwrap().exit_status.unwrap();
+        }
         clean_up(pid)?;
         Ok(pid)
     } else {

@@ -45,13 +45,6 @@ impl From<PhysicalAddress> for usize {
     }
 }
 
-
-impl From<*mut u8> for PhysicalAddress {
-    fn from(addr: *mut u8) -> Self {
-        PhysicalAddress::from(addr as u64)
-    }
-}
-
 impl fmt::Debug for PhysicalAddress {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         write!(f, "PhysicalAddress({:#x})", self.0)
@@ -117,6 +110,12 @@ impl VirtualAddress {
 impl From<PhysicalAddress> for KernelVirtualAddress {
     fn from(addr: PhysicalAddress) -> Self {
         Self(addr.0 | kernel_virtual_base_addr())
+    }
+}
+
+impl From<KernelVirtualAddress> for PhysicalAddress {
+    fn from(addr: KernelVirtualAddress) -> Self {
+        Self(addr.0 & !kernel_virtual_base_addr())
     }
 }
 

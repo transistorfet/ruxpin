@@ -1,5 +1,6 @@
 
 use core::ptr;
+use core::fmt;
 use core::arch::asm;
 
 use ruxpin_api::syscalls::{SyscallRequest, SyscallFunction};
@@ -16,7 +17,7 @@ extern "C" {
 pub static mut CURRENT_CONTEXT: *mut Context = ptr::null_mut();
 
 #[repr(C)]
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Context {
     x_registers: [u64; 32],
     v_registers: [u64; 64],     // TODO this should be u128, but they don't have a stable ABI, so I'm avoiding them for safety
@@ -37,6 +38,23 @@ impl Default for Context {
     }
 }
 
+impl fmt::Display for Context {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for (i, reg) in self.x_registers.iter().enumerate() {
+            write!(f, "x{:02}: {:#018x} ", i, reg)?;
+            if i % 4 == 3 {
+                write!(f, "\n")?;
+            }
+        }
+
+        write!(f, "ELR: {:#018x} ", self.elr)?;
+        write!(f, "SPSR: {:#018x} ", self.spsr)?;
+        write!(f, "TTBR: {:#018x} ", self.ttbr)?;
+        write!(f, "\n")?;
+        Ok(())
+    }
+}
+
 impl Context {
     pub fn init(&mut self, entry: VirtualAddress, sp: VirtualAddress, ttbr: u64) {
         self.set_ttbr(ttbr);
@@ -49,28 +67,8 @@ impl Context {
         self.ttbr = ttbr;
     }
 
-    pub fn switch_current_context(new_context: &mut Context) {
-        unsafe {
-            // Update TTBR0 before the context switch, so we can restart a syscall in progress
-            asm!(
-                "msr     TTBR0_EL1, {ttbr}",
-                ttbr = in(reg) new_context.ttbr,
-            );
-
-            CURRENT_CONTEXT = new_context as *mut Context;
-        }
-    }
-
-    pub fn syscall_from_current_context() -> SyscallRequest {
-        unsafe {
-            (&*CURRENT_CONTEXT).into()
-        }
-    }
-
-    pub fn write_syscall_result_to_current_context(syscall: &SyscallRequest) {
-        unsafe {
-            (&mut *CURRENT_CONTEXT).write_syscall_result(syscall);
-        }
+    pub fn get_stack(&self) -> VirtualAddress {
+        VirtualAddress::from(self.x_registers[31])
     }
 
     pub fn write_syscall_result(&mut self, syscall: &SyscallRequest) {
@@ -97,6 +95,39 @@ impl Context {
         self.x_registers[2] = envp.into();
     }
 }
+
+impl Context {
+    pub fn dump_current() {
+        unsafe {
+            crate::printkln!("{}", &*CURRENT_CONTEXT);
+        }
+    }
+
+    pub fn switch_current_context(new_context: &mut Context) {
+        unsafe {
+            // Update TTBR0 before the context switch, so we can restart a syscall in progress
+            asm!(
+                "msr     TTBR0_EL1, {ttbr}",
+                ttbr = in(reg) new_context.ttbr,
+            );
+
+            CURRENT_CONTEXT = new_context as *mut Context;
+        }
+    }
+
+    pub fn syscall_from_current_context() -> SyscallRequest {
+        unsafe {
+            (&*CURRENT_CONTEXT).into()
+        }
+    }
+
+    pub fn write_syscall_result_to_current_context(syscall: &SyscallRequest) {
+        unsafe {
+            (&mut *CURRENT_CONTEXT).write_syscall_result(syscall);
+        }
+    }
+}
+
 
 impl From<&Context> for SyscallRequest {
     fn from(context: &Context) -> SyscallRequest {

@@ -6,8 +6,8 @@ extern crate alloc;
 use alloc::boxed::Box;
  
 use ruxpin_kernel::printkln;
-use ruxpin_kernel::printk::printk_dump;
 use ruxpin_kernel::errors::KernelError;
+use ruxpin_kernel::printk::printk_dump_slice;
 use ruxpin_kernel::arch::types::PhysicalAddress;
 
 use ruxpin_kernel::irqs;
@@ -123,7 +123,7 @@ fn startup_tests() -> Result<(), KernelError> {
     loop {
         let nbytes = vfs::read(file.clone(), &mut data).unwrap();
         printkln!("read in {} bytes", nbytes);
-        unsafe { printk_dump(&data as *const u8, 1024); }
+        printk_dump_slice(&data);
         //if nbytes != 1024 {
             break;
         //}
@@ -141,7 +141,7 @@ fn startup_tests() -> Result<(), KernelError> {
     let file = vfs::open(None, "/test2", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0).unwrap();
     let mut data = [0; 128];
     vfs::read(file.clone(), &mut data).unwrap();
-    unsafe { printk_dump(&data as *const u8, 128); }
+    printk_dump_slice(&data);
     //vfs::close(file)?;
 
     printkln!("\nPrinting the contents of the root directory (ext2 mount)");

@@ -46,6 +46,7 @@ impl PagePool {
     pub fn alloc_page(&mut self) -> PhysicalAddress {
         for region in &mut self.regions {
             if let Some(addr) = region.alloc_page() {
+                //printkln!("pages: allocating page at {:#x}", usize::from(addr));
                 return addr;
             }
         }
@@ -54,7 +55,6 @@ impl PagePool {
 
     pub fn alloc_page_zeroed(&mut self) -> PhysicalAddress {
         let paddr = self.alloc_page();
-        //crate::printkln!("allocate page {:x}", usize::from(paddr));
         unsafe {
             zero_page(paddr);
         }
@@ -64,7 +64,7 @@ impl PagePool {
     pub fn free_page(&mut self, ptr: PhysicalAddress) {
         for region in &mut self.regions {
             if ptr >= region.pages_start && ptr <= region.pages_start.add(region.total_pages() * mmu::page_size()) {
-                //crate::printkln!("free page {:x}", usize::from(ptr));
+                //printkln!("pages: freeing page at {:x}", usize::from(ptr));
                 region.free_page(ptr);
                 return;
             }
