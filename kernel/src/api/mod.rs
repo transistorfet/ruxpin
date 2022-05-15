@@ -23,6 +23,8 @@ pub fn handle_syscall() {
 }
 
 pub fn process_syscall(syscall: &mut SyscallRequest) {
+    let current_proc = get_current();
+
     if syscall.function == SyscallFunction::Exec {
         let mut i = 0;
         syscall_decode!(syscall, i, path: &str);
@@ -118,7 +120,7 @@ pub fn process_syscall(syscall: &mut SyscallRequest) {
         }
     }
 
-    Context::write_syscall_result_to_current_context(syscall);
+    current_proc.try_lock().unwrap().context.write_syscall_result(syscall);
 }
 
 pub fn store_result(syscall: &mut SyscallRequest, result: Result<usize, KernelError>) {

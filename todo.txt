@@ -1,10 +1,18 @@
 
+* for the translation table stuff, you could possible have a special Visitor type struct to store all the info about the traversal, and
+  modify the unmap functions to be generic traversal code, with closures for unmap_block and unmap_granuale/table = 0
+
+
 * there's a problem with the stack upon returning to the process after a fork and/or waitpid, in the shell.  It was previously working,
   but after upgrading the compiler, it now has a fatal error when trying to print the result from waitpid.  If I comment out the printing,
   it works without issue.  If I comment out the printing but print the status var which is stack allocated after the fork, then it fails,
   but if i move the decl to before the fork, it works without issue.  Moving the result var to before the fork, but still printing it after
   fails.  So something weird is going on with the stack.
   It seemed like the values made sense when checking them in restore_context
+
+* once you get past this issue, you were going to split api/ into api/, syscall/, and types/, but it's causing a failure whenever anything
+  is moved out and the applications are recompiled
+
 
 * make a proc macro if necessary, to encode all the members of an enum, into a usize and back, for the errors enums in particular,
   complete with mapping between ApiError and KernelError
@@ -35,7 +43,8 @@ WHAT IFS:
 
 * how would you isolate the unix-specific aspects of the api such that you could implement a light unix-to-ruxpin
   shim on the user process side (or even on the kernel side), so that the ruxpin-native api is not constrained by
-  unix but is compatible enough to be source compatible
+  unix but is compatible enough to be source compatible.  Things like waitpid, which take a pointer to the location to put the status,
+  it would be nice to have a safer means of passing back data
 * can you separate the syscalls, maybe even based on permission levels as well as function, and require permission for each api to
   be granted explicitly, so that APIs security-wise are opt-in, kind of like a web api, or like WASI
 * I'm leaning a lot more to the idea of splitting up the APIs into different groups with a different svc number for
@@ -65,6 +74,9 @@ TODO:
 
 * add threading support in api
 * add an events system for processes to wait on (IO blocking, process exit, select/poll, etc)
+
+* add a stack guard page to each stack segment, with permissions/mapping in the translation table such that it will cause a fault
+  instead of crashing into the adjacent segment.  Linux has this adjustable in size I think
 
 * add more data to procfs
 * add . and .. to procfs, as well as devfs and tmpfs

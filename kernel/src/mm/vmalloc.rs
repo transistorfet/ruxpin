@@ -172,7 +172,7 @@ impl VirtualAddressSpace {
                 // Allocate new page
                 let page = pages.alloc_page_zeroed();
                 let page_vaddr = far.align_down(mmu::page_size());
-                self.table.update_mapping(page_vaddr, page, mmu::page_size()).unwrap();
+                self.table.update_addr(page_vaddr, page, mmu::page_size()).unwrap();
 
                 // Load data into the page if necessary
                 let page_buffer = unsafe {
