@@ -1,5 +1,4 @@
 
-pub mod bitmap;
 pub mod byteorder;
 pub mod cache;
 pub mod memory;

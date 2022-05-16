@@ -59,6 +59,10 @@ impl PhysicalAddress {
     pub fn to_kernel_addr(self) -> KernelVirtualAddress {
         KernelVirtualAddress::from(self)
     }
+
+    pub fn align_up(self, align: usize) -> Self  {
+        Self(align_up(self.0 as usize, align) as u64)
+    }
 }
 
 
