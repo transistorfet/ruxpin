@@ -45,7 +45,7 @@ pub static DEFAULT_TCR: i64 =
 
 
 
-pub struct TranslationTable(u64);
+pub struct TranslationTable(pub(super) u64);
 
 
 #[inline(always)]
