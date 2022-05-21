@@ -6,6 +6,7 @@ use core::arch::asm;
 use ruxpin_api::syscalls::{SyscallRequest, SyscallFunction};
 
 use super::types::VirtualAddress;
+use super::mmu::TranslationTable;
 
 extern "C" {
     // These definitions are in aarch64/exceptions.s
@@ -65,6 +66,10 @@ impl Context {
 
     pub fn set_ttbr(&mut self, ttbr: u64) {
         self.ttbr = ttbr;
+    }
+
+    pub fn get_translation_table(&self) -> TranslationTable {
+        TranslationTable(self.ttbr)
     }
 
     pub fn get_stack(&self) -> VirtualAddress {

@@ -46,10 +46,26 @@ pub fn disable_all_irq() {
 #[no_mangle]
 pub extern "C" fn fatal_error(context: &Context, elr: u64, esr: u64, far: u64) -> ! {
     let sp = context.get_stack();
+    let table = context.get_translation_table();
+    let far_addr = table.translate_addr(VirtualAddress::from(far));
+    let elr_addr = table.translate_addr(VirtualAddress::from(elr));
+    let pid = crate::proc::scheduler::get_current().lock().process_id;
 
-    printkln!("\nFatal Error: ESR: {:#010x}, FAR: {:#x}, ELR: {:#x}", esr, far, elr);
+    printkln!("\nFatal Error in PID {}: ESR: {:#010x}, FAR: {:#x}, ELR: {:#x}\n", pid, esr, far, elr);
+    if let Ok(addr) = elr_addr {
+        unsafe {
+            let ptr: *const u32 = addr.to_kernel_addr().as_ptr();
+            printkln!("Instruction: {:#010x}", *ptr);
+        }
+    }
+    if let Ok(addr) = far_addr {
+        unsafe {
+            let ptr: *const u32 = addr.to_kernel_addr().as_ptr();
+            printkln!("Fault Address: {:#010x}", *ptr);
+        }
+    }
     printkln!("\n{}", context);
-    printkln!("Stacktrace:");
+    printkln!("\nStacktrace:");
     unsafe { printk_dump(u64::from(context.get_stack()), 128); }
     loop {}
 }
@@ -78,6 +94,9 @@ extern "C" fn handle_user_exception(context: &Context, elr: u64, esr: u64, far: 
             if esr & 0b111100 == 0b001000 {
                 printkln!("Instruction or Data Abort caused by Access Flag at address {:x} (allocating new page)", far);
                 page_fault_handler(far);
+            } else if esr & 0b111100 == 0b001100 {
+                printkln!("Instruction or Data Abort caused by Permissions Flag at address {:x} (either copy-on-write or fault)", far);
+                page_access_handler(far);
             } else {
                 fatal_error(context, elr, esr, far);
             }
@@ -128,5 +147,10 @@ extern "C" fn handle_irq(context: &Context, _elr: u64, _esr: u64, _far: u64, _sp
 fn page_fault_handler(far: u64) {
     let current = crate::proc::scheduler::get_current();
     current.try_lock().unwrap().space.try_lock().unwrap().alloc_page_at(VirtualAddress::from(far)).unwrap();
+}
+
+fn page_access_handler(far: u64) {
+    //let current = crate::proc::scheduler::get_current();
+    //current.try_lock().unwrap().space.try_lock().unwrap().copy_on_write_at(VirtualAddress::from(far)).unwrap();
 }
 

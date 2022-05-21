@@ -13,6 +13,7 @@ pub enum KernelError {
     CorruptTranslationTable,
     OutOfMemory,
     NoSegmentFound,
+    MemoryPermissionDenied,
 
     // Device Errors
     NoSuchDevice,
@@ -58,6 +59,7 @@ impl From<KernelError> for ApiError {
             KernelError::CorruptTranslationTable        => ApiError::CorruptTranslationTable,
             KernelError::OutOfMemory                    => ApiError::OutOfMemory,
             KernelError::NoSegmentFound                 => ApiError::NoSegmentFound,
+            KernelError::MemoryPermissionDenied         => ApiError::MemoryPermissionDenied,
 
             KernelError::NoSuchDevice                   => ApiError::NoSuchDevice,
             KernelError::OperationNotPermitted          => ApiError::OperationNotPermitted,

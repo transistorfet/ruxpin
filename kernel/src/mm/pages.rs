@@ -26,8 +26,10 @@ pub struct PageRegion {
     pages_start: PhysicalAddress,
 }
 
+pub type PageRefCount = u16;
+
 pub struct Page {
-    refcount: u16,
+    refcount: PageRefCount,
 }
 
 static mut PAGES: PagePool = PagePool::new();
@@ -82,6 +84,16 @@ impl PagePool {
         }
         panic!("pages: attempting to free a page with no region: {:x}", usize::from(ptr));
     }
+
+    pub fn ref_page(&mut self, ptr: PhysicalAddress) -> PhysicalAddress {
+        for region in &mut self.regions {
+            if ptr >= region.pages_start && ptr <= region.pages_start.add(region.total_pages() * mmu::page_size()) {
+                printkln!("pages: incrementing page ref at {:#x}", usize::from(ptr));
+                return region.ref_page(ptr);
+            }
+        }
+        panic!("pages: attempting to reference a page with no region: {:x}", usize::from(ptr));
+    }
 }
 
 impl PageRegion {
@@ -126,11 +138,22 @@ impl PageRegion {
     }
 
     pub fn free_page(&mut self, ptr: PhysicalAddress) {
+        //printkln!("pages: decrementing page ref at {:x}", usize::from(ptr));
         let bit = (usize::from(ptr) - usize::from(self.pages_start)) / mmu::page_size();
         self.desc_table[bit].refcount -= 1;
         if self.desc_table[bit].refcount == 0 {
+            //printkln!("pages: freeing page at {:x}", usize::from(ptr));
             self.free_bit(bit);
         }
+    }
+
+    pub fn ref_page(&mut self, ptr: PhysicalAddress) -> PhysicalAddress {
+        let bit = (usize::from(ptr) - usize::from(self.pages_start)) / mmu::page_size();
+        self.desc_table[bit].refcount += 1;
+        if self.desc_table[bit].refcount == u16::MAX {
+            panic!("Error: reference count for page {:?} has reached the limit", ptr);
+        }
+        ptr
     }
 
     fn alloc_bit(&mut self) -> Option<usize> {
