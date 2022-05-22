@@ -103,56 +103,25 @@ impl VirtualAddressSpace {
     pub fn alloc_mapped(&mut self, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) -> PhysicalAddress {
         let pages = pages::get_page_area();
 
-        self.table.map_addr(MemoryType::Existing, permissions, vaddr, len, pages, &|pages, _, len| {
-            if len == mmu::page_size() {
-                Some(pages.alloc_page_zeroed())
-            } else {
-                None // Don't map granuales larger than a page
-            }
-        }).unwrap();
+        self.table.map_paged_range(MemoryType::Allocated, permissions, vaddr, len, pages).unwrap();
 
         self.table.translate_addr(vaddr).unwrap()
     }
 
     pub fn map_on_demand(&mut self, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) {
         let pages = pages::get_page_area();
-        self.table.map_addr(MemoryType::Unallocated, permissions, vaddr, len, pages, &|_, _, len| {
-            if len == mmu::page_size() {
-                Some(PhysicalAddress::from(0))
-            } else {
-                None
-            }
-        }).unwrap();
+        self.table.map_paged_range(MemoryType::Unallocated, permissions, vaddr, len, pages).unwrap();
     }
 
     pub fn copy_segment_map(&mut self, parent_table: &TranslationTable, segment: &Segment) {
         let pages = pages::get_page_area();
-        self.table.map_addr(MemoryType::Existing, segment.permissions, segment.start, segment.page_aligned_len(), pages, &|_, page_addr, len| {
-            if len == mmu::page_size() {
-                Some(parent_table.translate_addr(page_addr).unwrap())
-            } else {
-                None
-            }
-        }).unwrap();
-    }
-
-    #[allow(dead_code)]
-    pub fn map_existing(&mut self, permissions: MemoryPermissions, vaddr: VirtualAddress, paddr: PhysicalAddress, len: usize) {
-        let pages = pages::get_page_area();
-        self.table.map_addr(MemoryType::Existing, permissions, vaddr, len, pages, &|_, current_vaddr, _| {
-            let voffset = usize::from(current_vaddr) - usize::from(vaddr);
-            Some(paddr.add(voffset))
-        }).unwrap();
+        self.table.copy_paged_range(parent_table, segment.start, segment.page_aligned_len(), pages).unwrap();
     }
 
     pub fn unmap_range(&mut self, start: VirtualAddress, len: usize, free_pages: bool) {
         let pages = pages::get_page_area();
 
-        if free_pages {
-            self.table.unmap_addr(start, len, pages, &|pages, _, paddr| if usize::from(paddr) != 0 { pages.free_page(paddr) }).unwrap();
-        } else {
-            self.table.unmap_addr(start, len, pages, &|_, _, _| { }).unwrap();
-        }
+        self.table.unmap_range(start, len, pages, free_pages).unwrap();
     }
 
     pub fn translate_addr(&mut self, vaddr: VirtualAddress) -> Result<PhysicalAddress, KernelError> {
@@ -175,9 +144,7 @@ impl VirtualAddressSpace {
                 self.table.update_addr(page_vaddr, page, mmu::page_size()).unwrap();
 
                 // Load data into the page if necessary
-                let page_buffer = unsafe {
-                    slice::from_raw_parts_mut(page.to_kernel_addr().as_mut(), mmu::page_size())
-                };
+                let page_buffer = get_page_slice(page);
                 locked_seg.load_page_at(&*locked_seg, page_vaddr, page_buffer).unwrap();
 
                 return Ok(());
@@ -185,6 +152,12 @@ impl VirtualAddressSpace {
         }
 
         Err(KernelError::NoSegmentFound)
+    }
+}
+
+fn get_page_slice(page: PhysicalAddress) -> &'static mut [u8] {
+    unsafe {
+        slice::from_raw_parts_mut(page.to_kernel_addr().as_mut(), mmu::page_size())
     }
 }
 

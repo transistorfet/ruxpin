@@ -64,23 +64,58 @@ impl TranslationTable {
         Self(u64::from(tl0))
     }
 
-    pub fn map_addr<F>(&mut self, mtype: MemoryType, access: MemoryPermissions, mut vaddr: VirtualAddress, mut len: usize, pages: &mut PagePool, map_block: &F) -> Result<(), KernelError>
-    where
-        F: Fn(&mut PagePool, VirtualAddress, usize) -> Option<PhysicalAddress>
-    {
+
+    #[allow(dead_code)]
+    pub fn map_existing_range(&mut self, access: MemoryPermissions, mut vaddr: VirtualAddress, mut paddr: PhysicalAddress, mut len: usize, pages: &mut PagePool) -> Result<(), KernelError> {
+        check_vaddr_and_usize(vaddr, len)?;
+
+        let start_vaddr = vaddr;
+        let flags = memory_type_flags(MemoryType::Existing) | memory_permissions_flags(access);
+        map_level(TL0_ADDR_BITS, self.as_slice_mut(), &mut len, &mut vaddr, pages, &mut |_, current_vaddr, _| {
+            let voffset = usize::from(current_vaddr) - usize::from(start_vaddr);
+            Ok(Some((paddr.add(voffset), flags)))
+        })
+    }
+
+    pub fn map_paged_range(&mut self, mtype: MemoryType, access: MemoryPermissions, mut vaddr: VirtualAddress, mut len: usize, pages: &mut PagePool) -> Result<(), KernelError> {
         check_vaddr_and_usize(vaddr, len)?;
 
         let flags = memory_type_flags(mtype) | memory_permissions_flags(access);
-        map_level(TL0_ADDR_BITS, self.as_slice_mut(), &mut len, &mut vaddr, flags, pages, map_block)
+        map_level(TL0_ADDR_BITS, self.as_slice_mut(), &mut len, &mut vaddr, pages, &mut |pages, _, len| {
+            if len != page_size() {
+                Ok(None) // Don't map granuales larger than a page
+            } else if mtype == MemoryType::Allocated {
+                Ok(Some((pages.alloc_page_zeroed(), flags)))
+            } else {
+                Ok(Some((PhysicalAddress::from(0), flags)))
+            }
+        })
     }
 
-    pub fn unmap_addr<F>(&mut self, mut vaddr: VirtualAddress, mut len: usize, pages: &mut PagePool, unmap_block: &F) -> Result<(), KernelError>
-    where
-        F: Fn(&mut PagePool, VirtualAddress, PhysicalAddress)
-    {
+    pub fn copy_paged_range(&mut self, parent_table: &Self, mut vaddr: VirtualAddress, mut len: usize, pages: &mut PagePool) -> Result<(), KernelError> {
         check_vaddr_and_usize(vaddr, len)?;
 
-        let mut visitor = UnmapRange::new(pages, unmap_block);
+        let (descriptor, _) = lookup_level(TL0_ADDR_BITS, parent_table.as_slice(), vaddr)?;
+        let flags = memory_type_flags(MemoryType::Unallocated) | (descriptor & TT_PERMISSIONS_MASK);
+
+        map_level(TL0_ADDR_BITS, self.as_slice_mut(), &mut len, &mut vaddr, pages, &mut |_, page_addr, len| {
+            if len == page_size() {
+                Ok(Some((parent_table.translate_addr(page_addr).unwrap(), TT_ACCESS_FLAG | flags)))
+            } else {
+                Ok(None)
+            }
+        })
+    }
+
+    pub fn unmap_range(&mut self, mut vaddr: VirtualAddress, mut len: usize, pages: &mut PagePool, free_pages: bool) -> Result<(), KernelError> {
+        check_vaddr_and_usize(vaddr, len)?;
+
+        let free_pages_fn = |pages: &mut PagePool, _, paddr| {
+            if usize::from(paddr) != 0 && free_pages {
+                pages.free_page(paddr)
+            }
+        };
+        let mut visitor = UnmapRange::new(pages, free_pages_fn);
         visitor.visit_level(TL0_ADDR_BITS, self.as_slice_mut(), &mut len, &mut vaddr)
     }
 
@@ -132,16 +167,16 @@ fn check_vaddr_and_usize(vaddr: VirtualAddress, len: usize) -> Result<(), Kernel
 }
 
 
-fn map_level<F>(addr_bits: usize, table: &mut [u64], len: &mut usize, vaddr: &mut VirtualAddress, flags: u64, pages: &mut PagePool, map_block: &F) -> Result<(), KernelError>
+fn map_level<F>(addr_bits: usize, table: &mut [u64], len: &mut usize, vaddr: &mut VirtualAddress, pages: &mut PagePool, map_block: &mut F) -> Result<(), KernelError>
 where
-    F: Fn(&mut PagePool, VirtualAddress, usize) -> Option<PhysicalAddress>
+    F: FnMut(&mut PagePool, VirtualAddress, usize) -> Result<Option<(PhysicalAddress, u64)>, KernelError>
 {
     let granuale_size = 1 << addr_bits;
 
     while *len > 0 {
         let mut index = table_index_from_vaddr(addr_bits, *vaddr);
         if vaddr.offset_from_align(granuale_size) == 0 && *len >= granuale_size {
-            let should_break = map_granuales(addr_bits, table, &mut index, len, vaddr, flags, pages, map_block)?;
+            let should_break = map_granuales(addr_bits, table, &mut index, len, vaddr, pages, map_block)?;
             if should_break {
                 break;
             }
@@ -150,16 +185,16 @@ where
         if addr_bits != 12 {
             ensure_table_entry(table, index, pages)?;
 
-            map_level(addr_bits - 9, table_ref_mut(table, index), len, vaddr, flags, pages, map_block)?;
+            map_level(addr_bits - 9, table_ref_mut(table, index), len, vaddr, pages, map_block)?;
         }
     }
 
     Ok(())
 }
 
-fn map_granuales<F>(addr_bits: usize, table: &mut [u64], index: &mut usize, len: &mut usize, vaddr: &mut VirtualAddress, flags: u64, pages: &mut PagePool, map_block: &F) -> Result<bool, KernelError>
+fn map_granuales<F>(addr_bits: usize, table: &mut [u64], index: &mut usize, len: &mut usize, vaddr: &mut VirtualAddress, pages: &mut PagePool, map_block: &mut F) -> Result<bool, KernelError>
 where
-    F: Fn(&mut PagePool, VirtualAddress, usize) -> Option<PhysicalAddress>
+    F: FnMut(&mut PagePool, VirtualAddress, usize) -> Result<Option<(PhysicalAddress, u64)>, KernelError>
 {
     let granuale_size = 1 << addr_bits;
     let block_flag = if addr_bits == 12 { TT3_DESCRIPTOR_BLOCK } else { TT2_DESCRIPTOR_BLOCK };
@@ -169,7 +204,7 @@ where
             return Err(KernelError::AddressAlreadyMapped);
         }
 
-        if let Some(paddr) = map_block(pages, *vaddr, granuale_size) {
+        if let Some((paddr, flags)) = map_block(pages, *vaddr, granuale_size)? {
             table[*index] = (u64::from(paddr) & TT_BLOCK_MASK) | flags | block_flag;
         } else {
             return Ok(false);
@@ -442,6 +477,7 @@ const fn attribute_index(index: u64) -> u64 {
 const fn memory_type_flags(mtype: MemoryType) -> u64 {
     match mtype {
         MemoryType::Unallocated => 0 | attribute_index(0),
+        MemoryType::Allocated => TT_ACCESS_FLAG | attribute_index(0),
         MemoryType::Existing => TT_ACCESS_FLAG | attribute_index(0),
         MemoryType::ExistingNoCache => TT_ACCESS_FLAG | attribute_index(1),
     }
