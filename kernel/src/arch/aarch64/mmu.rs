@@ -92,26 +92,28 @@ impl TranslationTable {
         })
     }
 
-    pub fn copy_paged_range(&mut self, parent_table: &Self, mut vaddr: VirtualAddress, mut len: usize, pages: &mut PagePool) -> Result<(), KernelError> {
+    pub fn copy_paged_range(&mut self, parent_table: &Self, access: MemoryPermissions, mut vaddr: VirtualAddress, mut len: usize, pages: &mut PagePool) -> Result<(), KernelError> {
         check_vaddr_and_usize(vaddr, len)?;
 
-        let (descriptor, _) = lookup_level(TL0_ADDR_BITS, parent_table.as_slice(), vaddr)?;
-        let flags = memory_type_flags(MemoryType::Unallocated) | (descriptor & TT_PERMISSIONS_MASK);
+        let flags = memory_type_flags(MemoryType::Unallocated) | memory_permissions_flags(access);
 
-        map_level(TL0_ADDR_BITS, self.as_slice_mut(), &mut len, &mut vaddr, pages, &mut |_, page_addr, len| {
-            if len == page_size() {
-                Ok(Some((parent_table.translate_addr(page_addr).unwrap(), TT_ACCESS_FLAG | flags)))
+        map_level(TL0_ADDR_BITS, self.as_slice_mut(), &mut len, &mut vaddr, pages, &mut |pages, page_addr, len| {
+            let (descriptor, _) = lookup_level(TL0_ADDR_BITS, parent_table.as_slice(), page_addr)?;
+            if len != page_size() {
+                Ok(None) // Don't map granuales larger than a page
+            } else if *descriptor & TT_BLOCK_MASK == 0 {
+                Ok(Some((PhysicalAddress::from(0), flags)))
             } else {
-                Ok(None)
+                Ok(Some((pages.ref_page(PhysicalAddress::from(*descriptor & TT_BLOCK_MASK)), TT_ACCESS_FLAG | flags)))
             }
         })
     }
 
-    pub fn unmap_range(&mut self, mut vaddr: VirtualAddress, mut len: usize, pages: &mut PagePool, free_pages: bool) -> Result<(), KernelError> {
+    pub fn unmap_range(&mut self, mut vaddr: VirtualAddress, mut len: usize, pages: &mut PagePool) -> Result<(), KernelError> {
         check_vaddr_and_usize(vaddr, len)?;
 
         let free_pages_fn = |pages: &mut PagePool, _, paddr| {
-            if usize::from(paddr) != 0 && free_pages {
+            if usize::from(paddr) != 0 {
                 pages.free_page(paddr)
             }
         };

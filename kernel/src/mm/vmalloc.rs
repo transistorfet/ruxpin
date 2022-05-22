@@ -72,10 +72,9 @@ impl VirtualAddressSpace {
 
     pub fn clear_segments(&mut self) {
         for i in 0..self.segments.len() {
-            let free_pages = Arc::strong_count(&self.segments[i]) == 1;
             let start = self.segments[i].lock().start;
             let len = self.segments[i].lock().page_aligned_len();
-            self.unmap_range(start, len, free_pages);
+            self.unmap_range(start, len);
         }
         self.segments.clear();
     }
@@ -115,13 +114,13 @@ impl VirtualAddressSpace {
 
     pub fn copy_segment_map(&mut self, parent_table: &TranslationTable, segment: &Segment) {
         let pages = pages::get_page_area();
-        self.table.copy_paged_range(parent_table, segment.start, segment.page_aligned_len(), pages).unwrap();
+        self.table.copy_paged_range(parent_table, segment.permissions, segment.start, segment.page_aligned_len(), pages).unwrap();
     }
 
-    pub fn unmap_range(&mut self, start: VirtualAddress, len: usize, free_pages: bool) {
+    pub fn unmap_range(&mut self, start: VirtualAddress, len: usize) {
         let pages = pages::get_page_area();
 
-        self.table.unmap_range(start, len, pages, free_pages).unwrap();
+        self.table.unmap_range(start, len, pages).unwrap();
     }
 
     pub fn translate_addr(&mut self, vaddr: VirtualAddress) -> Result<PhysicalAddress, KernelError> {
