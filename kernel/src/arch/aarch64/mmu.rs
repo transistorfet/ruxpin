@@ -58,6 +58,12 @@ pub const fn table_entries() -> usize {
     page_size() / 8
 }
 
+pub fn get_page_slice(page: PhysicalAddress) -> &'static mut [u8] {
+    unsafe {
+        slice::from_raw_parts_mut(page.to_kernel_addr().as_mut(), page_size())
+    }
+}
+
 impl TranslationTable {
     pub fn new_user_table(pages: &mut PagePool) -> Self {
         let tl0 = allocate_table(pages);
@@ -105,6 +111,33 @@ impl TranslationTable {
                 Ok(Some((PhysicalAddress::from(0), flags)))
             } else {
                 Ok(Some((pages.ref_page(PhysicalAddress::from(*descriptor & TT_BLOCK_MASK)), TT_ACCESS_FLAG | flags)))
+            }
+        })
+    }
+
+
+    pub fn copy_pages_in_range(&mut self, parent_table: &Self, mut vaddr: VirtualAddress, mut len: usize, pages: &mut PagePool) -> Result<(), KernelError> {
+        check_vaddr_and_usize(vaddr, len)?;
+
+        let flags = memory_type_flags(MemoryType::Unallocated) | memory_permissions_flags(MemoryPermissions::ReadWrite);
+
+        map_level(TL0_ADDR_BITS, self.as_slice_mut(), &mut len, &mut vaddr, pages, &mut |pages, page_addr, len| {
+            let (descriptor, _) = lookup_level(TL0_ADDR_BITS, parent_table.as_slice(), page_addr)?;
+            if len != page_size() {
+                Ok(None) // Don't map granuales larger than a page
+            } else if *descriptor & TT_BLOCK_MASK == 0 {
+                Ok(Some((PhysicalAddress::from(0), flags)))
+            } else {
+                let new_page = pages.alloc_page_zeroed();
+
+                // Copy data into new page
+                let page_buffer = get_page_slice(PhysicalAddress::from(*descriptor & TT_BLOCK_MASK));
+                let new_page_buffer = get_page_slice(new_page);
+                for i in 0..page_buffer.len() {
+                    new_page_buffer[i] = page_buffer[i];
+                }
+
+                Ok(Some((PhysicalAddress::from(new_page), TT_ACCESS_FLAG | flags)))
             }
         })
     }

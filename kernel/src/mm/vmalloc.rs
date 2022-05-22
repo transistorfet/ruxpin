@@ -79,11 +79,11 @@ impl VirtualAddressSpace {
         self.segments.clear();
     }
 
-    pub fn copy_segments(&mut self, parent: &Self) {
+    pub fn copy_segments(&mut self, parent: &mut Self) {
         for segment in parent.segments.iter() {
             //crate::printkln!("cloning segment {:x} to {:x}", usize::from(segment.start), usize::from(segment.end));
             self.segments.push(segment.clone());
-            self.copy_segment_map(&parent.table, &*segment.lock());
+            self.copy_segment_map(&mut parent.table, &*segment.lock());
         }
     }
 
@@ -112,9 +112,14 @@ impl VirtualAddressSpace {
         self.table.map_paged_range(MemoryType::Unallocated, permissions, vaddr, len, pages).unwrap();
     }
 
-    pub fn copy_segment_map(&mut self, parent_table: &TranslationTable, segment: &Segment) {
+    pub fn copy_segment_map(&mut self, parent_table: &mut TranslationTable, segment: &Segment) {
         let pages = pages::get_page_area();
-        self.table.copy_paged_range(parent_table, segment.permissions, segment.start, segment.page_aligned_len(), pages).unwrap();
+
+        if segment.permissions == MemoryPermissions::ReadWrite {
+            self.table.copy_pages_in_range(parent_table, segment.start, segment.page_aligned_len(), pages).unwrap();
+        } else  {
+            self.table.copy_paged_range(parent_table, segment.permissions, segment.start, segment.page_aligned_len(), pages).unwrap();
+        }
     }
 
     pub fn unmap_range(&mut self, start: VirtualAddress, len: usize) {
@@ -143,7 +148,7 @@ impl VirtualAddressSpace {
                 self.table.update_addr(page_vaddr, page, mmu::page_size()).unwrap();
 
                 // Load data into the page if necessary
-                let page_buffer = get_page_slice(page);
+                let page_buffer = mmu::get_page_slice(page);
                 locked_seg.load_page_at(&*locked_seg, page_vaddr, page_buffer).unwrap();
 
                 return Ok(());
@@ -151,12 +156,6 @@ impl VirtualAddressSpace {
         }
 
         Err(KernelError::NoSegmentFound)
-    }
-}
-
-fn get_page_slice(page: PhysicalAddress) -> &'static mut [u8] {
-    unsafe {
-        slice::from_raw_parts_mut(page.to_kernel_addr().as_mut(), mmu::page_size())
     }
 }
 
