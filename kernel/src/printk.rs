@@ -59,7 +59,7 @@ pub unsafe fn printk_dump(mut addr: u64, mut size: usize) {
         printk!("{:#010x}: ", addr);
         let ptr = addr as *const u8;
         for i in 0..16 {
-            printk!("{:02x} ", unsafe { *ptr.add(i) });
+            printk!("{:02x} ", *ptr.add(i));
             size -= 1;
             if size == 0 {
                 break;

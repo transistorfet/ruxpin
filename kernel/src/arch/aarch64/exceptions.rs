@@ -6,7 +6,7 @@ use crate::printkln;
 use crate::printk::printk_dump;
 
 use super::context::Context;
-use super::types::{VirtualAddress, PhysicalAddress};
+use super::types::VirtualAddress;
 
 
 pub type IrqFlags = u64;
@@ -140,7 +140,7 @@ extern "C" fn handle_kernel_exception(sp: u64, elr: u64, esr: u64, far: u64) {
 }
 
 #[no_mangle]
-extern "C" fn handle_irq(context: &Context, _elr: u64, _esr: u64, _far: u64, _sp: u64) {
+extern "C" fn handle_irq(_context: &Context, _elr: u64, _esr: u64, _far: u64, _sp: u64) {
     //printkln!("Handle an irq of {:x} for sp {:x}", _esr, _sp);
 
     irqs::handle_irqs();

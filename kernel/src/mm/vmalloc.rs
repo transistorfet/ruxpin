@@ -1,6 +1,4 @@
 
-use core::slice;
-
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 
@@ -118,7 +116,7 @@ impl VirtualAddressSpace {
         if segment.permissions == MemoryPermissions::ReadWrite {
             self.table.remap_copy_on_write(parent_table, segment.start, segment.page_aligned_len(), pages).unwrap();
         } else  {
-            self.table.copy_paged_range(parent_table, segment.permissions, segment.start, segment.page_aligned_len(), pages).unwrap();
+            self.table.copy_refs_in_range(parent_table, segment.permissions, segment.start, segment.page_aligned_len(), pages).unwrap();
         }
     }
 
