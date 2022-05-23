@@ -1,6 +1,8 @@
 
-* for the translation table stuff, you could possible have a special Visitor type struct to store all the info about the traversal, and
-  modify the unmap functions to be generic traversal code, with closures for unmap_block and unmap_granuale/table = 0
+* when a segment is copied, it only copies the pages loaded into memory at that time, and puts 0 for all other pages, but that means when
+  those pages are loaded, they will be duplicated.  The solution is to have a cache for each file/exec that is being used which holds a
+  reference to each page, and once it is dropped, those pages will be freed, and when a page is loaded, the cache is searched first.  I'm
+  not yet sure how I'd like to implement this, and I still haven't exactly figured out how other OSes do it
 
 
 * there's a problem with the stack upon returning to the process after a fork and/or waitpid, in the shell.  It was previously working,
