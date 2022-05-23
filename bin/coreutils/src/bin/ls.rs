@@ -3,9 +3,8 @@
 
 extern crate ruxpin_app;
 
-use ruxpin_api::println;
-use ruxpin_api::api::{open, close, readdir};
-use ruxpin_api::types::{OpenFlags, FileAccess, DirEntry};
+use ruxpin_api::{println, open, close, readdir};
+use ruxpin_types::{OpenFlags, FileAccess, DirEntry};
 
 use ruxpin_app::env;
 

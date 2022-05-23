@@ -1,7 +1,7 @@
 
-use ruxpin_api::types::{Pid, FileDesc, OpenFlags, FileAccess, DirEntry, ApiError};
-use ruxpin_api::syscall_decode;
-use ruxpin_api::syscalls::{SyscallRequest, SyscallFunction};
+use ruxpin_syscall::syscall_decode;
+use ruxpin_syscall::{SyscallRequest, SyscallFunction};
+use ruxpin_types::{Pid, FileDesc, OpenFlags, FileAccess, DirEntry, ApiError};
 
 use crate::printkln;
 use crate::api::file::*;

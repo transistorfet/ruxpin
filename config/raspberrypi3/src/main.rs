@@ -18,7 +18,7 @@ use ruxpin_kernel::proc::scheduler;
 use ruxpin_kernel::mm::kmalloc::init_kernel_heap;
 use ruxpin_kernel::mm::vmalloc::init_virtual_memory;
 
-use ruxpin_api::types::{OpenFlags, FileAccess, Seek, DeviceID};
+use ruxpin_types::{OpenFlags, FileAccess, Seek, DeviceID};
 
 use ruxpin_drivers_arm::SystemTimer;
 use ruxpin_drivers_arm::GenericInterruptController;

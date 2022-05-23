@@ -5,9 +5,8 @@ use core::str;
 
 extern crate ruxpin_app;
 
-use ruxpin_api::{print, println};
-use ruxpin_api::api::{exit, open, close, read};
-use ruxpin_api::types::{OpenFlags, FileAccess};
+use ruxpin_api::{print, println, exit, open, close, read};
+use ruxpin_types::{OpenFlags, FileAccess};
 
 use ruxpin_app::env;
 

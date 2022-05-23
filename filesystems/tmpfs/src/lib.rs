@@ -4,7 +4,7 @@ extern crate alloc;
 
 use alloc::sync::Arc;
 
-use ruxpin_api::types::{FileAccess, DeviceID};
+use ruxpin_types::{FileAccess, DeviceID};
 
 use ruxpin_kernel::sync::Spinlock;
 use ruxpin_kernel::errors::KernelError;

@@ -5,4 +5,6 @@ authors = ["transistor <trans@jabberwocky.ca>"]
 edition = "2021"
 
 [dependencies]
+ruxpin_syscall = { path = "../../lib/syscall" }
+ruxpin_types = { path = "../../lib/types" }
 

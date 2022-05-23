@@ -1,5 +1,10 @@
+#![no_std]
 
+pub mod arch;
 pub use crate::arch::execute_syscall;
+
+use ruxpin_types::ApiError;
+
 
 #[repr(usize)]
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -38,6 +43,45 @@ impl Default for SyscallRequest {
         }
     }
 }
+
+
+impl SyscallRequest {
+    pub fn store_result(&mut self, result: Result<usize, ApiError>) {
+        match result {
+            Ok(value) => {
+                self.error = false;
+                self.result = value;
+            },
+            Err(value) => {
+                self.error = true;
+                self.result = ApiError::from(value) as usize;
+            },
+        }
+    }
+}
+
+pub trait IntoSyscallResult {
+    fn into_result(self) -> usize;
+}
+
+impl IntoSyscallResult for usize {
+    fn into_result(self) -> usize {
+        self
+    }
+}
+
+impl IntoSyscallResult for () {
+    fn into_result(self) -> usize {
+        0
+    }
+}
+
+impl IntoSyscallResult for i32 {
+    fn into_result(self) -> usize {
+        self as usize
+    }
+}
+
 
 #[macro_export]
 macro_rules! syscall_encode {
@@ -213,4 +257,5 @@ macro_rules! syscall_args {
     //};
 }
 */
+
 

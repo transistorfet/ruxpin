@@ -1,8 +1,8 @@
 
 use alloc::string::String;
 
-use ruxpin_api::syscalls::SyscallRequest;
-use ruxpin_api::types::{Tid, Pid, UserID};
+use ruxpin_syscall::SyscallRequest;
+use ruxpin_types::{Tid, Pid, UserID};
 
 use crate::arch::Context;
 use crate::fs::filedesc::{FileDescriptors, SharableFileDescriptors};

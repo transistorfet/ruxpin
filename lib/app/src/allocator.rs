@@ -3,7 +3,7 @@ use core::ptr;
 use core::mem;
 use core::alloc::{GlobalAlloc, Layout};
 
-use ruxpin_api::api::sbrk;
+use ruxpin_api::sbrk;
 
 
 struct Block {

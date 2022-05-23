@@ -5,13 +5,29 @@ version = 3
 [[package]]
 name = "ruxpin_api"
 version = "0.1.0"
+dependencies = [
+ "ruxpin_syscall",
+ "ruxpin_types",
+]
 
 [[package]]
 name = "ruxpin_app"
 version = "0.1.0"
 dependencies = [
  "ruxpin_api",
+ "ruxpin_types",
 ]
+
+[[package]]
+name = "ruxpin_syscall"
+version = "0.1.0"
+dependencies = [
+ "ruxpin_types",
+]
+
+[[package]]
+name = "ruxpin_types"
+version = "0.1.0"
 
 [[package]]
 name = "sh"
@@ -19,4 +35,5 @@ version = "0.1.0"
 dependencies = [
  "ruxpin_api",
  "ruxpin_app",
+ "ruxpin_types",
 ]

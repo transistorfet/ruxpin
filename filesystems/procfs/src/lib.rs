@@ -8,7 +8,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 
-use ruxpin_api::types::{OpenFlags, FileAccess, DeviceID, Pid, DirEntry};
+use ruxpin_types::{OpenFlags, FileAccess, DeviceID, Pid, DirEntry};
 
 use ruxpin_kernel::sync::Spinlock;
 use ruxpin_kernel::errors::KernelError;

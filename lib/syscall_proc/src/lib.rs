@@ -32,7 +32,7 @@ pub fn syscall_handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
             let mut i = 0;
             #( ruxpin_syscall::syscall_decode!(syscall, i, #args); )*
             let result = #existing_name(#( #args_names ),*);
-            syscall.store_result(result.map(|ret| ret.into_result()).map_err(|err| ruxpin_api::types::ApiError::from(err)));
+            syscall.store_result(result.map(|ret| ret.into_result()).map_err(|err| ruxpin_types::ApiError::from(err)));
         }
     };
 

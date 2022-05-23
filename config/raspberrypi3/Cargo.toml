@@ -6,11 +6,13 @@ edition = "2021"
 
 [dependencies]
 ruxpin_kernel = { path = "../../kernel", features = ["arch-aarch64"] }
-ruxpin_api = { path = "../../lib/api" }
+ruxpin_types = { path = "../../lib/types" }
 
+# Driver Packs
 ruxpin_drivers_arm = { path = "../../drivers/arm" }
 ruxpin_drivers_raspberrypi = { path = "../../drivers/raspberrypi" }
 
+# File Systems
 ruxpin_filesystems_devfs = { path = "../../filesystems/devfs" }
 ruxpin_filesystems_procfs = { path = "../../filesystems/procfs" }
 ruxpin_filesystems_tmpfs = { path = "../../filesystems/tmpfs" }

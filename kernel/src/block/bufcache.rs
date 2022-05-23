@@ -5,7 +5,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use alloc::vec;
 use alloc::boxed::Box;
 
-use ruxpin_api::types::DeviceID;
+use ruxpin_types::DeviceID;
 
 use crate::block;
 use crate::errors::KernelError;

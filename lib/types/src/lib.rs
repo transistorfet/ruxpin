@@ -1,3 +1,4 @@
+#![no_std]
 
 pub type UserID = u16;
 pub type GroupID = u16;

@@ -1,7 +1,7 @@
 
 use core::str;
 
-use ruxpin_api::types::{FileAccess, DirEntry};
+use ruxpin_types::{FileAccess, DirEntry};
 
 use ruxpin_kernel::block;
 use ruxpin_kernel::misc::align_up;

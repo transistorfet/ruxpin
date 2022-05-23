@@ -1,10 +1,9 @@
 [package]
-name = "ruxpin_filesystems_tmpfs"
+name = "ruxpin_syscall"
 version = "0.1.0"
 authors = ["transistor <trans@jabberwocky.ca>"]
 edition = "2021"
 
 [dependencies]
-ruxpin_kernel = { path = "../../kernel" }
 ruxpin_types = { path = "../../lib/types" }
 

@@ -1,5 +1,5 @@
 
-use ruxpin_api::types::ApiError;
+use ruxpin_types::ApiError;
 
 #[repr(usize)]
 #[allow(dead_code)]

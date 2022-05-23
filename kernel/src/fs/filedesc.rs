@@ -2,7 +2,7 @@
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 
-use ruxpin_api::types::{OpenFlags, FileAccess, UserID, FileDesc};
+use ruxpin_types::{OpenFlags, FileAccess, UserID, FileDesc};
 
 use crate::sync::Spinlock;
 use crate::errors::KernelError;

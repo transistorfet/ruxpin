@@ -9,7 +9,7 @@ use ruxpin_kernel::arch::types::KernelVirtualAddress;
 use ruxpin_kernel::misc::deviceio::DeviceRegisters;
 use ruxpin_kernel::block::partition::Partition;
 
-use ruxpin_api::types::{OpenFlags, DeviceID};
+use ruxpin_types::{OpenFlags, DeviceID};
 
 //use super::gpio;
 

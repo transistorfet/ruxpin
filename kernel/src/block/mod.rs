@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use alloc::sync::Arc;
 use alloc::boxed::Box;
  
-use ruxpin_api::types::{OpenFlags, DeviceID, DriverID, MinorDeviceID};
+use ruxpin_types::{OpenFlags, DeviceID, DriverID, MinorDeviceID};
 
 use crate::sync::Spinlock;
 use crate::errors::KernelError;

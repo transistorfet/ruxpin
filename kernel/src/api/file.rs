@@ -1,5 +1,5 @@
 
-use ruxpin_api::types::{FileDesc, OpenFlags, FileAccess, DirEntry};
+use ruxpin_types::{FileDesc, OpenFlags, FileAccess, DirEntry};
 
 use crate::fs::vfs;
 use crate::errors::KernelError;

@@ -2,7 +2,7 @@
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 
-use ruxpin_api::types::{OpenFlags, FileAccess, Seek, UserID, DeviceID, DirEntry};
+use ruxpin_types::{OpenFlags, FileAccess, Seek, UserID, DeviceID, DirEntry};
 
 use crate::printkln;
 use crate::sync::Spinlock;
@@ -59,6 +59,20 @@ fn _link_mount_to_vnode(mount: Mount, vnode: Option<Vnode>) -> Result<(), Kernel
         *ROOT_NODE.lock() = Some(root);
     }
     Ok(())
+}
+
+
+// TODO these implementations are missing
+pub fn link() {
+
+}
+
+pub fn unlink() {
+
+}
+
+pub fn rename() {
+
 }
 
 pub fn access(cwd: Option<Vnode>, path: &str, access: FileAccess, current_uid: UserID) -> Result<(), KernelError> {

@@ -1,7 +1,7 @@
 
 pub mod elf;
 
-use ruxpin_api::types::{OpenFlags, FileAccess};
+use ruxpin_types::{OpenFlags, FileAccess};
 
 use crate::errors::KernelError;
 use crate::proc::binaries::elf::loader;

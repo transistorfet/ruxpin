@@ -1,7 +1,7 @@
 
 use core::mem;
 
-use ruxpin_api::types::DeviceID;
+use ruxpin_types::DeviceID;
 
 use ruxpin_kernel::block;
 use ruxpin_kernel::block::BlockNum;

@@ -7,8 +7,7 @@ pub mod allocator;
 
 use core::panic::PanicInfo;
 
-use ruxpin_api::println;
-use ruxpin_api::api::exit;
+use ruxpin_api::{println, exit};
 
 use crate::env::{Args, Vars};
 

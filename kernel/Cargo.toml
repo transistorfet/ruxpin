@@ -8,6 +8,7 @@ edition = "2021"
 arch-aarch64 = []
 
 [dependencies]
-ruxpin_api = { path = "../lib/api" }
+ruxpin_types = { path = "../lib/types" }
+ruxpin_syscall = { path = "../lib/syscall" }
 ruxpin_syscall_proc = { path = "../lib/syscall_proc" }
 

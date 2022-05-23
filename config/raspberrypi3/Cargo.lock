@@ -23,12 +23,15 @@ dependencies = [
 [[package]]
 name = "ruxpin_api"
 version = "0.1.0"
+dependencies = [
+ "ruxpin_syscall",
+ "ruxpin_types",
+]
 
 [[package]]
 name = "ruxpin_config_raspberrypi3"
 version = "0.1.0"
 dependencies = [
- "ruxpin_api",
  "ruxpin_drivers_arm",
  "ruxpin_drivers_raspberrypi",
  "ruxpin_filesystems_devfs",
@@ -36,6 +39,7 @@ dependencies = [
  "ruxpin_filesystems_procfs",
  "ruxpin_filesystems_tmpfs",
  "ruxpin_kernel",
+ "ruxpin_types",
 ]
 
 [[package]]
@@ -50,48 +54,56 @@ dependencies = [
 name = "ruxpin_drivers_raspberrypi"
 version = "0.1.0"
 dependencies = [
- "ruxpin_api",
  "ruxpin_kernel",
+ "ruxpin_types",
 ]
 
 [[package]]
 name = "ruxpin_filesystems_devfs"
 version = "0.1.0"
 dependencies = [
- "ruxpin_api",
  "ruxpin_kernel",
+ "ruxpin_types",
 ]
 
 [[package]]
 name = "ruxpin_filesystems_ext2"
 version = "0.1.0"
 dependencies = [
- "ruxpin_api",
  "ruxpin_kernel",
+ "ruxpin_types",
 ]
 
 [[package]]
 name = "ruxpin_filesystems_procfs"
 version = "0.1.0"
 dependencies = [
- "ruxpin_api",
  "ruxpin_kernel",
+ "ruxpin_types",
 ]
 
 [[package]]
 name = "ruxpin_filesystems_tmpfs"
 version = "0.1.0"
 dependencies = [
- "ruxpin_api",
  "ruxpin_kernel",
+ "ruxpin_types",
 ]
 
 [[package]]
 name = "ruxpin_kernel"
 version = "0.1.0"
 dependencies = [
- "ruxpin_api",
+ "ruxpin_syscall",
  "ruxpin_syscall_proc",
+ "ruxpin_types",
+]
+
+[[package]]
+name = "ruxpin_syscall"
+version = "0.1.0"
+dependencies = [
+ "ruxpin_types",
 ]
 
 [[package]]
@@ -102,6 +114,10 @@ dependencies = [
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "ruxpin_types"
+version = "0.1.0"
 
 [[package]]
 name = "syn"

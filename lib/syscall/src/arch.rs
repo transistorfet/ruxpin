@@ -1,7 +1,7 @@
 
 use core::arch::asm;
 
-use crate::syscalls::SyscallRequest;
+use crate::SyscallRequest;
 
 #[cfg(target_arch = "aarch64")]
 #[inline(always)]

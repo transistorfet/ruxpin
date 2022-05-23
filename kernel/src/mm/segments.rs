@@ -2,7 +2,7 @@
 use alloc::sync::Arc;
 use alloc::boxed::Box;
 
-use ruxpin_api::types::Seek;
+use ruxpin_types::Seek;
 
 use crate::fs::vfs;
 use crate::arch::mmu;

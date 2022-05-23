@@ -3,7 +3,7 @@ use core::ptr::NonNull;
 
 use alloc::sync::Arc;
 
-use ruxpin_api::types::{DeviceID, FileAccess, UserID, GroupID};
+use ruxpin_types::{DeviceID, FileAccess, UserID, GroupID};
 
 use ruxpin_kernel::block;
 use ruxpin_kernel::printkln;

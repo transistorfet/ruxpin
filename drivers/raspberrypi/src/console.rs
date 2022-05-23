@@ -2,7 +2,7 @@
 use alloc::boxed::Box;
 use alloc::collections::vec_deque::VecDeque;
 
-use ruxpin_api::types::{OpenFlags, DeviceID};
+use ruxpin_types::{OpenFlags, DeviceID};
 
 use ruxpin_kernel::irqs;
 use ruxpin_kernel::printkln;

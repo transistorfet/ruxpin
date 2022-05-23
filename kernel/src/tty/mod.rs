@@ -2,8 +2,8 @@
 use alloc::vec::Vec;
 use alloc::boxed::Box;
  
-use ruxpin_api::syscalls::SyscallFunction;
-use ruxpin_api::types::{OpenFlags, DeviceID, DriverID, MinorDeviceID};
+use ruxpin_syscall::SyscallFunction;
+use ruxpin_types::{OpenFlags, DeviceID, DriverID, MinorDeviceID};
 
 use crate::proc::scheduler;
 use crate::sync::Spinlock;

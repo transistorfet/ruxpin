@@ -3,6 +3,7 @@ use core::mem;
 use core::slice;
 use core::mem::MaybeUninit;
 
+
 pub unsafe fn copy_struct<T>(dest: &mut T, source: &[u8]) {
     let data_len = mem::size_of::<T>();
     let buffer = slice::from_raw_parts_mut(dest as *mut T as *mut u8, data_len);

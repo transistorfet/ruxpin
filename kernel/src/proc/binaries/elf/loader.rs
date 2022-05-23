@@ -2,7 +2,7 @@
 use core::mem;
 use alloc::string::ToString;
 
-use ruxpin_api::types::{OpenFlags, FileAccess, Seek};
+use ruxpin_types::{OpenFlags, FileAccess, Seek};
 
 use crate::printkln;
 use crate::arch::mmu;

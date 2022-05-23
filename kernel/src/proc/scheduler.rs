@@ -1,8 +1,8 @@
 
 use alloc::vec::Vec;
 
-use ruxpin_api::types::{Tid, Pid};
-use ruxpin_api::syscalls::{SyscallFunction};
+use ruxpin_types::{Tid, Pid};
+use ruxpin_syscall::{SyscallFunction};
 
 use crate::api::process_syscall;
 use crate::arch::Context;

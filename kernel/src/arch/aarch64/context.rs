@@ -3,7 +3,7 @@ use core::ptr;
 use core::fmt;
 use core::arch::asm;
 
-use ruxpin_api::syscalls::{SyscallRequest, SyscallFunction};
+use ruxpin_syscall::{SyscallRequest, SyscallFunction};
 
 use super::types::VirtualAddress;
 use super::mmu::TranslationTable;
