@@ -131,6 +131,7 @@ impl TranslationTable {
                 let new_page = pages.alloc_page_zeroed();
 
                 // Copy data into new page
+                crate::printkln!("copying physical page {:?} to {:?}", PhysicalAddress::from(*descriptor & TT_BLOCK_MASK), new_page);
                 let page_buffer = get_page_slice(PhysicalAddress::from(*descriptor & TT_BLOCK_MASK));
                 let new_page_buffer = get_page_slice(new_page);
                 for i in 0..page_buffer.len() {
@@ -471,7 +472,7 @@ fn table_as_slice(paddr: PhysicalAddress) -> &'static [u64] {
 
 fn table_as_slice_mut(paddr: PhysicalAddress) -> &'static mut [u64] {
     unsafe {
-        slice::from_raw_parts_mut(paddr.to_kernel_addr().as_mut(), table_entries())
+        slice::from_raw_parts_mut(paddr.to_kernel_addr().as_mut() as *mut u64, table_entries())
     }
 }
 

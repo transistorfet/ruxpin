@@ -124,12 +124,12 @@ impl From<KernelVirtualAddress> for PhysicalAddress {
 }
 
 impl KernelVirtualAddress {
-    pub fn add(self, offset: usize) -> Self {
-        Self(self.0 + offset as u64)
-    }
-
     pub const fn new(addr: u64) -> Self {
         Self(addr | kernel_virtual_base_addr())
+    }
+
+    pub fn add(self, offset: usize) -> Self {
+        Self(self.0 + offset as u64)
     }
 
     pub unsafe fn as_ptr<T>(self) -> *const T {

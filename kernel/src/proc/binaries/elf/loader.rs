@@ -130,7 +130,7 @@ fn set_up_stack(locked_proc: &mut TaskRecord, entrypoint: VirtualAddress, argv: 
     locked_proc.space.try_lock().unwrap().alloc_page_at(VirtualAddress::from(stack_start - page_size as u64))?;
     let page_addr = locked_proc.space.try_lock().unwrap().translate_addr(VirtualAddress::from(stack_start - page_size as u64))?;
     let page_data: &mut [u8] = unsafe {
-        core::slice::from_raw_parts_mut(page_addr.to_kernel_addr().as_mut(), page_size)
+        core::slice::from_raw_parts_mut(page_addr.to_kernel_addr().as_mut() as *mut u8, page_size)
     };
 
     argv.marshall(&mut page_data[argv_start..], argv_base);

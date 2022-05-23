@@ -65,16 +65,22 @@ pub extern "C" fn fatal_error(context: &Context, elr: u64, esr: u64, far: u64) -
         }
     }
     printkln!("\n{}", context);
-    printkln!("\nStacktrace:");
-    unsafe { printk_dump(u64::from(context.get_stack()), 128); }
+    if u64::from(sp) != 0 {
+        printkln!("\nStacktrace:");
+        unsafe { printk_dump(u64::from(sp), 128); }
+    }
+
     loop {}
 }
 
 #[no_mangle]
 pub extern "C" fn fatal_kernel_error(sp: u64, elr: u64, esr: u64, far: u64) -> ! {
-    printkln!("\nFatal Error: ESR: {:#010x}, FAR: {:#x}, ELR: {:#x}", esr, far, elr);
-    printkln!("\nStacktrace:");
-    unsafe { printk_dump(sp, 128); }
+    printkln!("\nFatal Kernel Error: ESR: {:#010x}, FAR: {:#x}, ELR: {:#x}", esr, far, elr);
+    if sp != 0 {
+        printkln!("\nStacktrace:");
+        unsafe { printk_dump(sp, 128); }
+    }
+
     loop {}
 }
 
