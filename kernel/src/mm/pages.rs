@@ -195,7 +195,7 @@ impl PageRegion {
 }
 
 unsafe fn zero_page(paddr: PhysicalAddress) {
-    let page = slice::from_raw_parts_mut(paddr.to_kernel_addr().as_mut(), mmu::page_size());
+    let page = slice::from_raw_parts_mut(paddr.to_kernel_addr().as_mut() as *mut u8, mmu::page_size());
     for ptr in page.iter_mut() {
         *ptr = 0;
     }
