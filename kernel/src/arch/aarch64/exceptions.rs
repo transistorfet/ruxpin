@@ -156,7 +156,7 @@ fn page_fault_handler(far: u64) {
 }
 
 fn page_access_handler(far: u64) {
-    //let current = crate::proc::scheduler::get_current();
-    //current.try_lock().unwrap().space.try_lock().unwrap().copy_on_write_at(VirtualAddress::from(far)).unwrap();
+    let current = crate::proc::scheduler::get_current();
+    current.try_lock().unwrap().space.try_lock().unwrap().copy_on_write_at(VirtualAddress::from(far)).unwrap();
 }
 

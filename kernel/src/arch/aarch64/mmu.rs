@@ -123,6 +123,7 @@ impl TranslationTable {
 
         map_level(TL0_ADDR_BITS, self.as_slice_mut(), &mut len, &mut vaddr, pages, &mut |pages, page_addr, len| {
             let (descriptor, _) = lookup_level(TL0_ADDR_BITS, parent_table.as_slice(), page_addr)?;
+
             if len != page_size() {
                 Ok(None) // Don't map granuales larger than a page
             } else if *descriptor & TT_BLOCK_MASK == 0 {
@@ -139,6 +140,25 @@ impl TranslationTable {
                 }
 
                 Ok(Some((PhysicalAddress::from(new_page), TT_ACCESS_FLAG | flags)))
+            }
+        })
+    }
+
+    pub fn remap_copy_on_write(&mut self, parent: &mut Self, mut vaddr: VirtualAddress, mut len: usize, pages: &mut PagePool) -> Result<(), KernelError> {
+        check_vaddr_and_usize(vaddr, len)?;
+
+        let flags = memory_permissions_flags(MemoryPermissions::ReadWrite) | attribute_index(0);
+        map_level(TL0_ADDR_BITS, self.as_slice_mut(), &mut len, &mut vaddr, pages, &mut |pages, page_addr, len| {
+            let (descriptor, granuale_size) = lookup_level_mut(TL0_ADDR_BITS, parent.as_slice_mut(), page_addr)?;
+            let page = *descriptor & TT_BLOCK_MASK;
+
+            if len != page_size() {
+                Ok(None)
+            } else if page != 0 {
+                *descriptor = (*descriptor & !TT_PERMISSIONS_MASK) | TT_READ_ONLY_FLAG | TT_COPY_ON_WRITE_FLAG | attribute_index(0);
+                Ok(Some((pages.ref_page(PhysicalAddress::from(page)), TT_COPY_ON_WRITE_FLAG | TT_ACCESS_FLAG | TT_READ_ONLY_FLAG | attribute_index(0))))
+            } else {
+                Ok(Some((PhysicalAddress::from(0), flags)))
             }
         })
     }
@@ -160,6 +180,14 @@ impl TranslationTable {
         visitor.visit_level(TL0_ADDR_BITS, self.as_slice_mut(), &mut len, &mut vaddr)
     }
 
+    pub fn reset_copy_on_write(&mut self, vaddr: VirtualAddress) -> Result<(PhysicalAddress, bool), KernelError> {
+        check_vaddr_and_usize(vaddr, page_size())?;
+
+        let (descriptor, granuale_size) = lookup_level_mut(TL0_ADDR_BITS, self.as_slice_mut(), vaddr)?;
+        let previous_cow = (*descriptor & TT_COPY_ON_WRITE_FLAG) == TT_COPY_ON_WRITE_FLAG;
+        *descriptor = (*descriptor & !(TT_PERMISSIONS_MASK | TT_COPY_ON_WRITE_FLAG)) | TT_READ_WRITE_FLAG;
+        Ok((PhysicalAddress::from(*descriptor & TT_BLOCK_MASK), previous_cow))
+    }
 
     pub fn update_addr(&mut self, vaddr: VirtualAddress, paddr: PhysicalAddress, expected_size: usize) -> Result<(), KernelError> {
         check_vaddr_and_usize(vaddr, expected_size)?;

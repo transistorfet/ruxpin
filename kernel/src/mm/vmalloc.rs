@@ -116,7 +116,7 @@ impl VirtualAddressSpace {
         let pages = pages::get_page_area();
 
         if segment.permissions == MemoryPermissions::ReadWrite {
-            self.table.copy_pages_in_range(parent_table, segment.start, segment.page_aligned_len(), pages).unwrap();
+            self.table.remap_copy_on_write(parent_table, segment.start, segment.page_aligned_len(), pages).unwrap();
         } else  {
             self.table.copy_paged_range(parent_table, segment.permissions, segment.start, segment.page_aligned_len(), pages).unwrap();
         }
@@ -156,6 +156,33 @@ impl VirtualAddressSpace {
         }
 
         Err(KernelError::NoSegmentFound)
+    }
+
+    pub(crate) fn copy_on_write_at(&mut self, far: VirtualAddress) -> Result<(), KernelError> {
+        let page_vaddr = far.align_down(mmu::page_size());
+        let (page, previous_cow) = self.table.reset_copy_on_write(page_vaddr).unwrap();
+        if previous_cow {
+            crate::printkln!("copying page on write {:?}", page);
+            let pages = pages::get_page_area();
+
+            // Allocate new page and map it in the current address space
+            let new_page = pages.alloc_page_zeroed();
+            self.table.update_addr(page_vaddr, new_page, mmu::page_size()).unwrap();
+
+            // Copy data into new page
+            let page_buffer = mmu::get_page_slice(page);
+            let new_page_buffer = mmu::get_page_slice(new_page);
+            for i in 0..page_buffer.len() {
+                new_page_buffer[i] = page_buffer[i];
+            }
+
+            // TODO this doesn't allow a page to be reused if it's the last ref... need a way to check refs without freeing
+            pages.free_page(page);
+
+            Ok(())
+        } else {
+            Err(KernelError::MemoryPermissionDenied)
+        }
     }
 }
 
