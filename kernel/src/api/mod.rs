@@ -26,12 +26,8 @@ pub fn process_syscall(syscall: &mut SyscallRequest) {
     let current_proc = get_current();
 
     if syscall.function == SyscallFunction::Exec {
-        let mut i = 0;
-        syscall_decode!(syscall, i, path: &str);
-        syscall_decode!(syscall, i, args: &[&str]);
-        syscall_decode!(syscall, i, envp: &[&str]);
-        if let Err(err) = syscall_exec(path, args, envp) {
-            store_result(syscall, Err(err));
+        self::proc::handle_syscall_exec(syscall);
+        if syscall.error {
             Context::write_syscall_result_to_current_context(syscall);
         }
         // Return without setting the return value, which would overwrite the
@@ -41,102 +37,46 @@ pub fn process_syscall(syscall: &mut SyscallRequest) {
 
     match syscall.function {
         SyscallFunction::Exit => {
-            let mut i = 0;
-            syscall_decode!(syscall, i, status: isize);
-            let result = syscall_exit(status);
-            store_result(syscall, result.map(|_| 0));
-            //self::proc::handle_syscall_exit(syscall);
+            self::proc::handle_syscall_exit(syscall);
         },
 
         SyscallFunction::Fork => {
-            let result = syscall_fork();
-            store_result(syscall, result.map(|ret| ret as usize));
-            //self::proc::handle_syscall_fork(syscall);
+            self::proc::handle_syscall_fork(syscall);
         },
 
         //SyscallFunction::Exec => {
-        //    let mut i = 0;
-        //    syscall_decode!(syscall, i, path: &str);
-        //    syscall_decode!(syscall, i, args: &[&str]);
-        //    syscall_decode!(syscall, i, envp: &[&str]);
-        //    let result = syscall_exec(path, args, envp);
-        //    store_result(syscall, result.map(|_| 0));
+        //    self::proc::handle_syscall_exec(syscall);
         //},
 
         SyscallFunction::WaitPid => {
-            let mut i = 0;
-            syscall_decode!(syscall, i, pid: Pid);
-            syscall_decode!(syscall, i, status: &mut isize);
-            syscall_decode!(syscall, i, options: usize);
-            let result = syscall_waitpid(pid, status, options);
-            store_result(syscall, result.map(|ret| ret as usize));
+            self::proc::handle_syscall_waitpid(syscall);
         },
 
         SyscallFunction::Sbrk => {
-            let mut i = 0;
-            syscall_decode!(syscall, i, increment: usize);
-            let result = syscall_sbrk(increment);
-            store_result(syscall, result.map(|ret| ret as usize));
+            self::proc::handle_syscall_sbrk(syscall);
         },
 
         SyscallFunction::Open => {
-            let mut i = 0;
-            syscall_decode!(syscall, i, path: &str);
-            syscall_decode!(syscall, i, flags: OpenFlags);
-            syscall_decode!(syscall, i, access: FileAccess);
-            let result = syscall_open(path, flags, access);
-            store_result(syscall, result.map(|ret| ret.0));
+            self::file::handle_syscall_open(syscall);
         },
         SyscallFunction::Close => {
-            let mut i = 0;
-            syscall_decode!(syscall, i, file: FileDesc);
-            let result = syscall_close(file);
-            store_result(syscall, result.map(|_| 0));
+            self::file::handle_syscall_close(syscall);
         },
         SyscallFunction::Read => {
-            let mut i = 0;
-            syscall_decode!(syscall, i, file: FileDesc);
-            syscall_decode!(syscall, i, buffer: &mut [u8]);
-            let result = syscall_read(file, buffer);
-            store_result(syscall, result);
+            self::file::handle_syscall_read(syscall);
         },
         SyscallFunction::Write => {
-            let mut i = 0;
-            syscall_decode!(syscall, i, file: FileDesc);
-            syscall_decode!(syscall, i, buffer: &[u8]);
-            let result = syscall_write(file, buffer);
-            store_result(syscall, result);
+            self::file::handle_syscall_write(syscall);
         },
         SyscallFunction::ReadDir => {
-            let mut i = 0;
-            syscall_decode!(syscall, i, file: FileDesc);
-            syscall_decode!(syscall, i, dirent: &mut DirEntry);
-            let result = syscall_readdir(file, dirent);
-            store_result(syscall, result.map(|r| r as usize));
+            self::file::handle_syscall_readdir(syscall);
         },
         _ => {
             printkln!("syscall: invalid function number: {}", syscall.function as usize);
-            store_result(syscall, Err(KernelError::BadSystemCall));
+            syscall.store_result(Err(ApiError::BadSystemCall));
         }
     }
 
     current_proc.try_lock().unwrap().context.write_syscall_result(syscall);
-}
-
-pub fn store_result(syscall: &mut SyscallRequest, result: Result<usize, KernelError>) {
-    match result {
-        Ok(value) => {
-            syscall.error = false;
-            syscall.result = value;
-        },
-        Err(value) => {
-            if value == KernelError::SuspendProcess {
-                suspend(get_current());
-            }
-
-            syscall.error = true;
-            syscall.result = ApiError::from(value) as usize;
-        },
-    }
 }
 

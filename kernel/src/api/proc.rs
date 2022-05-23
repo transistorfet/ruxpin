@@ -9,11 +9,13 @@ use crate::proc::scheduler::{get_current, clone_current, exit_current, find_exit
 use crate::proc::binaries::elf::loader;
 
 
+#[syscall_handler]
 pub fn syscall_exit(status: isize) -> Result<(), KernelError> {
     exit_current(status);
     Ok(())
 }
 
+#[syscall_handler]
 pub fn syscall_fork() -> Result<Pid, KernelError> {
     let args = TaskCloneArgs::new();
     let new_proc = clone_current(args);
@@ -21,6 +23,7 @@ pub fn syscall_fork() -> Result<Pid, KernelError> {
     Ok(child_pid)
 }
 
+#[syscall_handler]
 pub fn syscall_exec(path: &str, argv: &[&str], envp: &[&str]) -> Result<(), KernelError> {
     let proc = get_current();
 
@@ -46,6 +49,7 @@ pub fn syscall_exec(path: &str, argv: &[&str], envp: &[&str]) -> Result<(), Kern
     }
 }
 
+#[syscall_handler]
 pub fn syscall_waitpid(pid: Pid, status: &mut isize, _options: usize) -> Result<Pid, KernelError> {
     let parent_id = get_current().lock().process_id;
 
@@ -66,6 +70,7 @@ pub fn syscall_waitpid(pid: Pid, status: &mut isize, _options: usize) -> Result<
     }
 }
 
+#[syscall_handler]
 pub fn syscall_sbrk(increment: usize) -> Result<*const u8, KernelError> {
     let proc = get_current();
     let old_break = proc.try_lock().unwrap().space.try_lock().unwrap().adjust_stack_break(increment)?;

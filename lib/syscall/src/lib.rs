@@ -3,7 +3,7 @@
 pub mod arch;
 pub use crate::arch::execute_syscall;
 
-use ruxpin_types::ApiError;
+use ruxpin_types::{ApiError, FileDesc};
 
 
 #[repr(usize)]
@@ -64,15 +64,15 @@ pub trait IntoSyscallResult {
     fn into_result(self) -> usize;
 }
 
-impl IntoSyscallResult for usize {
-    fn into_result(self) -> usize {
-        self
-    }
-}
-
 impl IntoSyscallResult for () {
     fn into_result(self) -> usize {
         0
+    }
+}
+
+impl IntoSyscallResult for bool {
+    fn into_result(self) -> usize {
+        self as usize
     }
 }
 
@@ -81,6 +81,25 @@ impl IntoSyscallResult for i32 {
         self as usize
     }
 }
+
+impl IntoSyscallResult for usize {
+    fn into_result(self) -> usize {
+        self
+    }
+}
+
+impl IntoSyscallResult for FileDesc {
+    fn into_result(self) -> usize {
+        self.0 as usize
+    }
+}
+
+impl<T> IntoSyscallResult for *const T {
+    fn into_result(self) -> usize {
+        self as usize
+    }
+}
+
 
 
 #[macro_export]
@@ -207,55 +226,4 @@ macro_rules! syscall_decode {
         let $name = unsafe { &mut *($syscall.args[$i - 1] as *mut usize as *mut $type) };
     };
 }
-
-
-/*
-macro_rules! call_syscall {
-    ($arg1:expr) => {
-
-    }
-}
-
-
-macro_rules! define_syscall {
-    ($name:ident ( $arg1:ident ), $( $body:tt* )* ) => {
-        pub fn $name($arg1: u32) -> Result<(), u32> {
-
-        }
-    }
-}
-
-fn test() {
-    call_syscall!(5);
-}
-
-define_syscall!(api_print_number(num),
-    //nothing much
-);
-
-macro_rules! syscall_args {
-    /*
-    ($syscall:ident, $name0:ident: $type0:ty, $name1:ident: $type1:ty) => {
-        let $name0 = <$type0>::from($syscall.args[0]);
-        let $name1 = <$type1>::from($syscall.args[1]);
-    }
-    */
-
-    ($syscall:ident, $name:ident: $type:ty, $( $remain:tt )*) => {
-        //let $name = <$type>::from($syscall.args[0]);
-        syscall_encode!($syscall, 0, $name: $type);
-        syscall_args!($syscall, $( $remain )*);
-    };
-
-    ($syscall:ident, $name:ident: $type:ty) => {
-        //let $name = <$type>::from($syscall.args[0]);
-        syscall_encode!($syscall, 0, $name: $type);
-    }
-
-    //($syscall:ident, $($remain:tt)*) => {
-    //    syscall_args!($syscall, $($remain)*)
-    //};
-}
-*/
-
 

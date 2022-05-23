@@ -1,11 +1,13 @@
 
 use ruxpin_types::{FileDesc, OpenFlags, FileAccess, DirEntry};
+use ruxpin_syscall_proc::syscall_handler;
 
 use crate::fs::vfs;
 use crate::errors::KernelError;
 use crate::proc::scheduler::get_current;
 
 
+#[syscall_handler]
 pub fn syscall_open(path: &str, flags: OpenFlags, access: FileAccess) -> Result<FileDesc, KernelError> {
     let proc = get_current();
 
@@ -23,22 +25,26 @@ pub fn syscall_open(path: &str, flags: OpenFlags, access: FileAccess) -> Result<
     Ok(file_num)
 }
 
+#[syscall_handler]
 pub fn syscall_close(file: FileDesc) -> Result<(), KernelError> {
     let proc = get_current();
     let result = proc.try_lock().unwrap().files.try_lock().unwrap().clear_slot(file);
     result
 }
 
+#[syscall_handler]
 pub fn syscall_read(file: FileDesc, buffer: &mut [u8]) -> Result<usize, KernelError> {
     let file = get_current().try_lock().unwrap().files.try_lock().unwrap().get_file(file)?;
     vfs::read(file, buffer)
 }
 
+#[syscall_handler]
 pub fn syscall_write(file: FileDesc, buffer: &[u8]) -> Result<usize, KernelError> {
     let file = get_current().try_lock().unwrap().files.try_lock().unwrap().get_file(file)?;
     vfs::write(file, buffer)
 }
 
+#[syscall_handler]
 pub fn syscall_readdir(file: FileDesc, dirent: &mut DirEntry) -> Result<bool, KernelError> {
     let file = get_current().try_lock().unwrap().files.try_lock().unwrap().get_file(file)?;
     match vfs::readdir(file)? {
