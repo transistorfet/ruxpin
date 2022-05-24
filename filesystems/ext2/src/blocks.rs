@@ -97,49 +97,46 @@ impl Ext2Vnode {
         }
     }
 
-    /*
     pub(super) fn free_all_blocks(&mut self) -> Result<(), KernelError> {
-        let device_id = self.get_device_id();
-        let superblock = &mut get_mount(self.mount_ptr).superblock;
         self.dirty = true;
 
-        for i in 0..EXT2_INODE_DIRECT_BLOCKS {
-            superblock.free_block(self.blocks[i]);
-            self.blocks[i] = 0;
+        for index in 0..EXT2_INODE_DIRECT_BLOCKS {
+            if self.blocks[index] != 0 {
+                self.get_mount().superblock.free_block(self.blocks[index])?;
+                self.blocks[index] = 0;
+            }
         }
 
-        let entries_per_block = self.get_block_size() / mem::size_of::<Ext2BlockNumber>();
-
-        free_blocks_in_tier(device_id, 1, self.blocks[EXT2_INODE_DIRECT_BLOCKS], entries_per_block)?;
-        free_blocks_in_tier(device_id, 2, self.blocks[EXT2_INODE_DIRECT_BLOCKS + 1], entries_per_block)?;
-        free_blocks_in_tier(device_id, 3, self.blocks[EXT2_INODE_DIRECT_BLOCKS + 2], entries_per_block)?;
+        let device_id = self.get_device_id();
+        self.free_blocks_in_tier(device_id, 1, self.blocks[EXT2_INODE_DIRECT_BLOCKS])?;
+        self.free_blocks_in_tier(device_id, 2, self.blocks[EXT2_INODE_DIRECT_BLOCKS + 1])?;
+        self.free_blocks_in_tier(device_id, 3, self.blocks[EXT2_INODE_DIRECT_BLOCKS + 2])?;
 
         Ok(())
     }
-    */
-}
 
-/*
-fn free_blocks_in_tier(device_id: DeviceID, tier: usize, table_block: BlockNum, table_size: ) -> Result<(), KernelError> {
-    let entries_per_block = self.get_block_size() / mem::size_of::<Ext2BlockNumber>();
-    let buf = block::get_buf(device_id, table)?;
-    let locked_buf = &*buf.lock();
-
-    let table_data = unsafe { cast_to_slice(locked_buf) };
-    let index = offset / entries_per_block.pow(tiers as u32);
-
-    if tiers <= 1 {
-        if op == GetFileBlockOp::Allocate && table_data[index] == 0 {
-            // TODO this needs mutability, which requires a bunch of changes
-            //table_data[index] = get_mount(self.mount_ptr).alloc_block(self.attrs.inode as Ext2InodeNum)?;
+    fn free_blocks_in_tier(&mut self, device_id: DeviceID, tier: usize, table_block: BlockNum) -> Result<(), KernelError> {
+        if table_block == 0 {
+            return Ok(());
         }
-        Ok(table_data[index])
-    } else {
-        let remain = offset % entries_per_block.pow(tiers as u32);
-        self.get_block_in_tier(device_id, tiers - 1, table_data[index], remain, op)
+
+        let buf = block::get_buf(device_id, table_block)?;
+        let mut locked_buf = buf.lock_mut();
+        let table_data = unsafe { cast_to_slice_mut(&mut *locked_buf) };
+
+        for index in 0..table_data.len() {
+            if table_data[index] != 0 {
+                if tier > 1 {
+                    self.free_blocks_in_tier(device_id, tier - 1, table_data[index])?;
+                }
+                self.get_mount().superblock.free_block(table_data[index])?;
+                table_data[index] = 0;
+            }
+        }
+        Ok(())
     }
 }
-*/
+
 
 impl Ext2Mount {
     pub(super) fn alloc_block(&mut self, near_inode: Ext2InodeNum) -> Result<Ext2BlockNumber, KernelError> {

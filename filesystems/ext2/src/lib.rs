@@ -113,16 +113,10 @@ impl VnodeOperations for Ext2Vnode {
     //    Err(KernelError::OperationNotPermitted)
     //}
 
-    /*
     fn truncate(&mut self) -> Result<(), KernelError> {
-        if self.attrs.access.is_file() {
-
-        } else {
-            //self.contents.clear();
-        }
+        self.free_all_blocks()?;
         Ok(())
     }
-    */
 
     fn attributes<'a>(&'a mut self) -> Result<&'a FileAttributes, KernelError> {
         Ok(&mut self.attrs)
