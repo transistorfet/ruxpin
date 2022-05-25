@@ -3,8 +3,9 @@ use ruxpin_types::{Pid, OpenFlags, FileAccess};
 use ruxpin_syscall_proc::syscall_handler;
 
 use crate::errors::KernelError;
-use crate::misc::strarray::{StrArray, StandardArrayOfStrings};
+use crate::proc::scheduler::Task;
 use crate::proc::tasks::TaskCloneArgs;
+use crate::misc::strarray::{StrArray, StandardArrayOfStrings};
 use crate::proc::scheduler::{get_current, clone_current, exit_current, find_exited, suspend, clean_up};
 use crate::proc::binaries::elf::loader;
 
@@ -25,6 +26,7 @@ pub fn syscall_fork() -> Result<Pid, KernelError> {
 
 #[syscall_handler]
 pub fn syscall_exec(path: &str, argv: &[&str], envp: &[&str]) -> Result<(), KernelError> {
+    // This function must not return an error without exiting the process
     let proc = get_current();
 
     let parsed_argv = StandardArrayOfStrings::new_parsed(argv);
@@ -36,10 +38,7 @@ pub fn syscall_exec(path: &str, argv: &[&str], envp: &[&str]) -> Result<(), Kern
 
     proc.try_lock().unwrap().free_resources();
 
-    proc.try_lock().unwrap().files.try_lock().unwrap().open(None, "/dev/console0", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0)?;
-
-    let result = loader::load_binary(proc.clone(), saved_path.as_str(), &parsed_argv, &parsed_envp);
-
+    let result = setup_process(proc, saved_path.as_str(), &parsed_argv, &parsed_envp);
     match result {
         Ok(_) => Ok(()),
         Err(err) => {
@@ -47,6 +46,15 @@ pub fn syscall_exec(path: &str, argv: &[&str], envp: &[&str]) -> Result<(), Kern
             Err(err)
         },
     }
+}
+
+fn setup_process(proc: Task, path: &str, argv: &StandardArrayOfStrings, envp: &StandardArrayOfStrings) -> Result<(), KernelError> {
+    // This function can return an error safely
+    proc.try_lock().unwrap().files.try_lock().unwrap().open(None, "/dev/console0", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0)?;
+
+    loader::load_binary(proc.clone(), path, argv, envp)?;
+
+    Ok(())
 }
 
 #[syscall_handler]
