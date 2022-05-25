@@ -299,6 +299,7 @@ impl Ext2SuperBlock {
         let buf = block::get_buf(self.device_id, self.groups[group].inode_bitmap)?;
         let locked_buf = &mut *buf.lock_mut();
 
+        crate::printkln!("ext2: freeing inode {} in group {}", inode_num, group);
         free_bit(locked_buf, group_inode as usize);
         self.groups[group].free_inode_count += 1;
         self.total_unalloc_inodes += 1;
@@ -374,6 +375,7 @@ impl Ext2SuperBlock {
         let buf = block::get_buf(self.device_id, self.groups[group].block_bitmap)?;
         let locked_buf = &mut *buf.lock_mut();
 
+        crate::printkln!("ext2: freeing block {} in group {}", block_num, group);
         free_bit(locked_buf, group_block as usize);
         self.groups[group].free_block_count += 1;
         self.total_unalloc_blocks += 1;

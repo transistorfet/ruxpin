@@ -253,13 +253,15 @@ pub enum ApiError {
     FileSizeTooLarge            = 25,
     OutOfDiskSpace              = 26,
     ReadOnlyFilesystem          = 27,
+    AccessDenied                = 28,
+    DirectoryNotEmpty           = 29,
 
-    NoSuchTask                  = 28,
-    NotExecutable               = 29,
-    InvalidArgument             = 30,
-    InvalidSegmentType          = 31,
-    BadSystemCall               = 32,
-    NotExited                   = 33,
+    NoSuchTask                  = 30,
+    NotExecutable               = 31,
+    InvalidArgument             = 32,
+    InvalidSegmentType          = 33,
+    BadSystemCall               = 34,
+    NotExited                   = 35,
 
     UnknownError                = 9999,
 }
@@ -296,13 +298,15 @@ impl From<usize> for ApiError {
             25 => ApiError::FileSizeTooLarge,
             26 => ApiError::OutOfDiskSpace,
             27 => ApiError::ReadOnlyFilesystem,
+            28 => ApiError::AccessDenied,
+            29 => ApiError::DirectoryNotEmpty,
 
-            28 => ApiError::NoSuchTask,
-            29 => ApiError::NotExecutable,
-            30 => ApiError::InvalidArgument,
-            31 => ApiError::InvalidSegmentType,
-            32 => ApiError::BadSystemCall,
-            33 => ApiError::NotExited,
+            30 => ApiError::NoSuchTask,
+            31 => ApiError::NotExecutable,
+            32 => ApiError::InvalidArgument,
+            33 => ApiError::InvalidSegmentType,
+            34 => ApiError::BadSystemCall,
+            35 => ApiError::NotExited,
 
             _ => ApiError::UnknownError,
         }

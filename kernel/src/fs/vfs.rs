@@ -8,6 +8,7 @@ use crate::printkln;
 use crate::sync::Spinlock;
 use crate::errors::KernelError;
 
+use super::utils;
 use super::types::{Filesystem, Mount, Vnode, File, FilePointer, FileAttributes};
 
 
@@ -62,18 +63,66 @@ fn _link_mount_to_vnode(mount: Mount, vnode: Option<Vnode>) -> Result<(), Kernel
 }
 
 
-// TODO these implementations are missing
 pub fn link() {
-
+    // TODO this implementations are missing
 }
 
-pub fn unlink() {
+pub fn unlink(cwd: Option<Vnode>, path: &str, current_uid: UserID) -> Result<(), KernelError> {
+    let (dirname, filename) = get_path_component_reverse(path);
+    if filename == "." || filename == ".." {
+        // TODO this should use reverse lookup to find the actual name
+        return Err(KernelError::InvalidArgument);
+    }
 
+    let parent = lookup(cwd, dirname, current_uid)?;
+
+    // Verify that parent directory is writable
+    if !verify_file_access(current_uid, FileAccess::Write, parent.lock().attributes()?) {
+        return Err(KernelError::AccessDenied);
+    }
+
+    // We look up the file here to check permissions
+    let vnode = parent.lock().lookup(filename)?;
+
+    // Verify that the file we're trying to delete is writable
+    if !verify_file_access(current_uid, FileAccess::Write, vnode.lock().attributes()?) {
+        return Err(KernelError::OperationNotPermitted);
+    }
+
+    if utils::is_directory(vnode.clone())? && !utils::is_directory_empty(vnode.clone())? {
+        return Err(KernelError::DirectoryNotEmpty);
+    }
+
+    parent.lock().unlink(vnode, filename)?;
+    Ok(())
 }
 
-pub fn rename() {
+pub fn rename(cwd: Option<Vnode>, old_path: &str, new_path: &str, current_uid: UserID) -> Result<(), KernelError> {
+    let (old_parent, old_dir, old_name) = rename_get_parent(cwd.clone(), old_path, current_uid)?;
+    let (new_parent, new_dir, new_name) = rename_get_parent(cwd, new_path, current_uid)?;
 
+    // TODO verify that both locations are on the same device
+
+    old_parent.lock().rename(old_name, new_parent, new_name)?;
+    Ok(())
 }
+
+fn rename_get_parent<'a>(cwd: Option<Vnode>, path: &'a str, current_uid: UserID) -> Result<(Vnode, &'a str, &'a str), KernelError> {
+    let (dirname, filename) = get_path_component_reverse(path);
+    if filename == "." || filename == ".." {
+        return Err(KernelError::InvalidArgument);
+    }
+
+    let parent = lookup(cwd, dirname, current_uid)?;
+
+    // Verify that the parent directory of the old location is writable and searchable
+    if !verify_file_access(current_uid, FileAccess::Write.plus(FileAccess::Exec).plus(FileAccess::Directory), parent.lock().attributes()?) {
+        return Err(KernelError::OperationNotPermitted);
+    }
+
+    Ok((parent, dirname, filename))
+}
+
 
 pub fn access(cwd: Option<Vnode>, path: &str, access: FileAccess, current_uid: UserID) -> Result<(), KernelError> {
     let vnode = lookup(cwd, path, current_uid)?;

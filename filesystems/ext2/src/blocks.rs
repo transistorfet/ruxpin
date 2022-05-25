@@ -112,6 +112,7 @@ impl Ext2Vnode {
         self.free_blocks_in_tier(device_id, 2, self.blocks[EXT2_INODE_DIRECT_BLOCKS + 1])?;
         self.free_blocks_in_tier(device_id, 3, self.blocks[EXT2_INODE_DIRECT_BLOCKS + 2])?;
 
+        self.attrs.size = 0;
         Ok(())
     }
 

@@ -1,17 +1,14 @@
 
-use ruxpin_syscall::syscall_decode;
 use ruxpin_syscall::{SyscallRequest, SyscallFunction};
-use ruxpin_types::{Pid, FileDesc, OpenFlags, FileAccess, DirEntry, ApiError};
+use ruxpin_types::ApiError;
 
 use crate::printkln;
-use crate::api::file::*;
-use crate::api::proc::*;
-use crate::errors::KernelError;
 use crate::arch::context::Context;
-use crate::proc::scheduler::{get_current, suspend, check_restart_syscall};
+use crate::proc::scheduler::{get_current, check_restart_syscall};
 
 mod file;
 mod proc;
+
 
 pub fn handle_syscall() {
     //crate::printkln!("A SYSCALL for {:?}!", syscall.function);
@@ -70,6 +67,18 @@ pub fn process_syscall(syscall: &mut SyscallRequest) {
         },
         SyscallFunction::ReadDir => {
             self::file::handle_syscall_readdir(syscall);
+        },
+        SyscallFunction::Unlink => {
+            self::file::handle_syscall_unlink(syscall);
+        },
+        SyscallFunction::MkDir => {
+            self::file::handle_syscall_mkdir(syscall);
+        },
+        SyscallFunction::GetCwd => {
+            self::file::handle_syscall_getcwd(syscall);
+        },
+        SyscallFunction::Rename => {
+            self::file::handle_syscall_rename(syscall);
         },
         _ => {
             printkln!("syscall: invalid function number: {}", syscall.function as usize);

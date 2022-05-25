@@ -131,6 +131,59 @@ pub fn readdir(file: FileDesc, dirent: &mut DirEntry) -> Result<bool, ApiError> 
     }
 }
 
+pub fn unlink(path: &str) -> Result<(), ApiError> {
+    let mut i = 0;
+    let mut syscall: SyscallRequest = Default::default();
+    syscall_encode!(syscall, i, path: &str);
+    syscall.function = SyscallFunction::Unlink;
+    execute_syscall(&mut syscall);
+    match syscall.error {
+        false => Ok(()),
+        true => Err(ApiError::from(syscall.result)),
+    }
+}
+
+pub fn mkdir(path: &str, access: FileAccess) -> Result<(), ApiError> {
+    let mut i = 0;
+    let mut syscall: SyscallRequest = Default::default();
+    syscall_encode!(syscall, i, path: &str);
+    syscall_encode!(syscall, i, access: FileAccess);
+    syscall.function = SyscallFunction::MkDir;
+    execute_syscall(&mut syscall);
+    match syscall.error {
+        false => Ok(()),
+        true => Err(ApiError::from(syscall.result)),
+    }
+}
+
+//#[syscall_function]
+//pub fn getcwd(path: &mut [u8]) -> Result<(), ApiError> { }
+/*
+{
+    let mut i = 0;
+    let mut syscall: SyscallRequest = Default::default();
+    syscall_encode!(syscall, i, path: &mut [u8]);
+    syscall.function = SyscallFunction::GetCwd;
+    execute_syscall(&mut syscall);
+    match syscall.error {
+        false => Ok(()),
+        true => Err(ApiError::from(syscall.result)),
+    }
+}
+*/
+
+pub fn rename(old_path: &str, new_path: &str) -> Result<(), ApiError> {
+    let mut i = 0;
+    let mut syscall: SyscallRequest = Default::default();
+    syscall_encode!(syscall, i, old_path: &str);
+    syscall_encode!(syscall, i, new_path: &str);
+    syscall.function = SyscallFunction::Rename;
+    execute_syscall(&mut syscall);
+    match syscall.error {
+        false => Ok(()),
+        true => Err(ApiError::from(syscall.result)),
+    }
+}
 
 
 //pub static STDIN: UnbufferedFile = UnbufferedFile(FileDesc(0));

@@ -105,13 +105,20 @@ impl VnodeOperations for Ext2Vnode {
     //    Err(KernelError::OperationNotPermitted)
     //}
 
-    //fn unlink(&mut self, _target: Vnode, _filename: &str) -> Result<Vnode, KernelError> {
-    //    Err(KernelError::OperationNotPermitted)
-    //}
+    fn unlink(&mut self, target: Vnode, filename: &str) -> Result<(), KernelError> {
+        let inode = self.remove_directory_entry(filename)?;
+        self.dirty = true;
+        self.attrs.nlinks -= 1;
+        if self.attrs.nlinks == 0 {
+            target.try_lock().unwrap().truncate()?;
+            self.get_mount().superblock.free_inode(inode)?;
+        }
+        Ok(())
+    }
 
-    //fn rename(&mut self, _filename: &str) -> Result<Vnode, KernelError> {
-    //    Err(KernelError::OperationNotPermitted)
-    //}
+    fn rename(&mut self, old_name: &str, new_parent: Vnode, new_name: &str) -> Result<(), KernelError> {
+        Err(KernelError::OperationNotPermitted)
+    }
 
     fn truncate(&mut self) -> Result<(), KernelError> {
         self.free_all_blocks()?;

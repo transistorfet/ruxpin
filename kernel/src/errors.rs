@@ -37,6 +37,8 @@ pub enum KernelError {
     FileSizeTooLarge,
     OutOfDiskSpace,
     ReadOnlyFilesystem,
+    AccessDenied,
+    DirectoryNotEmpty,
 
     // Task Errors
     NoSuchTask,
@@ -81,6 +83,8 @@ impl From<KernelError> for ApiError {
             KernelError::FileSizeTooLarge               => ApiError::FileSizeTooLarge,
             KernelError::OutOfDiskSpace                 => ApiError::OutOfDiskSpace,
             KernelError::ReadOnlyFilesystem             => ApiError::ReadOnlyFilesystem,
+            KernelError::AccessDenied                   => ApiError::AccessDenied,
+            KernelError::DirectoryNotEmpty              => ApiError::DirectoryNotEmpty,
 
             KernelError::NoSuchTask                     => ApiError::NoSuchTask,
             KernelError::NotExecutable                  => ApiError::NotExecutable,

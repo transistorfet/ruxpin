@@ -1,38 +1,34 @@
 
+
+* you were in the middle of trying to get rm to work, via unlink()
+* you were also going to implement rename(), mkdir(), and getcwd()
+* you also started adding marshalling macros for syscalls, but running into parse errors
+
+
 * when a segment is copied, it only copies the pages loaded into memory at that time, and puts 0 for all other pages, but that means when
   those pages are loaded, they will be duplicated.  The solution is to have a cache for each file/exec that is being used which holds a
   reference to each page, and once it is dropped, those pages will be freed, and when a page is loaded, the cache is searched first.  I'm
   not yet sure how I'd like to implement this, and I still haven't exactly figured out how other OSes do it
 
 
-* there's a problem with the stack upon returning to the process after a fork and/or waitpid, in the shell.  It was previously working,
-  but after upgrading the compiler, it now has a fatal error when trying to print the result from waitpid.  If I comment out the printing,
-  it works without issue.  If I comment out the printing but print the status var which is stack allocated after the fork, then it fails,
-  but if i move the decl to before the fork, it works without issue.  Moving the result var to before the fork, but still printing it after
-  fails.  So something weird is going on with the stack.
-  It seemed like the values made sense when checking them in restore_context
-
-* once you get past this issue, you were going to split api/ into api/, syscall/, and types/, but it's causing a failure whenever anything
-  is moved out and the applications are recompiled
-
-
-* make a proc macro if necessary, to encode all the members of an enum, into a usize and back, for the errors enums in particular,
-  complete with mapping between ApiError and KernelError
-* proc macro to decorate syscalls with
 * think about multicore and what that would mean for everything
-* i kind of want to change the name of ruxpin_api, perhaps split into ruxpin_syscall and ruxpin_types
 
+* fix the idle process so it's not arch specific
 * need to change segments, translation tables, to make it more sharable
 * fix the sbrk growing/shrinking
 * fix the blocking/unblocking code (including exits) to use multiple queues and an event system of some sorts to improve the performance of checks
 * fill in link/unlink/rename, but can you also...
 * make methods on File for fs operations (including unlink/rename?), so you don't have to always use vfs::read(file)
+
 * should binaries move to api to better reflect that it's integrating code that uses multiple subsystems, rather than being an isolated subsystem
   Or should you even move it to its own crate, so that it can be selectively compiled in? but it would still need to be used by the api... can the
   api (as an integrating layer) be separate from the kernel crate?
-* fix the idle process so it's not arch specific
 
 
+* make a proc macro if necessary, to encode all the members of an enum, into a usize and back, for the errors enums in particular,
+  complete with mapping between ApiError and KernelError
+
+* add a lock error and return it up if the lock times out (rather than kernel panicking)
 
 
 WHAT IFS:

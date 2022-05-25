@@ -4,6 +4,7 @@ use core::str;
 use ruxpin_types::{FileAccess, DirEntry};
 
 use ruxpin_kernel::block;
+use ruxpin_kernel::block::Buf;
 use ruxpin_kernel::misc::align_up;
 use ruxpin_kernel::block::BlockNum;
 use ruxpin_kernel::errors::KernelError;
@@ -114,20 +115,20 @@ impl Ext2Vnode {
             let buf = block::get_buf(device_id, block_num)?;
             let locked_buf = &*buf.lock();
 
-            let mut position = 0;
-            while position < block_size {
+            let mut offset = 0;
+            while offset < block_size {
                 let entry_on_disk: &Ext2DirEntryHeader = unsafe {
-                    cast_to_ref(&locked_buf[position..])
+                    cast_to_ref(&locked_buf[offset..])
                 };
 
                 let entry_len = u16::from(entry_on_disk.entry_len) as usize;
                 let entry_min_len = align_up(entry_on_disk.name_len as usize + 8, 4);
 
                 if entry_len > entry_min_len + min_entry_len {
-                    return Ok((block_num, position));
+                    return Ok((block_num, offset));
                 }
 
-                position += entry_len;
+                offset += entry_len;
             }
 
             znum += 1;
@@ -147,6 +148,64 @@ impl Ext2Vnode {
         entry_on_disk.entry_len = (block_size as u16).into();
         Ok((block_num, 0))
     }
+
+    pub(super) fn remove_directory_entry(&mut self, filename: &str) -> Result<Ext2InodeNum, KernelError> {
+        let block_size = self.get_block_size();
+        let device_id = self.get_device_id();
+
+        let mut znum = 0;
+        while znum * block_size <= self.attrs.size {
+            let block_num = match self.get_file_block_num(znum, GetFileBlockOp::Lookup)? {
+                None => { break; },
+                Some(num) => num,
+            };
+            let buf = block::get_buf(device_id, block_num)?;
+
+            let mut position = 0;
+            let mut previous_position = None;
+            while position < block_size {
+                let offset = position % block_size;
+                let (is_equal, entry_len, inode) = compare_filename_from_buf(&buf, offset, filename);
+
+                if is_equal {
+                    if previous_position.is_none() {
+                        // TODO this should actually delete the block
+                        return Err(KernelError::InvalidInode);
+                    } else {
+                        let locked_buf = &mut *buf.lock_mut();
+                        let mut previous_entry_on_disk: &mut Ext2DirEntryHeader = unsafe {
+                            cast_to_ref_mut(&mut locked_buf[previous_position.unwrap()..])
+                        };
+
+                        previous_entry_on_disk.entry_len = (u16::from(previous_entry_on_disk.entry_len) + entry_len as u16).into();
+                        return Ok(inode);
+                    }
+                }
+
+                previous_position = Some(position);
+                position += entry_len;
+            }
+
+            previous_position = None;
+            znum += 1;
+        }
+
+        Err(KernelError::FileNotFound)
+    }
+}
+
+fn compare_filename_from_buf(buf: &Buf, offset: usize, filename: &str) -> (bool, usize, Ext2InodeNum) {
+    let locked_buf = &*buf.lock();
+
+    let entry_on_disk: &Ext2DirEntryHeader = unsafe {
+        cast_to_ref(&locked_buf[offset..])
+    };
+
+    let inode = u32::from(entry_on_disk.inode);
+    let entry_len = u16::from(entry_on_disk.entry_len) as usize;
+
+    let is_equal = filename.as_bytes() == &locked_buf[(offset + 8)..(offset + 8 + entry_on_disk.name_len as usize)];
+    (is_equal, entry_len, inode)
 }
 
 fn to_file_type(access: FileAccess) -> u8 {

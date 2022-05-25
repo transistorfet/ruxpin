@@ -40,15 +40,15 @@ pub trait VnodeOperations: Sync + Send {
         Err(KernelError::OperationNotPermitted)
     }
 
-    fn link(&mut self, _newparent: Vnode, _filename: &str) -> Result<Vnode, KernelError> {
+    fn link(&mut self, _new_parent: Vnode, _filename: &str) -> Result<(), KernelError> {
         Err(KernelError::OperationNotPermitted)
     }
 
-    fn unlink(&mut self, _target: Vnode, _filename: &str) -> Result<Vnode, KernelError> {
+    fn unlink(&mut self, _target: Vnode, _filename: &str) -> Result<(), KernelError> {
         Err(KernelError::OperationNotPermitted)
     }
 
-    fn rename(&mut self, _filename: &str) -> Result<Vnode, KernelError> {
+    fn rename(&mut self, _old_name: &str, _new_parent: Vnode, _new_name: &str) -> Result<(), KernelError> {
         Err(KernelError::OperationNotPermitted)
     }
 

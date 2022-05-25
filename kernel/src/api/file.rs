@@ -1,8 +1,9 @@
 
-use ruxpin_types::{FileDesc, OpenFlags, FileAccess, DirEntry};
+use ruxpin_types::{FileDesc, OpenFlags, FileAccess, DirEntry, UserID};
 use ruxpin_syscall_proc::syscall_handler;
 
 use crate::fs::vfs;
+use crate::fs::types::Vnode;
 use crate::errors::KernelError;
 use crate::proc::scheduler::get_current;
 
@@ -54,5 +55,40 @@ pub fn syscall_readdir(file: FileDesc, dirent: &mut DirEntry) -> Result<bool, Ke
         },
         None => Ok(false),
     }
+}
+
+#[syscall_handler]
+pub fn syscall_unlink(path: &str) -> Result<(), KernelError> {
+    let (cwd, current_uid) = get_current_cwd_and_uid();
+    vfs::unlink(cwd, path, current_uid)?;
+    Ok(())
+}
+
+#[syscall_handler]
+pub fn syscall_mkdir(path: &str, access: FileAccess) -> Result<(), KernelError> {
+
+    Err(KernelError::OperationNotPermitted)
+}
+
+#[syscall_handler]
+pub fn syscall_getcwd(path: &mut [u8]) -> Result<(), KernelError> {
+
+    Err(KernelError::OperationNotPermitted)
+}
+
+#[syscall_handler]
+pub fn syscall_rename(old_path: &str, new_path: &str) -> Result<(), KernelError> {
+    let (cwd, current_uid) = get_current_cwd_and_uid();
+    vfs::rename(cwd, old_path, new_path, current_uid)?;
+    Ok(())
+}
+
+fn get_current_cwd_and_uid() -> (Option<Vnode>, UserID) {
+    let proc = get_current();
+    let locked_proc = proc.try_lock().unwrap();
+
+    let cwd = locked_proc.files.try_lock().unwrap().get_cwd();
+    let current_uid = locked_proc.current_uid;
+    (cwd, current_uid)
 }
 

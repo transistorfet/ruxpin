@@ -1,6 +1,6 @@
 
 TARGETDIR = target/aarch64-unknown-none/release
-COREUTILS = ls args cat ps
+COREUTILS = ls args cat ps rm mv
 WORKSPACE_MEMBERS = bin/coreutils bin/sh config/raspberrypi3 kernel lib/api lib/app lib/syscall_proc
 
 
