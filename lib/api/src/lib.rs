@@ -3,13 +3,91 @@
 use core::fmt;
 use core::fmt::Write;
 
-use ruxpin_syscall::syscall_encode;
-use ruxpin_syscall::arch::execute_syscall;
-use ruxpin_syscall::{SyscallRequest, SyscallFunction};
+use ruxpin_syscall_proc::syscall_function;
 
 use ruxpin_types::{Pid, FileDesc, ApiError, OpenFlags, FileAccess, DirEntry};
 
 
+#[syscall_function(Exit)]
+pub fn exit(status: isize) -> ! {}
+
+#[syscall_function(Fork)]
+pub fn fork() -> Result<Pid, ApiError> {}
+
+#[syscall_function(Exec)]
+pub fn exec(path: &str, args: &[&str], envp: &[&str]) -> ! {}
+
+#[syscall_function(WaitPid)]
+pub fn waitpid(pid: Pid, status: &mut isize, options: usize) -> Result<Pid, ApiError> {}
+
+#[syscall_function(Sbrk)]
+pub fn sbrk(increment: usize) -> Result<*const u8, ApiError> {}
+
+#[syscall_function(Open)]
+pub fn open(path: &str, flags: OpenFlags, access: FileAccess) -> Result<FileDesc, ApiError> {}
+
+#[syscall_function(Close)]
+pub fn close(file: FileDesc) -> Result<(), ApiError> {}
+
+#[syscall_function(Read)]
+pub fn read(file: FileDesc, buffer: &mut [u8]) -> Result<usize, ApiError> {}
+
+#[syscall_function(Write)]
+pub fn write(file: FileDesc, buffer: &[u8]) -> Result<usize, ApiError> {}
+
+#[syscall_function(ReadDir)]
+pub fn readdir(file: FileDesc, dirent: &mut DirEntry) -> Result<bool, ApiError> {}
+
+#[syscall_function(Unlink)]
+pub fn unlink(path: &str) -> Result<(), ApiError> {}
+
+#[syscall_function(MkDir)]
+pub fn mkdir(path: &str, access: FileAccess) -> Result<(), ApiError> {}
+
+#[syscall_function(GetCwd)]
+pub fn getcwd(path: &mut [u8]) -> Result<(), ApiError> {}
+
+#[syscall_function(Rename)]
+pub fn rename(old_path: &str, new_path: &str) -> Result<(), ApiError> {}
+
+
+//pub static STDIN: UnbufferedFile = UnbufferedFile(FileDesc(0));
+//pub static STDOUT: UnbufferedFile = UnbufferedFile(FileDesc(1));
+//pub static STDERR: UnbufferedFile = UnbufferedFile(FileDesc(2));
+
+pub struct UnbufferedFile(pub FileDesc);
+
+impl UnbufferedFile {
+    pub fn stdout() -> UnbufferedFile {
+        UnbufferedFile(FileDesc(0))
+    }
+}
+
+impl Write for UnbufferedFile {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        write(self.0, s.as_bytes()).unwrap();
+        Ok(())
+    }
+}
+
+#[macro_export]
+macro_rules! print {
+    ($($args:tt)*) => ({
+        use core::fmt::Write;
+        $crate::UnbufferedFile::stdout().write_fmt(format_args!($($args)*)).unwrap();
+    })
+}
+
+#[macro_export]
+macro_rules! println {
+    ($($args:tt)*) => ({
+        use core::fmt::Write;
+        $crate::UnbufferedFile::stdout().write_fmt(format_args!($($args)*)).unwrap();
+        $crate::UnbufferedFile::stdout().write_str("\n").unwrap();
+    })
+}
+
+/*
 pub fn exit(status: isize) -> ! {
     let mut i = 0;
     let mut syscall: SyscallRequest = Default::default();
@@ -156,10 +234,7 @@ pub fn mkdir(path: &str, access: FileAccess) -> Result<(), ApiError> {
     }
 }
 
-//#[syscall_function]
-//pub fn getcwd(path: &mut [u8]) -> Result<(), ApiError> { }
-/*
-{
+pub fn getcwd(path: &mut [u8]) -> Result<(), ApiError> {
     let mut i = 0;
     let mut syscall: SyscallRequest = Default::default();
     syscall_encode!(syscall, i, path: &mut [u8]);
@@ -170,7 +245,6 @@ pub fn mkdir(path: &str, access: FileAccess) -> Result<(), ApiError> {
         true => Err(ApiError::from(syscall.result)),
     }
 }
-*/
 
 pub fn rename(old_path: &str, new_path: &str) -> Result<(), ApiError> {
     let mut i = 0;
@@ -184,41 +258,5 @@ pub fn rename(old_path: &str, new_path: &str) -> Result<(), ApiError> {
         true => Err(ApiError::from(syscall.result)),
     }
 }
-
-
-//pub static STDIN: UnbufferedFile = UnbufferedFile(FileDesc(0));
-//pub static STDOUT: UnbufferedFile = UnbufferedFile(FileDesc(1));
-//pub static STDERR: UnbufferedFile = UnbufferedFile(FileDesc(2));
-
-pub struct UnbufferedFile(pub FileDesc);
-
-impl UnbufferedFile {
-    pub fn stdout() -> UnbufferedFile {
-        UnbufferedFile(FileDesc(0))
-    }
-}
-
-impl Write for UnbufferedFile {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        write(self.0, s.as_bytes()).unwrap();
-        Ok(())
-    }
-}
-
-#[macro_export]
-macro_rules! print {
-    ($($args:tt)*) => ({
-        use core::fmt::Write;
-        $crate::UnbufferedFile::stdout().write_fmt(format_args!($($args)*)).unwrap();
-    })
-}
-
-#[macro_export]
-macro_rules! println {
-    ($($args:tt)*) => ({
-        use core::fmt::Write;
-        $crate::UnbufferedFile::stdout().write_fmt(format_args!($($args)*)).unwrap();
-        $crate::UnbufferedFile::stdout().write_str("\n").unwrap();
-    })
-}
+*/
 

@@ -88,10 +88,6 @@ pub fn unlink(cwd: Option<Vnode>, path: &str, current_uid: UserID) -> Result<(),
         return Err(KernelError::OperationNotPermitted);
     }
 
-    if is_directory(vnode.clone())? && !is_directory_empty(vnode.clone())? {
-        return Err(KernelError::DirectoryNotEmpty);
-    }
-
     parent.lock().unlink(vnode, filename)?;
     Ok(())
 }

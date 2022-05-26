@@ -104,7 +104,45 @@ impl<T> IntoSyscallResult for *const T {
     }
 }
 
+pub trait FromSyscallResult {
+    fn from_result(input: usize) -> Self;
+}
 
+impl<T> FromSyscallResult for *const T {
+    fn from_result(input: usize) -> Self {
+        input as *const T
+    }
+}
+
+impl FromSyscallResult for () {
+    fn from_result(_input: usize) -> Self {
+        ()
+    }
+}
+
+impl FromSyscallResult for bool {
+    fn from_result(input: usize) -> Self {
+        input != 0
+    }
+}
+
+impl FromSyscallResult for i32 {
+    fn from_result(input: usize) -> Self {
+        input as i32
+    }
+}
+
+impl FromSyscallResult for usize {
+    fn from_result(input: usize) -> Self {
+        input
+    }
+}
+
+impl FromSyscallResult for FileDesc {
+    fn from_result(input: usize) -> Self {
+        FileDesc(input)
+    }
+}
 
 #[macro_export]
 macro_rules! syscall_encode {

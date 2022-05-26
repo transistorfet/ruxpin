@@ -186,7 +186,6 @@ impl Ext2Vnode {
                 position += entry_len;
             }
 
-            previous_position = None;
             znum += 1;
         }
 

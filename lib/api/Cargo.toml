@@ -6,5 +6,6 @@ edition = "2021"
 
 [dependencies]
 ruxpin_syscall = { path = "../../lib/syscall" }
+ruxpin_syscall_proc = { path = "../../lib/syscall_proc" }
 ruxpin_types = { path = "../../lib/types" }
 

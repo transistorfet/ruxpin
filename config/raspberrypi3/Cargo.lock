@@ -25,6 +25,7 @@ name = "ruxpin_api"
 version = "0.1.0"
 dependencies = [
  "ruxpin_syscall",
+ "ruxpin_syscall_proc",
  "ruxpin_types",
 ]
 

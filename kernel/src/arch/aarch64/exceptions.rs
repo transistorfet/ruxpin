@@ -74,7 +74,7 @@ pub extern "C" fn fatal_error(context: &Context, elr: u64, esr: u64, far: u64) -
 }
 
 #[no_mangle]
-pub extern "C" fn fatal_kernel_error(sp: u64, elr: u64, esr: u64, far: u64) -> ! {
+pub extern "C" fn fatal_kernel_error(_sp: u64, elr: u64, esr: u64, far: u64) -> ! {
     printkln!("\nFatal Kernel Error: ESR: {:#010x}, FAR: {:#x}, ELR: {:#x}", esr, far, elr);
     loop {}
 }

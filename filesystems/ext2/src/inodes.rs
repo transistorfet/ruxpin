@@ -59,6 +59,7 @@ pub(super) struct Ext2Vnode {
     pub mounted_vnode: Option<Vnode>,
     pub blocks: [Ext2BlockNumber; EXT2_INODE_BLOCK_ENTRIES],
     pub dirty: bool,
+    pub freed: bool,
 }
 
 unsafe impl Send for Ext2Vnode {}
@@ -89,9 +90,16 @@ impl Ext2Vnode {
     }
 
     pub fn writeback(&mut self) -> Result<(), KernelError> {
-        if self.dirty {
+        if self.dirty && !self.freed {
             self.get_mount().store_inode(&self, self.attrs.inode)?;
         }
+        Ok(())
+    }
+
+    pub fn free_inode(&mut self, inode_num: Ext2InodeNum) -> Result<(), KernelError> {
+        printkln!("ext2: freeing inode {}", inode_num);
+        self.get_mount().superblock.free_inode(inode_num)?;
+        self.freed = true;
         Ok(())
     }
 }
@@ -104,6 +112,7 @@ impl Ext2Vnode {
             mounted_vnode: None,
             blocks: [0; EXT2_INODE_BLOCK_ENTRIES],
             dirty: false,
+            freed: false,
         }
     }
 
@@ -114,6 +123,7 @@ impl Ext2Vnode {
             mounted_vnode: None,
             blocks: [0; EXT2_INODE_BLOCK_ENTRIES],
             dirty: false,
+            freed: false,
         }
     }
 }
@@ -140,12 +150,6 @@ impl Ext2Mount {
         })?;
 
         Ok((inode_num, (*arc_vnode).clone()))
-    }
-
-    pub(super) fn free_inode(&mut self, inode_num: Ext2InodeNum) -> Result<(), KernelError> {
-        printkln!("ext2: freeing inode {}", inode_num);
-        self.superblock.free_inode(inode_num)?;
-        Ok(())
     }
 
     pub(super) fn get_inode(&mut self, inode_num: Ext2InodeNum) -> Result<Vnode, KernelError> {
