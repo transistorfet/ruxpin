@@ -198,6 +198,11 @@ pub fn readdir(file: File) -> Result<Option<DirEntry>, KernelError> {
 }
 
 
+pub fn make_directory(cwd: Option<Vnode>, path: &str, access: FileAccess, current_uid: UserID) -> Result<Vnode, KernelError> {
+    let vnode = create(cwd, path, access.plus(FileAccess::Directory), current_uid)?;
+    Ok(vnode)
+}
+
 pub fn is_directory(vnode: Vnode) -> Result<bool, KernelError> {
     Ok(vnode.try_lock().unwrap().attributes()?.access.is_dir())
 }
@@ -222,6 +227,10 @@ pub(super) fn create(cwd: Option<Vnode>, path: &str, access: FileAccess, current
 
     if !verify_file_access(current_uid, FileAccess::Write, vnode.lock().attributes()?) {
         return Err(KernelError::OperationNotPermitted);
+    }
+
+    if let Ok(_) = vnode.lock().lookup(filename) {
+        return Err(KernelError::FileExists);
     }
 
     // TODO need to add groupid here

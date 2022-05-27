@@ -71,14 +71,14 @@ pub fn process_syscall(syscall: &mut SyscallRequest) {
         SyscallFunction::Unlink => {
             self::file::handle_syscall_unlink(syscall);
         },
+        SyscallFunction::Rename => {
+            self::file::handle_syscall_rename(syscall);
+        },
         SyscallFunction::MkDir => {
             self::file::handle_syscall_mkdir(syscall);
         },
         SyscallFunction::GetCwd => {
             self::file::handle_syscall_getcwd(syscall);
-        },
-        SyscallFunction::Rename => {
-            self::file::handle_syscall_rename(syscall);
         },
         _ => {
             printkln!("syscall: invalid function number: {}", syscall.function as usize);

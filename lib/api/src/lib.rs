@@ -41,14 +41,14 @@ pub fn readdir(file: FileDesc, dirent: &mut DirEntry) -> Result<bool, ApiError> 
 #[syscall_function(Unlink)]
 pub fn unlink(path: &str) -> Result<(), ApiError> {}
 
+#[syscall_function(Rename)]
+pub fn rename(old_path: &str, new_path: &str) -> Result<(), ApiError> {}
+
 #[syscall_function(MkDir)]
 pub fn mkdir(path: &str, access: FileAccess) -> Result<(), ApiError> {}
 
 #[syscall_function(GetCwd)]
 pub fn getcwd(path: &mut [u8]) -> Result<(), ApiError> {}
-
-#[syscall_function(Rename)]
-pub fn rename(old_path: &str, new_path: &str) -> Result<(), ApiError> {}
 
 
 //pub static STDIN: UnbufferedFile = UnbufferedFile(FileDesc(0));

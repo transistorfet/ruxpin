@@ -22,9 +22,9 @@ pub enum SyscallFunction {
     Write,
     ReadDir,
     Unlink,
+    Rename,
     MkDir,
     GetCwd,
-    Rename,
 
     Sbrk,
 }

@@ -65,22 +65,23 @@ pub fn syscall_unlink(path: &str) -> Result<(), KernelError> {
 }
 
 #[syscall_handler]
-pub fn syscall_mkdir(path: &str, access: FileAccess) -> Result<(), KernelError> {
+pub fn syscall_rename(old_path: &str, new_path: &str) -> Result<(), KernelError> {
+    let (cwd, current_uid) = get_current_cwd_and_uid();
+    vfs::rename(cwd, old_path, new_path, current_uid)?;
+    Ok(())
+}
 
-    Err(KernelError::OperationNotPermitted)
+#[syscall_handler]
+pub fn syscall_mkdir(path: &str, access: FileAccess) -> Result<(), KernelError> {
+    let (cwd, current_uid) = get_current_cwd_and_uid();
+    vfs::make_directory(cwd, path, access, current_uid)?;
+    Ok(())
 }
 
 #[syscall_handler]
 pub fn syscall_getcwd(path: &mut [u8]) -> Result<(), KernelError> {
 
     Err(KernelError::OperationNotPermitted)
-}
-
-#[syscall_handler]
-pub fn syscall_rename(old_path: &str, new_path: &str) -> Result<(), KernelError> {
-    let (cwd, current_uid) = get_current_cwd_and_uid();
-    vfs::rename(cwd, old_path, new_path, current_uid)?;
-    Ok(())
 }
 
 fn get_current_cwd_and_uid() -> (Option<Vnode>, UserID) {

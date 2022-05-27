@@ -122,6 +122,11 @@ impl VnodeOperations for Ext2Vnode {
     }
 
     fn rename(&mut self, old_name: &str, new_parent: Vnode, new_name: &str) -> Result<(), KernelError> {
+
+        // TODO find dir entry of old parent
+        //      if entry_len is less than new name, reuse, otherwise find new one
+        //      write inode to new entry, delete old entry
+
         Err(KernelError::OperationNotPermitted)
     }
 

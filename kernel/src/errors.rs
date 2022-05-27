@@ -39,6 +39,7 @@ pub enum KernelError {
     ReadOnlyFilesystem,
     AccessDenied,
     DirectoryNotEmpty,
+    FileExists,
 
     // Task Errors
     NoSuchTask,
@@ -85,6 +86,7 @@ impl From<KernelError> for ApiError {
             KernelError::ReadOnlyFilesystem             => ApiError::ReadOnlyFilesystem,
             KernelError::AccessDenied                   => ApiError::AccessDenied,
             KernelError::DirectoryNotEmpty              => ApiError::DirectoryNotEmpty,
+            KernelError::FileExists                     => ApiError::FileExists,
 
             KernelError::NoSuchTask                     => ApiError::NoSuchTask,
             KernelError::NotExecutable                  => ApiError::NotExecutable,

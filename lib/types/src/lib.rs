@@ -255,13 +255,14 @@ pub enum ApiError {
     ReadOnlyFilesystem          = 27,
     AccessDenied                = 28,
     DirectoryNotEmpty           = 29,
+    FileExists                  = 30,
 
-    NoSuchTask                  = 30,
-    NotExecutable               = 31,
-    InvalidArgument             = 32,
-    InvalidSegmentType          = 33,
-    BadSystemCall               = 34,
-    NotExited                   = 35,
+    NoSuchTask                  = 31,
+    NotExecutable               = 32,
+    InvalidArgument             = 33,
+    InvalidSegmentType          = 34,
+    BadSystemCall               = 35,
+    NotExited                   = 36,
 
     UnknownError                = 9999,
 }
@@ -300,13 +301,14 @@ impl From<usize> for ApiError {
             27 => ApiError::ReadOnlyFilesystem,
             28 => ApiError::AccessDenied,
             29 => ApiError::DirectoryNotEmpty,
+            30 => ApiError::FileExists,
 
-            30 => ApiError::NoSuchTask,
-            31 => ApiError::NotExecutable,
-            32 => ApiError::InvalidArgument,
-            33 => ApiError::InvalidSegmentType,
-            34 => ApiError::BadSystemCall,
-            35 => ApiError::NotExited,
+            31 => ApiError::NoSuchTask,
+            32 => ApiError::NotExecutable,
+            33 => ApiError::InvalidArgument,
+            34 => ApiError::InvalidSegmentType,
+            35 => ApiError::BadSystemCall,
+            36 => ApiError::NotExited,
 
             _ => ApiError::UnknownError,
         }
