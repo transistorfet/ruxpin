@@ -204,12 +204,12 @@ pub fn make_directory(cwd: Option<Vnode>, path: &str, access: FileAccess, curren
 }
 
 pub fn is_directory(vnode: Vnode) -> Result<bool, KernelError> {
-    Ok(vnode.try_lock().unwrap().attributes()?.access.is_dir())
+    Ok(vnode.try_lock()?.attributes()?.access.is_dir())
 }
 
 pub fn is_directory_empty(vnode: Vnode) -> Result<bool, KernelError> {
     let mut file = FilePointer::new(vnode.clone());
-    let mut locked_vnode = vnode.try_lock().unwrap();
+    let mut locked_vnode = vnode.try_lock()?;
     locked_vnode.open(&mut file, OpenFlags::ReadOnly)?;
 
     while let Some(dirent) = locked_vnode.readdir(&mut file)? {

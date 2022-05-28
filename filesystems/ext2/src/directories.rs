@@ -68,7 +68,7 @@ impl Ext2Vnode {
         Ok(Some(entry_len))
     }
 
-    pub(super) fn add_directory_to_vnode(&mut self, access: FileAccess, filename: &str, inode: Ext2InodeNum) -> Result<(), KernelError> {
+    pub(super) fn add_directory_to_vnode(&mut self, filename: &str, inode: Ext2InodeNum, access: FileAccess) -> Result<(), KernelError> {
         let device_id = self.get_device_id();
         let name_len = filename.len();
         let min_entry_len = align_up(name_len + 8, 4);

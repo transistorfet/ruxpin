@@ -76,7 +76,7 @@ impl VnodeOperations for Ext2Vnode {
         }
 
         let (inode_num, vnode) = self.get_mount().alloc_inode(self.attrs.inode, access, uid, gid)?;
-        self.add_directory_to_vnode(access, filename, inode_num)?;
+        self.add_directory_to_vnode(filename, inode_num, access)?;
 
         Ok(vnode)
     }
@@ -102,8 +102,11 @@ impl VnodeOperations for Ext2Vnode {
         Err(KernelError::FileNotFound)
     }
 
-    //fn link(&mut self, _newparent: Vnode, _filename: &str) -> Result<Vnode, KernelError> {
-    //    Err(KernelError::OperationNotPermitted)
+    //fn link(&mut self, newparent: Vnode, filename: &str) -> Result<(), KernelError> {
+    //    newparent.add_directory_to_vnode(filename, self.attrs.inode, self.attrs.access)?;
+    //    self.attrs.nlinks += 1;
+    //    self.dirty = true;
+    //    Ok(())
     //}
 
     fn unlink(&mut self, target: Vnode, filename: &str) -> Result<(), KernelError> {

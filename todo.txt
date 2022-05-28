@@ -1,26 +1,24 @@
 
-
-* there's a problem with `mkdir test/pants`, doesn't create the entry for pants for some reason
 * there is currently no checking for illegal characters in each path component
+* you were also going to implement rename(), and getcwd()
+* implement link
 
-* you were also going to implement rename(), mkdir(), and getcwd()
-* fill in link/unlink/rename, but can you also...
-* make methods on File for fs operations (including unlink/rename?), so you don't have to always use vfs::read(file)
+* add user process abort
 * add a lock error and return it up if the lock times out (rather than kernel panicking)
-
+* fix the idle process so it's not arch specific
 
 * when a segment is copied, it only copies the pages loaded into memory at that time, and puts 0 for all other pages, but that means when
   those pages are loaded, they will be duplicated.  The solution is to have a cache for each file/exec that is being used which holds a
   reference to each page, and once it is dropped, those pages will be freed, and when a page is loaded, the cache is searched first.  I'm
   not yet sure how I'd like to implement this, and I still haven't exactly figured out how other OSes do it
+* fix the sbrk growing/shrinking
+* need to change how segments are shared, and how pages are shared (need a page cache)
 
 
 * think about multicore and what that would mean for everything
 
-* fix the idle process so it's not arch specific
-* need to change how segments are shared, and how pages are shared (need a page cache)
-* fix the sbrk growing/shrinking
 * fix the blocking/unblocking code (including exits) to use multiple queues and an event system of some sorts to improve the performance of checks
+* make methods on File for fs operations (including unlink/rename?), so you don't have to always use vfs::read(file)
 
 * should binaries move to api to better reflect that it's integrating code that uses multiple subsystems, rather than being an isolated subsystem
   Or should you even move it to its own crate, so that it can be selectively compiled in? but it would still need to be used by the api... can the
@@ -31,11 +29,11 @@
 
 WHAT IFS:
 
+* how could I make it more event-oriented rather than traditional unixy
+
 * what if you added json for procfs's data, to make it easier to parse?  What if you made json and/or unixstd file formats a compile
   time feature flag?  What if procfs (and all the others) where their own crates with their own feature flags, that are tied together
   by a toplevel config crate (ie. the breakup into crates)
-
-* how could I make it more event-oriented rather than traditional unixy
 
 * how would you isolate the unix-specific aspects of the api such that you could implement a light unix-to-ruxpin
   shim on the user process side (or even on the kernel side), so that the ruxpin-native api is not constrained by

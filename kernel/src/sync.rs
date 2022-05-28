@@ -4,6 +4,8 @@ use core::hint::spin_loop;
 use core::ops::{Deref, DerefMut};
 use core::sync::atomic::{AtomicBool, Ordering};
 
+use crate::errors::KernelError;
+
 
 pub struct SpinlockGuard<'a, T: ?Sized + 'a> {
     spinlock: &'a Spinlock<T>,
@@ -40,17 +42,17 @@ impl<T: ?Sized> Spinlock<T> {
         SpinlockGuard { spinlock: self }
     }
 
-    pub fn try_lock(&self) -> Option<SpinlockGuard<'_, T>> {
+    pub fn try_lock(&self) -> Result<SpinlockGuard<'_, T>, KernelError> {
         let mut count = 0;
         while self.lock.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed).is_err() {
             // TODO delay
             spin_loop();
             count += 1;
             if count == 1_000_000_000 {
-                return None;
+                return Err(KernelError::LockTimeout);
             }
         }
-        Some(SpinlockGuard { spinlock: self })
+        Ok(SpinlockGuard { spinlock: self })
     }
 }
 

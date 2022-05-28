@@ -53,9 +53,9 @@ impl TaskManager {
     }
 
     pub fn get_task(&mut self, tid: Tid) -> Option<Task> {
-        for proc in self.tasks.iter() {
-            if proc.try_lock().unwrap().task_id == tid {
-                return Some(proc.clone());
+        for task in self.tasks.iter() {
+            if task.try_lock().unwrap().task_id == tid {
+                return Some(task.clone());
             }
         }
         None
@@ -101,15 +101,15 @@ impl TaskManager {
         self.set_current_context();
     }
 
-    fn suspend(&mut self, proc: Task) {
+    fn suspend(&mut self, task: Task) {
         // also take an "event" arg
         // TODO actually you need an event to block on, and you could just put it in the process, but you... I supposed... could just
         // allocate the list nodes as needed and not have a vec (would mean a bunch of boxes, but that's ok... but also kinda implies the alloc::linked_list impl
 
-        if proc.try_lock().unwrap().state == TaskState::Running {
-            proc.try_lock().unwrap().state = TaskState::Blocked;
-            self.scheduled.remove_node(proc.clone());
-            self.blocked.insert_head(proc.clone());
+        if task.try_lock().unwrap().state == TaskState::Running {
+            task.try_lock().unwrap().state = TaskState::Blocked;
+            self.scheduled.remove_node(task.clone());
+            self.blocked.insert_head(task.clone());
         }
 
         self.set_current_context();
@@ -130,34 +130,37 @@ impl TaskManager {
         self.set_current_context();
     }
 
-    fn detach(&mut self, proc: Task) {
-        if proc.try_lock().unwrap().state != TaskState::Exited {
-            proc.try_lock().unwrap().state = TaskState::Exited;
-            self.scheduled.remove_node(proc.clone());
+    fn detach(&mut self, task: Task) {
+        if task.try_lock().unwrap().state != TaskState::Exited {
+            task.try_lock().unwrap().state = TaskState::Exited;
+            self.scheduled.remove_node(task.clone());
         }
 
         self.set_current_context();
     }
 
-    fn exit_current(&mut self, status: isize) {
-        let current = self.get_current();
-        crate::printkln!("Exiting process {}", current.try_lock().unwrap().process_id);
+    fn abort(&mut self, task: Task) {
+        self.exit(task, -1);
+    }
 
-        self.detach(current.clone());
-        current.try_lock().unwrap().exit_and_free_resources(status);
+    fn exit(&mut self, task: Task, status: isize) {
+        crate::printkln!("Exiting process {}", task.try_lock().unwrap().process_id);
+
+        self.detach(task.clone());
+        task.try_lock().unwrap().exit_and_free_resources(status);
         self.restart_blocked_by_syscall(SyscallFunction::WaitPid);
     }
 
     fn find_exited(&mut self, pid: Option<Pid>, parent: Option<Pid>, process_group: Option<Pid>) -> Option<Task> {
-        for process in self.tasks.iter() {
-            let locked_proc = process.try_lock().unwrap();
+        for task in self.tasks.iter() {
+            let locked_task = task.try_lock().unwrap();
             if
-                locked_proc.exit_status.is_some()
-                && (pid.is_none() || locked_proc.process_id == pid.unwrap())
-                && (parent.is_none() || locked_proc.parent_id == parent.unwrap())
-                && (process_group.is_none() || locked_proc.process_group_id == process_group.unwrap())
+                locked_task.exit_status.is_some()
+                && (pid.is_none() || locked_task.process_id == pid.unwrap())
+                && (parent.is_none() || locked_task.parent_id == parent.unwrap())
+                && (process_group.is_none() || locked_task.process_group_id == process_group.unwrap())
             {
-                return Some(process.clone());
+                return Some(task.clone());
             }
         }
 
@@ -165,9 +168,9 @@ impl TaskManager {
     }
 
     fn clean_up(&mut self, pid: Pid) -> Result<(), KernelError> {
-        for (i, process) in self.tasks.iter().enumerate() {
-            if process.try_lock().unwrap().process_id == pid {
-                if process.try_lock().unwrap().state != TaskState::Exited {
+        for (i, task) in self.tasks.iter().enumerate() {
+            if task.try_lock().unwrap().process_id == pid {
+                if task.try_lock().unwrap().state != TaskState::Exited {
                     return Err(KernelError::NotExited);
                 }
                 self.tasks.remove(i);
@@ -209,16 +212,21 @@ pub fn get_current() -> Task {
 
 pub fn clone_current(args: TaskCloneArgs) -> Task {
     let mut manager = TASK_MANAGER.try_lock().unwrap();
-    let current_proc = manager.get_current();
-    let new_proc = manager.create_task(Some(current_proc.clone()));
+    let current_task = manager.get_current();
+    let new_proc = manager.create_task(Some(current_task.clone()));
 
-    new_proc.try_lock().unwrap().clone_resources(&*current_proc.try_lock().unwrap(), args);
+    new_proc.try_lock().unwrap().clone_resources(&*current_task.try_lock().unwrap(), args);
 
     new_proc
 }
 
+pub fn abort(task: Task) {
+    TASK_MANAGER.try_lock().unwrap().abort(task)
+}
+
 pub fn exit_current(status: isize) {
-    TASK_MANAGER.try_lock().unwrap().exit_current(status)
+    let current_task = get_current();
+    TASK_MANAGER.try_lock().unwrap().exit(current_task, status)
 }
 
 pub fn find_exited(pid: Option<Pid>, parent: Option<Pid>, process_group: Option<Pid>) -> Option<Task> {
@@ -231,10 +239,10 @@ pub fn schedule() {
 }
 
 pub(crate) fn check_restart_syscall() {
-    let current_proc = get_current();
-    if current_proc.lock().restart_syscall {
-        current_proc.lock().restart_syscall = false;
-        let mut syscall = current_proc.lock().syscall.clone();
+    let current_task = get_current();
+    if current_task.lock().restart_syscall {
+        current_task.lock().restart_syscall = false;
+        let mut syscall = current_task.lock().syscall.clone();
         process_syscall(&mut syscall);
     }
 }

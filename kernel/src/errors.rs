@@ -14,6 +14,7 @@ pub enum KernelError {
     OutOfMemory,
     NoSegmentFound,
     MemoryPermissionDenied,
+    LockTimeout,
 
     // Device Errors
     NoSuchDevice,
@@ -63,6 +64,7 @@ impl From<KernelError> for ApiError {
             KernelError::OutOfMemory                    => ApiError::OutOfMemory,
             KernelError::NoSegmentFound                 => ApiError::NoSegmentFound,
             KernelError::MemoryPermissionDenied         => ApiError::MemoryPermissionDenied,
+            KernelError::LockTimeout                    => ApiError::LockTimeout,
 
             KernelError::NoSuchDevice                   => ApiError::NoSuchDevice,
             KernelError::OperationNotPermitted          => ApiError::OperationNotPermitted,

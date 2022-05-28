@@ -4,6 +4,7 @@ use core::arch::asm;
 use crate::irqs;
 use crate::printkln;
 use crate::printk::printk_dump;
+use crate::proc::scheduler;
 
 use super::context::Context;
 use super::types::VirtualAddress;
@@ -146,12 +147,12 @@ extern "C" fn handle_irq(_context: &Context, _elr: u64, _esr: u64, _far: u64, _s
 }
 
 fn page_fault_handler(far: u64) {
-    let current = crate::proc::scheduler::get_current();
-    current.try_lock().unwrap().space.try_lock().unwrap().alloc_page_at(VirtualAddress::from(far)).unwrap();
+    let current = scheduler::get_current();
+    current.try_lock().unwrap().space.try_lock().unwrap().alloc_page_at(VirtualAddress::from(far)).unwrap_or_else(|_| scheduler::abort(scheduler::get_current()));
 }
 
 fn page_access_handler(far: u64) {
-    let current = crate::proc::scheduler::get_current();
-    current.try_lock().unwrap().space.try_lock().unwrap().copy_on_write_at(VirtualAddress::from(far)).unwrap();
+    let current = scheduler::get_current();
+    current.try_lock().unwrap().space.try_lock().unwrap().copy_on_write_at(VirtualAddress::from(far)).unwrap_or_else(|_| scheduler::abort(scheduler::get_current()));
 }
 

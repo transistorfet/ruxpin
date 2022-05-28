@@ -89,7 +89,7 @@ impl VirtualAddressSpace {
     pub fn adjust_stack_break(&mut self, increment: usize) -> Result<VirtualAddress, KernelError> {
         let inc_aligned = align_up(increment, mmu::page_size());
         let segment = self.data.clone().unwrap();
-        let mut locked_seg = segment.try_lock().unwrap();
+        let mut locked_seg = segment.try_lock()?;
         let previous_end = locked_seg.end;
         locked_seg.end = locked_seg.end.add(inc_aligned);
         self.map_on_demand(locked_seg.permissions, previous_end, inc_aligned);
@@ -97,33 +97,33 @@ impl VirtualAddressSpace {
     }
 
 
-    pub fn alloc_mapped(&mut self, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) -> PhysicalAddress {
+    pub fn alloc_mapped(&mut self, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) -> Result<PhysicalAddress, KernelError> {
         let pages = pages::get_page_area();
 
-        self.table.map_paged_range(MemoryType::Allocated, permissions, vaddr, len, pages).unwrap();
+        self.table.map_paged_range(MemoryType::Allocated, permissions, vaddr, len, pages)?;
 
-        self.table.translate_addr(vaddr).unwrap()
+        self.table.translate_addr(vaddr)
     }
 
-    pub fn map_on_demand(&mut self, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) {
+    pub fn map_on_demand(&mut self, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) -> Result<(), KernelError> {
         let pages = pages::get_page_area();
-        self.table.map_paged_range(MemoryType::Unallocated, permissions, vaddr, len, pages).unwrap();
+        self.table.map_paged_range(MemoryType::Unallocated, permissions, vaddr, len, pages)
     }
 
-    pub fn copy_segment_map(&mut self, parent_table: &mut TranslationTable, segment: &Segment) {
+    pub fn copy_segment_map(&mut self, parent_table: &mut TranslationTable, segment: &Segment) -> Result<(), KernelError> {
         let pages = pages::get_page_area();
 
         if segment.permissions == MemoryPermissions::ReadWrite {
-            self.table.remap_copy_on_write(parent_table, segment.start, segment.page_aligned_len(), pages).unwrap();
+            self.table.remap_copy_on_write(parent_table, segment.start, segment.page_aligned_len(), pages)
         } else  {
-            self.table.copy_refs_in_range(parent_table, segment.permissions, segment.start, segment.page_aligned_len(), pages).unwrap();
+            self.table.copy_refs_in_range(parent_table, segment.permissions, segment.start, segment.page_aligned_len(), pages)
         }
     }
 
-    pub fn unmap_range(&mut self, start: VirtualAddress, len: usize) {
+    pub fn unmap_range(&mut self, start: VirtualAddress, len: usize) -> Result<(), KernelError> {
         let pages = pages::get_page_area();
 
-        self.table.unmap_range(start, len, pages).unwrap();
+        self.table.unmap_range(start, len, pages)
     }
 
     pub fn translate_addr(&mut self, vaddr: VirtualAddress) -> Result<PhysicalAddress, KernelError> {
@@ -136,7 +136,7 @@ impl VirtualAddressSpace {
 
     pub(crate) fn alloc_page_at(&mut self, far: VirtualAddress) -> Result<(), KernelError> {
         for segment in &self.segments {
-            let locked_seg = segment.try_lock().unwrap();
+            let locked_seg = segment.try_lock()?;
             if locked_seg.match_range(far) {
                 let pages = pages::get_page_area();
 

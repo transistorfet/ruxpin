@@ -20,7 +20,7 @@ pub fn syscall_exit(status: isize) -> Result<(), KernelError> {
 pub fn syscall_fork() -> Result<Pid, KernelError> {
     let args = TaskCloneArgs::new();
     let new_proc = clone_current(args);
-    let child_pid = new_proc.try_lock().unwrap().process_id;
+    let child_pid = new_proc.try_lock()?.process_id;
     Ok(child_pid)
 }
 
@@ -36,7 +36,7 @@ pub fn syscall_exec(path: &str, argv: &[&str], envp: &[&str]) -> Result<(), Kern
     let mut saved_path: StrArray<100> = StrArray::new();
     saved_path.copy_into(path);
 
-    proc.try_lock().unwrap().free_resources();
+    proc.try_lock()?.free_resources();
 
     let result = setup_process(proc, saved_path.as_str(), &parsed_argv, &parsed_envp);
     match result {
@@ -50,7 +50,7 @@ pub fn syscall_exec(path: &str, argv: &[&str], envp: &[&str]) -> Result<(), Kern
 
 fn setup_process(proc: Task, path: &str, argv: &StandardArrayOfStrings, envp: &StandardArrayOfStrings) -> Result<(), KernelError> {
     // This function can return an error safely
-    proc.try_lock().unwrap().files.try_lock().unwrap().open(None, "/dev/console0", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0)?;
+    proc.try_lock()?.files.try_lock()?.open(None, "/dev/console0", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0)?;
 
     loader::load_binary(proc.clone(), path, argv, envp)?;
 
@@ -66,9 +66,9 @@ pub fn syscall_waitpid(pid: Pid, status: &mut isize, _options: usize) -> Result<
     let proc = find_exited(search_pid, search_parent, None);
 
     if let Some(proc) = proc {
-        let pid = proc.try_lock().unwrap().process_id;
+        let pid = proc.try_lock()?.process_id;
         if status as *mut isize as usize != 0 {
-            *status = proc.try_lock().unwrap().exit_status.unwrap();
+            *status = proc.try_lock()?.exit_status.unwrap();
         }
         clean_up(pid)?;
         Ok(pid)
@@ -81,7 +81,7 @@ pub fn syscall_waitpid(pid: Pid, status: &mut isize, _options: usize) -> Result<
 #[syscall_handler]
 pub fn syscall_sbrk(increment: usize) -> Result<*const u8, KernelError> {
     let proc = get_current();
-    let old_break = proc.try_lock().unwrap().space.try_lock().unwrap().adjust_stack_break(increment)?;
+    let old_break = proc.try_lock()?.space.try_lock()?.adjust_stack_break(increment)?;
 
     Ok(usize::from(old_break) as *const u8)
 }

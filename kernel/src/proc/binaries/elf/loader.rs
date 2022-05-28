@@ -21,10 +21,10 @@ use super::defs::*;
 
 
 pub fn load_binary(proc: Task, path: &str, argv: &StandardArrayOfStrings, envp: &StandardArrayOfStrings) -> Result<(), KernelError> {
-    let mut locked_proc = proc.try_lock().unwrap();
+    let mut locked_proc = proc.try_lock()?;
     locked_proc.cmd = path.to_string();
 
-    vfs::access(locked_proc.files.try_lock().unwrap().get_cwd(), path, FileAccess::Exec.plus(FileAccess::Regular), locked_proc.current_uid)?;
+    vfs::access(locked_proc.files.try_lock()?.get_cwd(), path, FileAccess::Exec.plus(FileAccess::Regular), locked_proc.current_uid)?;
 
     let file = vfs::open(None, path, OpenFlags::ReadOnly, FileAccess::DefaultFile, locked_proc.current_uid)?;
 
@@ -64,10 +64,10 @@ pub fn load_binary(proc: Task, path: &str, argv: &StandardArrayOfStrings, envp: 
 
             let permissions = flags_to_permissions(segment.p_flags)?;
             let stype = if permissions == MemoryPermissions::ReadWrite { SegmentType::Data } else { SegmentType::Text };
-            locked_proc.space.try_lock().unwrap().add_file_backed_segment(stype, permissions, file.clone(), segment.p_offset as usize, segment.p_filesz as usize, vaddr, offset, segment.p_memsz as usize);
+            locked_proc.space.try_lock()?.add_file_backed_segment(stype, permissions, file.clone(), segment.p_offset as usize, segment.p_filesz as usize, vaddr, offset, segment.p_memsz as usize);
 
             // TODO this is a hack to forcefully load the page because the page fault in kernel space doesn't work
-            //locked_proc.space.try_lock().unwrap().alloc_page_at(vaddr)?;
+            //locked_proc.space.try_lock()?.alloc_page_at(vaddr)?;
 
         } else if segment.p_type == PT_GNU_RELRO {
             //char **data = proc->map.segments[M_TEXT].base + prog_headers[i].p_vaddr;
@@ -116,7 +116,7 @@ fn set_up_stack(locked_proc: &mut TaskRecord, entrypoint: VirtualAddress, argv: 
     let stack_size = page_size * page_size;
     let stack_start = 0x1_0000_0000 as u64;
 
-    locked_proc.space.try_lock().unwrap().add_memory_segment(SegmentType::Stack, MemoryPermissions::ReadWrite, VirtualAddress::from(stack_start - stack_size as u64), stack_size);
+    locked_proc.space.try_lock()?.add_memory_segment(SegmentType::Stack, MemoryPermissions::ReadWrite, VirtualAddress::from(stack_start - stack_size as u64), stack_size);
 
     let argv_size = argv.calculate_size();
     let envp_size = envp.calculate_size();
@@ -127,8 +127,8 @@ fn set_up_stack(locked_proc: &mut TaskRecord, entrypoint: VirtualAddress, argv: 
     let argv_base = VirtualAddress::from(stack_start - page_size as u64 + argv_start as u64);
     let envp_base = VirtualAddress::from(stack_start - page_size as u64 + envp_start as u64);
 
-    locked_proc.space.try_lock().unwrap().alloc_page_at(VirtualAddress::from(stack_start - page_size as u64))?;
-    let page_addr = locked_proc.space.try_lock().unwrap().translate_addr(VirtualAddress::from(stack_start - page_size as u64))?;
+    locked_proc.space.try_lock()?.alloc_page_at(VirtualAddress::from(stack_start - page_size as u64))?;
+    let page_addr = locked_proc.space.try_lock()?.translate_addr(VirtualAddress::from(stack_start - page_size as u64))?;
     let page_data: &mut [u8] = unsafe {
         core::slice::from_raw_parts_mut(page_addr.to_kernel_addr().as_mut() as *mut u8, page_size)
     };
@@ -138,7 +138,7 @@ fn set_up_stack(locked_proc: &mut TaskRecord, entrypoint: VirtualAddress, argv: 
 
     let starting_sp = VirtualAddress::from(stack_start - argv_size as u64 - envp_size as u64);
 
-    let ttrb = locked_proc.space.try_lock().unwrap().get_ttbr();
+    let ttrb = locked_proc.space.try_lock()?.get_ttbr();
     locked_proc.context.init(entrypoint, starting_sp, ttrb);
     locked_proc.context.write_args(argv.offset_len(), argv_base, envp_base);
 
