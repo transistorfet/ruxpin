@@ -3,10 +3,6 @@
 * you were also going to implement rename(), and getcwd()
 * implement link
 
-* add user process abort
-* add a lock error and return it up if the lock times out (rather than kernel panicking)
-* fix the idle process so it's not arch specific
-
 * when a segment is copied, it only copies the pages loaded into memory at that time, and puts 0 for all other pages, but that means when
   those pages are loaded, they will be duplicated.  The solution is to have a cache for each file/exec that is being used which holds a
   reference to each page, and once it is dropped, those pages will be freed, and when a page is loaded, the cache is searched first.  I'm

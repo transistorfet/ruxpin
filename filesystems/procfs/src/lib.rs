@@ -90,7 +90,10 @@ impl ProcFsRootVnode {
 
 impl VnodeOperations for ProcFsRootVnode {
     fn lookup(&mut self, filename: &str) -> Result<Vnode, KernelError> {
-        let process_id = filename.parse::<Pid>().map_err(|_| KernelError::FileNotFound)?;
+        let process_id = match filename.parse::<Pid>() {
+            Ok(process_id) if scheduler::get_process(process_id).is_some() => Ok(process_id),
+            _ => Err(KernelError::FileNotFound),
+        }?;
         Ok(Arc::new(Spinlock::new(GenericStaticDirectoryVnode::new(FileAccess::DefaultReadOnlyFile, 0, 0, PROCESS_ENTRIES, process_id))))
     }
 

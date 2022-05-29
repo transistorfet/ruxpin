@@ -65,7 +65,20 @@ pub fn get_page_slice(page: PhysicalAddress) -> &'static mut [u8] {
 }
 
 impl TranslationTable {
-    pub fn new_user_table(pages: &mut PagePool) -> Self {
+    pub fn initial_kernel_table() -> Self {
+        use core::arch::asm;
+
+        let mut ttbr;
+        unsafe {
+            asm!(
+                "mrs  {}, TTBR1_EL1",
+                out(reg) ttbr,
+            );
+        }
+        Self(ttbr)
+    }
+
+    pub fn new_table(pages: &mut PagePool) -> Self {
         let tl0 = allocate_table(pages);
         Self(u64::from(tl0))
     }

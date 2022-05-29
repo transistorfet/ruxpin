@@ -5,7 +5,7 @@ use core::arch::asm;
 
 use ruxpin_syscall::{SyscallRequest, SyscallFunction};
 
-use super::types::VirtualAddress;
+use super::types::{PhysicalAddress, VirtualAddress, KernelVirtualAddress};
 use super::mmu::TranslationTable;
 
 extern "C" {
@@ -62,6 +62,14 @@ impl Context {
         unsafe {
             _create_context(self, u64::from(sp), u64::from(entry));
         }
+    }
+
+    pub fn init_kernel_context(&mut self, entry: fn(), sp: VirtualAddress, ttbr: u64) {
+        self.set_ttbr(ttbr);
+        unsafe {
+            _create_context(self, u64::from(sp), entry as u64);
+        }
+        self.spsr = 0x0;
     }
 
     pub fn set_ttbr(&mut self, ttbr: u64) {

@@ -1,5 +1,6 @@
 
 use alloc::string::String;
+use alloc::string::ToString;
 
 use ruxpin_syscall::SyscallRequest;
 use ruxpin_types::{Tid, Pid, UserID};
@@ -68,6 +69,30 @@ pub struct TaskRecord {
 }
 
 impl TaskRecord {
+    pub(super) fn initial_kernel_task(cmd: &str) -> Self {
+        let task_id = next_task_id();
+
+        Self {
+            task_id,
+            process_id: task_id,
+
+            parent_id: task_id,
+            process_group_id: task_id,
+            session_id: task_id,
+            cmd: cmd.to_string(),
+            current_uid: 0,
+
+            space: VirtualAddressSpace::get_kernel_space(),
+            files: FileDescriptors::new_sharable(),
+
+            exit_status: None,
+            state: TaskState::Running,
+            syscall: Default::default(),
+            restart_syscall: false,
+            context: Default::default(),
+        }
+    }
+
     pub(super) fn new(parent: Option<Task>) -> Self {
         let task_id = next_task_id();
 
@@ -90,7 +115,7 @@ impl TaskRecord {
             cmd: String::new(),
             current_uid: 0,
 
-            space: VirtualAddressSpace::new_sharable_user_space(),
+            space: VirtualAddressSpace::new_sharable(),
             files: FileDescriptors::new_sharable(),
 
             exit_status: None,
@@ -123,5 +148,4 @@ impl TaskRecord {
         self.context.write_result(Ok(0));
     }
 }
-
 

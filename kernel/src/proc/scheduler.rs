@@ -26,15 +26,17 @@ struct TaskManager {
 static TASK_MANAGER: Spinlock<TaskManager> = Spinlock::new(TaskManager::new());
 
 pub fn initialize() -> Result<(), KernelError> {
-    //let idle = TASK_MANAGER.lock().create_task();
-    //load_code(idle.cast(), TEST_PROC1);
-
-    create_test_process();
+    TASK_MANAGER.lock().create_kernel_task("idle", idle_task)?;
 
     // NOTE this ensures the context is set before we start multitasking
     TASK_MANAGER.lock().schedule();
     Ok(())
 }
+
+fn idle_task() {
+    loop {}
+}
+
 
 impl TaskManager {
     const fn new() -> Self {
@@ -51,6 +53,18 @@ impl TaskManager {
         self.scheduled.insert_tail(task.clone());
         task
     }
+
+    fn create_kernel_task(&mut self, name: &str, entry: fn()) -> Result<(), KernelError> {
+        let task = QueueNode::new(TaskRecord::initial_kernel_task(name));
+        self.tasks.push(task.clone());
+        self.scheduled.insert_tail(task.clone());
+
+        let mut locked_task = task.try_lock()?;
+        let ttbr = locked_task.space.try_lock()?.get_ttbr();
+        locked_task.context.init_kernel_context(entry, VirtualAddress::from(0), ttbr);
+        Ok(())
+    }
+
 
     pub fn get_task(&mut self, tid: Tid) -> Option<Task> {
         for task in self.tasks.iter() {
@@ -253,45 +267,5 @@ pub(crate) fn suspend(proc: Task) {
 
 pub(crate) fn restart_blocked(function: SyscallFunction) {
     TASK_MANAGER.try_lock().unwrap().restart_blocked_by_syscall(function);
-}
-
-
-// TODO this is aarch64 specific and will eventually be removed
-
-const TEST_PROC1: &[u32] = &[0xd503205f, 0x17ffffff];
-//const TEST_PROC1: &[u32] = &[0xd40000e1, 0xd503205f, 0x17ffffff];
-//const TEST_PROC2: &[u32] = &[0xd10043ff, 0xf90003e0, 0xf90007e1, 0x14000001, 0xd4000021, 0x17ffffff];
-
-pub unsafe fn load_code(proc: Task, instructions: &[u32]) {
-    let code: *mut u32 = proc.try_lock().unwrap().space.try_lock().unwrap().translate_addr(VirtualAddress::from(0x77777000)).unwrap().to_kernel_addr().as_mut();
-    for i in 0..instructions.len() {
-        *code.add(i) = instructions[i];
-    }
-}
-
-fn create_test_process() {
-    unsafe {
-        let proc = create_task(None);
-        {
-            let mut locked_proc = proc.try_lock().unwrap();
-
-            let ttrb = {
-                let mut space = locked_proc.space.try_lock().unwrap();
-
-                // Allocate text segment
-                space.add_memory_segment_allocated(SegmentType::Text, MemoryPermissions::ReadExecute, VirtualAddress::from(0x77777000), 4096);
-
-                // Allocate stack segment
-                space.add_memory_segment(SegmentType::Stack, MemoryPermissions::ReadWrite, VirtualAddress::from(0xFF000000), 4096 * 4096);
-
-                space.get_ttbr()
-            };
-            locked_proc.context.init(VirtualAddress::from(0x77777000), VirtualAddress::from(0x1_0000_0000), ttrb);
-        }
-        load_code(proc, TEST_PROC1);
-
-        //let ptr = TASK_MANAGER.lock().create_test_process();
-        //load_code(ptr, TEST_PROC2);
-    }
 }
 

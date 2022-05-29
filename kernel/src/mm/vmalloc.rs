@@ -15,9 +15,21 @@ use crate::arch::types::{VirtualAddress, PhysicalAddress};
 
 const MAX_SEGMENTS: usize = 6;
 
+static mut KERNEL_ADDRESS_SPACE: Option<SharableVirtualAddressSpace> = None;
+
 
 pub fn init_virtual_memory(start: PhysicalAddress, end: PhysicalAddress) {
     pages::init_pages_area(start, end);
+
+    let space = VirtualAddressSpace {
+        table: TranslationTable::initial_kernel_table(),
+        segments: Vec::new(),
+        data: None,
+    };
+
+    unsafe {
+        KERNEL_ADDRESS_SPACE = Some(Arc::new(Spinlock::new(space)));
+    }
 }
 
 pub type SharableVirtualAddressSpace = Arc<Spinlock<VirtualAddressSpace>>;
@@ -29,9 +41,15 @@ pub struct VirtualAddressSpace {
 }
 
 impl VirtualAddressSpace {
-    pub fn new_user_space() -> Self {
+    pub fn get_kernel_space() -> SharableVirtualAddressSpace {
+        unsafe {
+            KERNEL_ADDRESS_SPACE.clone().unwrap()
+        }
+    }
+
+    pub fn new() -> Self {
         let pages = pages::get_page_area();
-        let table = TranslationTable::new_user_table(pages);
+        let table = TranslationTable::new_table(pages);
 
         Self {
             table,
@@ -40,8 +58,8 @@ impl VirtualAddressSpace {
         }
     }
 
-    pub fn new_sharable_user_space() -> SharableVirtualAddressSpace {
-        Arc::new(Spinlock::new(Self::new_user_space()))
+    pub fn new_sharable() -> SharableVirtualAddressSpace {
+        Arc::new(Spinlock::new(Self::new()))
     }
 
     pub fn add_memory_segment(&mut self, stype: SegmentType, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) {
