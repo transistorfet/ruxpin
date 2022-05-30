@@ -1,4 +1,6 @@
 
+* make different logging levels so you can disable messages
+
 * there is currently no checking for illegal characters in each path component
 * you were also going to implement rename(), and getcwd()
 * implement link
@@ -7,6 +9,7 @@
   those pages are loaded, they will be duplicated.  The solution is to have a cache for each file/exec that is being used which holds a
   reference to each page, and once it is dropped, those pages will be freed, and when a page is loaded, the cache is searched first.  I'm
   not yet sure how I'd like to implement this, and I still haven't exactly figured out how other OSes do it
+
 * fix the sbrk growing/shrinking
 * need to change how segments are shared, and how pages are shared (need a page cache)
 

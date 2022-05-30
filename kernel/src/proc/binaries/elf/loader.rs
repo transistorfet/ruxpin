@@ -4,7 +4,7 @@ use alloc::string::ToString;
 
 use ruxpin_types::{OpenFlags, FileAccess, Seek};
 
-use crate::printkln;
+use crate::debug;
 use crate::arch::mmu;
 use crate::fs::vfs;
 use crate::fs::types::File;
@@ -52,7 +52,7 @@ pub fn load_binary(proc: Task, path: &str, argv: &StandardArrayOfStrings, envp: 
     for i in 0..header.e_phnum as usize {
         let segment: Elf64ProgramSegment = read_file_data_into_struct(file.clone())?;
 
-        printkln!("program segment {}: {:x} {:x} offset: {:x} v:{:x} p:{:x} size: {:x}", i, segment.p_type, segment.p_flags, segment.p_offset, segment.p_vaddr, segment.p_paddr, segment.p_filesz);
+        debug!("program segment {}: {:x} {:x} offset: {:x} v:{:x} p:{:x} size: {:x}", i, segment.p_type, segment.p_flags, segment.p_offset, segment.p_vaddr, segment.p_paddr, segment.p_filesz);
         segments[i] = Some(segment);
     }
 

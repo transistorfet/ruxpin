@@ -6,8 +6,8 @@ use alloc::sync::Arc;
 
 use ruxpin_types::{OpenFlags, FileAccess, Seek, DeviceID, UserID, GroupID, DirEntry};
 
+use ruxpin_kernel::trace;
 use ruxpin_kernel::block;
-use ruxpin_kernel::printkln;
 use ruxpin_kernel::sync::Spinlock;
 use ruxpin_kernel::errors::KernelError;
 
@@ -55,7 +55,7 @@ impl Filesystem for Ext2Filesystem {
         block::open(device_id, OpenFlags::ReadOnly)?;
 
         let mount = Ext2Mount::create_mount(parent, device_id)?;
-        //printkln!("superblock: {:#?}", mount.superblock);
+        //debug!("superblock: {:#?}", mount.superblock);
 
         Ok(Arc::new(Spinlock::new(mount)))
     }
@@ -95,7 +95,7 @@ impl VnodeOperations for Ext2Vnode {
             };
             position += nbytes;
             if dirent.as_str() == filename {
-                printkln!("ext2: looking for {:?}, found inode {}", filename, dirent.inode); 
+                trace!("ext2: looking for {:?}, found inode {}", filename, dirent.inode); 
                 return self.get_inode(dirent.inode);
             }
         }

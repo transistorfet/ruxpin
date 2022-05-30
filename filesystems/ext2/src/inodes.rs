@@ -6,7 +6,7 @@ use alloc::sync::Arc;
 use ruxpin_types::{DeviceID, FileAccess, UserID, GroupID};
 
 use ruxpin_kernel::block;
-use ruxpin_kernel::printkln;
+use ruxpin_kernel::{info, debug, trace};
 use ruxpin_kernel::sync::Spinlock;
 use ruxpin_kernel::errors::KernelError;
 use ruxpin_kernel::misc::byteorder::{leu16, leu32};
@@ -97,7 +97,7 @@ impl Ext2Vnode {
     }
 
     pub fn free_inode(&mut self, inode_num: Ext2InodeNum) -> Result<(), KernelError> {
-        printkln!("ext2: freeing inode {}", inode_num);
+        info!("ext2: freeing inode {}", inode_num);
         self.get_mount().superblock.free_inode(inode_num)?;
         self.freed = true;
         Ok(())
@@ -140,7 +140,7 @@ impl Ext2Mount {
         let mut vnode = Ext2Vnode::new(mount_ptr, access, uid, gid);
         vnode.attrs.inode = inode_num;
         self.store_inode(&vnode, inode_num)?;
-        printkln!("ext2: allocating inode {}", inode_num);
+        info!("ext2: allocating inode {}", inode_num);
 
         // Insert the node into the cache
         let arc_vnode = self.vnode_cache.insert(inode_num, || {
@@ -190,7 +190,7 @@ impl Ext2Mount {
         vnode.attrs.mtime = u32::from(data.mtime).into();
         vnode.attrs.ctime = u32::from(data.ctime).into();
 
-        //printkln!("loading inode {}: {:#?} {:#?}", inode_num, (*data), vnode.attrs);
+        trace!("loading inode {}: {:#?} {:#?}", inode_num, (*data), vnode.attrs);
         Ok(())
     }
 
@@ -217,7 +217,7 @@ impl Ext2Mount {
         data.mtime = u32::from(vnode.attrs.mtime).into();
         data.ctime = u32::from(vnode.attrs.ctime).into();
 
-        //printkln!("storing inode {}: {:#?}", inode_num, (*data));
+        trace!("storing inode {}: {:#?}", inode_num, (*data));
         Ok(())
     }
 }

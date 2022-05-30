@@ -3,6 +3,18 @@ use core::fmt;
 use core::fmt::Write;
 
 
+#[derive(Copy, Clone, PartialEq, PartialOrd)]
+pub enum LogLevel {
+    Panic,
+    Error,
+    Warning,
+    Notice,
+    Info,
+    Debug,
+    Trace,
+}
+
+static mut CONSOLE_LOG_LEVEL: LogLevel = LogLevel::Info;
 static mut CONSOLE_DEVICE: ConsoleDevice = ConsoleDevice(null_printk);
 
 fn null_printk(_: &str) {
@@ -15,9 +27,12 @@ pub fn set_console_device(func: fn(&str)) {
     }
 }
 
-pub fn printk_args(args: fmt::Arguments) {
+#[inline(always)]
+pub fn printk_args(loglevel: LogLevel, args: fmt::Arguments) {
     unsafe {
-        CONSOLE_DEVICE.write_fmt(args).unwrap();
+        if loglevel <= CONSOLE_LOG_LEVEL {
+            CONSOLE_DEVICE.write_fmt(args).unwrap();
+        }
     }
 }
 
@@ -33,16 +48,64 @@ impl Write for ConsoleDevice {
 
 #[macro_export]
 macro_rules! printk {
-    ($($args:tt)*) => ({
-        $crate::printk::printk_args(format_args!($($args)*));
+    ($loglevel:expr, $($args:tt)*) => ({
+        $crate::printk::printk_args($loglevel, format_args!($($args)*));
     })
 }
 
 #[macro_export]
 macro_rules! printkln {
+    ($loglevel:expr, $($args:tt)*) => ({
+        $crate::printk::printk_args($loglevel, format_args!($($args)*));
+        $crate::printk::printk_args($loglevel, format_args!("\n"));
+    })
+}
+
+#[macro_export]
+macro_rules! error {
     ($($args:tt)*) => ({
-        $crate::printk::printk_args(format_args!($($args)*));
-        $crate::printk::printk_args(format_args!("\n"));
+        use $crate::printk::LogLevel;
+        $crate::printkln!(LogLevel::Error, $($args)*);
+    })
+}
+
+#[macro_export]
+macro_rules! warning {
+    ($($args:tt)*) => ({
+        use $crate::printk::LogLevel;
+        $crate::printkln!(LogLevel::Warning, $($args)*);
+    })
+}
+
+#[macro_export]
+macro_rules! notice {
+    ($($args:tt)*) => ({
+        use $crate::printk::LogLevel;
+        $crate::printkln!(LogLevel::Notice, $($args)*);
+    })
+}
+
+#[macro_export]
+macro_rules! info {
+    ($($args:tt)*) => ({
+        use $crate::printk::LogLevel;
+        $crate::printkln!(LogLevel::Info, $($args)*);
+    })
+}
+
+#[macro_export]
+macro_rules! debug {
+    ($($args:tt)*) => ({
+        use $crate::printk::LogLevel;
+        $crate::printkln!(LogLevel::Debug, $($args)*);
+    })
+}
+
+#[macro_export]
+macro_rules! trace {
+    ($($args:tt)*) => ({
+        use $crate::printk::LogLevel;
+        $crate::printkln!(LogLevel::Trace, $($args)*);
     })
 }
 
@@ -56,17 +119,17 @@ pub fn printk_dump_slice<T>(data: &[T]) {
 
 pub unsafe fn printk_dump(mut addr: u64, mut size: usize) {
     while size > 0 {
-        printk!("{:#010x}: ", addr);
+        printk!(LogLevel::Info, "{:#010x}: ", addr);
         let ptr = addr as *const u8;
         for i in 0..16 {
-            printk!("{:02x} ", *ptr.add(i));
+            printk!(LogLevel::Info, "{:02x} ", *ptr.add(i));
             size -= 1;
             if size == 0 {
                 break;
             }
         }
         addr += 16;
-        printkln!("");
+        printkln!(LogLevel::Info, "");
     }
 }
 

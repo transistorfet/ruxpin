@@ -2,7 +2,7 @@
 use core::arch::asm;
 
 use crate::irqs;
-use crate::printkln;
+use crate::{error, debug, trace};
 use crate::printk::printk_dump;
 use crate::proc::scheduler;
 
@@ -52,22 +52,22 @@ pub extern "C" fn fatal_error(context: &Context, elr: u64, esr: u64, far: u64) -
     let elr_addr = table.translate_addr(VirtualAddress::from(elr));
     let pid = crate::proc::scheduler::get_current().lock().process_id;
 
-    printkln!("\nFatal Error in PID {}: ESR: {:#010x}, FAR: {:#x}, ELR: {:#x}\n", pid, esr, far, elr);
+    error!("\nFatal Error in PID {}: ESR: {:#010x}, FAR: {:#x}, ELR: {:#x}\n", pid, esr, far, elr);
     if let Ok(addr) = elr_addr {
         unsafe {
             let ptr: *const u32 = addr.to_kernel_addr().as_ptr();
-            printkln!("Instruction: {:#010x}", *ptr);
+            error!("Instruction: {:#010x}", *ptr);
         }
     }
     if let Ok(addr) = far_addr {
         unsafe {
             let ptr: *const u32 = addr.to_kernel_addr().as_ptr();
-            printkln!("Fault Address: {:#010x}", *ptr);
+            error!("Fault Address: {:#010x}", *ptr);
         }
     }
-    printkln!("\n{}", context);
+    error!("\n{}", context);
     if u64::from(sp) != 0 {
-        printkln!("\nStacktrace:");
+        error!("\nStacktrace:");
         unsafe { printk_dump(u64::from(sp), 128); }
     }
 
@@ -76,13 +76,13 @@ pub extern "C" fn fatal_error(context: &Context, elr: u64, esr: u64, far: u64) -
 
 #[no_mangle]
 pub extern "C" fn fatal_kernel_error(_sp: u64, elr: u64, esr: u64, far: u64) -> ! {
-    printkln!("\nFatal Kernel Error: ESR: {:#010x}, FAR: {:#x}, ELR: {:#x}", esr, far, elr);
+    error!("\nFatal Kernel Error: ESR: {:#010x}, FAR: {:#x}, ELR: {:#x}", esr, far, elr);
     loop {}
 }
 
 #[no_mangle]
 extern "C" fn handle_user_exception(context: &Context, elr: u64, esr: u64, far: u64, _sp: u64) {
-    //printkln!("Handle an exception of {:x} for sp {:x}", esr, sp);
+    //debug!("Handle an exception of {:x} for sp {:x}", esr, sp);
 
     match esr >> 26 {
         // SVC from Aarch64
@@ -94,10 +94,10 @@ extern "C" fn handle_user_exception(context: &Context, elr: u64, esr: u64, far: 
         // Instruction or Data Abort from lower EL
         0b100000 | 0b100100 => {
             if esr & 0b111100 == 0b001000 {
-                printkln!("Instruction or Data Abort caused by Access Flag at address {:x} (allocating new page)", far);
+                trace!("Instruction or Data Abort caused by Access Flag at address {:x} (allocating new page)", far);
                 page_fault_handler(far);
             } else if esr & 0b111100 == 0b001100 {
-                printkln!("Instruction or Data Abort caused by Permissions Flag at address {:x} (either copy-on-write or fault)", far);
+                trace!("Instruction or Data Abort caused by Permissions Flag at address {:x} (either copy-on-write or fault)", far);
                 page_access_handler(far);
             } else {
                 fatal_error(context, elr, esr, far);
@@ -116,13 +116,13 @@ extern "C" fn handle_user_exception(context: &Context, elr: u64, esr: u64, far: 
 
 #[no_mangle]
 extern "C" fn handle_kernel_exception(sp: u64, elr: u64, esr: u64, far: u64) {
-    printkln!("Handle a kernel exception of {:x} for far {:x} at {:x}", esr, far, elr);
+    debug!("Handle a kernel exception of {:x} for far {:x} at {:x}", esr, far, elr);
 
     match esr >> 26 {
         // Instruction or Data Abort from lower EL
         0b100000 | 0b100100 | 0b100101 => {
             if esr & 0b111100 == 0b001000 {
-                printkln!("Instruction or Data Abort caused by Access Flag at address {:x} (allocating new page)", far);
+                trace!("Instruction or Data Abort caused by Access Flag at address {:x} (allocating new page)", far);
                 page_fault_handler(far);
             } else {
                 fatal_kernel_error(sp, elr, esr, far);
@@ -137,7 +137,7 @@ extern "C" fn handle_kernel_exception(sp: u64, elr: u64, esr: u64, far: u64) {
 
 #[no_mangle]
 extern "C" fn handle_irq(_context: &Context, _elr: u64, _esr: u64, _far: u64, _sp: u64) {
-    //printkln!("Handle an irq of {:x} for sp {:x}", _esr, _sp);
+    //trace!("Handle an irq of {:x} for sp {:x}", _esr, _sp);
 
     irqs::handle_irqs();
 

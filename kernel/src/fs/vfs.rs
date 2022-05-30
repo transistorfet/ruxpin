@@ -4,7 +4,7 @@ use alloc::sync::Arc;
 
 use ruxpin_types::{OpenFlags, FileAccess, Seek, UserID, DeviceID, DirEntry};
 
-use crate::printkln;
+use crate::notice;
 use crate::sync::Spinlock;
 use crate::errors::KernelError;
 
@@ -21,14 +21,14 @@ pub fn initialize() -> Result<(), KernelError> {
 }
 
 pub fn register_filesystem(fs: Arc<Spinlock<dyn Filesystem>>) -> Result<(), KernelError> {
-    printkln!("fs: registering filesystem {}", fs.lock().fstype());
+    notice!("fs: registering filesystem {}", fs.lock().fstype());
     FILESYSTEMS.lock().push(fs.clone());
     fs.lock().init()?;
     Ok(())
 }
 
 pub fn mount(cwd: Option<Vnode>, path: &str, fstype: &str, device_id: Option<DeviceID>, current_uid: UserID) -> Result<(), KernelError> {
-    crate::printkln!("fs: mounting {} at {}, device {:?}", fstype, path, device_id);
+    notice!("fs: mounting {} at {}, device {:?}", fstype, path, device_id);
     if current_uid != 0 {
         return Err(KernelError::OperationNotPermitted);
     }

@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use ruxpin_types::DeviceID;
 
 use ruxpin_kernel::block;
-use ruxpin_kernel::printkln;
+use ruxpin_kernel::{debug, notice, error};
 use ruxpin_kernel::block::BlockNum;
 use ruxpin_kernel::misc::ceiling_div;
 use ruxpin_kernel::errors::KernelError;
@@ -143,7 +143,7 @@ impl Ext2SuperBlock {
         };
 
         if u16::from(data.magic) != 0xEF53 {
-            printkln!("ext2: invalid superblock magic number {:x}", u16::from(data.magic));
+            error!("ext2: invalid superblock magic number {:x}", u16::from(data.magic));
             return Err(KernelError::InvalidSuperblock);
         }
 
@@ -151,13 +151,13 @@ impl Ext2SuperBlock {
         let fragment_size = 1024 << u32::from(data.log_fragment_size) as usize;
 
         if block_size != fragment_size {
-            printkln!("ext2: block size and fragment size don't match");
+            error!("ext2: block size and fragment size don't match");
             return Err(KernelError::InvalidSuperblock);
         }
 
         let incompat_features = u32::from(data.extended.incompat_features);
         if (incompat_features & !EXT2_INCOMPAT_SUPPORTED) != 0 {
-            printkln!("ext2: this filesystem has incompatible features than aren't supported: {:x}", incompat_features & !EXT2_INCOMPAT_SUPPORTED);
+            error!("ext2: this filesystem has incompatible features than aren't supported: {:x}", incompat_features & !EXT2_INCOMPAT_SUPPORTED);
             return Err(KernelError::IncompatibleFeatures);
         }
         let inode_size = if u32::from(data.major_version) >= 1 { u16::from(data.extended.inode_size) as usize } else { 128 };
@@ -188,9 +188,9 @@ impl Ext2SuperBlock {
             groups: Vec::with_capacity(total_block_groups),
         };
 
-        printkln!("ext2: magic number {:x}, block size {}", superblock.magic, superblock.block_size);
-        printkln!("ext2: total blocks {}, total inodes {}, unallocated blocks: {}, unallocated inodes: {}", superblock.total_blocks, superblock.total_inodes, superblock.total_unalloc_blocks, superblock.total_unalloc_inodes);
-        printkln!("ext2: features compat: {:x}, ro: {:x}, incompat: {:x}", u32::from(data.extended.compat_features), u32::from(data.extended.ro_compat_features), u32::from(data.extended.incompat_features));
+        notice!("ext2: magic number {:x}, block size {}", superblock.magic, superblock.block_size);
+        notice!("ext2: total blocks {}, total inodes {}, unallocated blocks: {}, unallocated inodes: {}", superblock.total_blocks, superblock.total_inodes, superblock.total_unalloc_blocks, superblock.total_unalloc_inodes);
+        notice!("ext2: features compat: {:x}, ro: {:x}, incompat: {:x}", u32::from(data.extended.compat_features), u32::from(data.extended.ro_compat_features), u32::from(data.extended.incompat_features));
 
         Ok(superblock)
     }
@@ -299,7 +299,7 @@ impl Ext2SuperBlock {
         let buf = block::get_buf(self.device_id, self.groups[group].inode_bitmap)?;
         let locked_buf = &mut *buf.lock_mut();
 
-        crate::printkln!("ext2: freeing inode {} in group {}", inode_num, group);
+        debug!("ext2: freeing inode {} in group {}", inode_num, group);
         free_bit(locked_buf, group_inode as usize);
         self.groups[group].free_inode_count += 1;
         self.total_unalloc_inodes += 1;
@@ -355,7 +355,7 @@ impl Ext2SuperBlock {
                 let block_num = ((group * self.blocks_per_group) + bit) as Ext2BlockNumber;
                 self.zero_block(block_num)?;
 
-                crate::printkln!("ext2: allocating block {} in group {}", block_num, group);
+                debug!("ext2: allocating block {} in group {}", block_num, group);
                 return Ok(block_num);
             }
 
@@ -375,7 +375,7 @@ impl Ext2SuperBlock {
         let buf = block::get_buf(self.device_id, self.groups[group].block_bitmap)?;
         let locked_buf = &mut *buf.lock_mut();
 
-        crate::printkln!("ext2: freeing block {} in group {}", block_num, group);
+        debug!("ext2: freeing block {} in group {}", block_num, group);
         free_bit(locked_buf, group_block as usize);
         self.groups[group].free_block_count += 1;
         self.total_unalloc_blocks += 1;

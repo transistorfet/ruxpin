@@ -5,7 +5,7 @@ use alloc::collections::vec_deque::VecDeque;
 use ruxpin_types::{OpenFlags, DeviceID};
 
 use ruxpin_kernel::irqs;
-use ruxpin_kernel::printkln;
+use ruxpin_kernel::notice;
 use ruxpin_kernel::errors::KernelError;
 use ruxpin_kernel::tty::{self, CharOperations};
 use ruxpin_kernel::printk::set_console_device;
@@ -20,7 +20,7 @@ static mut TTY_CONSOLE: Option<DeviceID> = None;
 
 
 pub fn register() -> Result<(), KernelError> {
-    printkln!("{}: initializing", PL011_DRIVER_NAME);
+    notice!("{}: initializing", PL011_DRIVER_NAME);
     let driver_id = tty::register_tty_driver(PL011_DRIVER_NAME)?;
     let console = PL011Device::new();
     init();
@@ -227,7 +227,7 @@ pub fn handle_irq_pl011() {
 
         if status & PL011_INT_RX_READY != 0 {
             while let Some(ch) = get_char() {
-                //crate::printkln!(">>> {}", ch);
+                //crate::debug!(">>> {}", ch);
 
                 PL011_RX.as_mut().unwrap().buffer.push_back(ch);
 

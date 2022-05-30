@@ -1,5 +1,5 @@
 
-use ruxpin_kernel::printkln;
+use ruxpin_kernel::notice;
 use ruxpin_kernel::arch::types::KernelVirtualAddress;
 use ruxpin_kernel::misc::deviceio::DeviceRegisters;
 
@@ -23,7 +23,7 @@ pub struct GenericInterruptController {
 
 impl GenericInterruptController {
     pub fn new() -> Self {
-        printkln!("interrupts: initializing generic arm interrupt controller");
+        notice!("interrupts: initializing generic arm interrupt controller");
 
         let gic = Self {
             registers: DeviceRegisters::new(KernelVirtualAddress::new(0x3F00_B200)),

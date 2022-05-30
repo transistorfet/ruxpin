@@ -2,7 +2,7 @@
 use alloc::boxed::Box;
 use alloc::collections::vec_deque::VecDeque;
 
-use crate::printkln;
+use crate::error;
 use crate::sync::Spinlock;
 use crate::errors::KernelError;
 
@@ -30,7 +30,7 @@ pub fn run_tasklets() {
     while let Some(task) = TASKLET_QUEUE.lock().as_mut().unwrap().pop_front() {
         match (task.func)() {
             Ok(()) => { },
-            Err(err) => { printkln!("tasklets: error {:?}", err); },
+            Err(err) => { error!("tasklets: error {:?}", err); },
         }
     }
 }

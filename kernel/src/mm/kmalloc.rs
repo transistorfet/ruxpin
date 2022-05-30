@@ -3,7 +3,7 @@ use core::ptr;
 use core::mem;
 use core::alloc::{GlobalAlloc, Layout};
 
-use crate::printkln;
+use crate::notice;
 use crate::arch::types::PhysicalAddress;
 
 
@@ -57,7 +57,7 @@ impl Heap {
         let mut space: *mut Block = start.to_kernel_addr().as_mut();
 
         let size = usize::from(end) - usize::from(start);
-        printkln!("kernel heap: using {:#x}, size {}MiB", u64::from(start), size / 1024 / 1024);
+        notice!("kernel heap: using {:#x}, size {}MiB", u64::from(start), size / 1024 / 1024);
 
         (*space).size = size;
         (*space).next = ptr::null_mut();

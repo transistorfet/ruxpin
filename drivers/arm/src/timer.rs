@@ -1,6 +1,6 @@
 
 use ruxpin_kernel::irqs;
-use ruxpin_kernel::printkln;
+use ruxpin_kernel::notice;
 use ruxpin_kernel::proc::scheduler;
 use ruxpin_kernel::arch::types::KernelVirtualAddress;
 use ruxpin_kernel::misc::deviceio::DeviceRegisters;
@@ -17,7 +17,7 @@ pub struct SystemTimer;
 
 impl SystemTimer {
     pub fn init(irq: usize) {
-        printkln!("timer: initializing generic arm timer to trigger context switch");
+        notice!("timer: initializing generic arm timer to trigger context switch");
 
         irqs::register_irq(irq ,SystemTimer::handle_irq).unwrap();
         irqs::enable_irq(irq);

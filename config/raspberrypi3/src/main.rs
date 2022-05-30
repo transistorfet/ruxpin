@@ -5,7 +5,7 @@ extern crate alloc;
 
 use alloc::boxed::Box;
  
-use ruxpin_kernel::printkln;
+use ruxpin_kernel::notice;
 use ruxpin_kernel::errors::KernelError;
 use ruxpin_kernel::printk::printk_dump_slice;
 use ruxpin_kernel::arch::types::PhysicalAddress;
@@ -35,7 +35,7 @@ use ruxpin_filesystems_ext2::Ext2Filesystem;
 pub fn register_devices() -> Result<(), KernelError> {
     console::set_safe_console();
 
-    printkln!("starting kernel...");
+    notice!("starting kernel...");
 
     init_kernel_heap(PhysicalAddress::from(0x20_0000), PhysicalAddress::from(0x100_0000));
     init_virtual_memory(PhysicalAddress::from(0x100_0000), PhysicalAddress::from(0x1000_0000));
@@ -62,34 +62,34 @@ pub fn register_devices() -> Result<(), KernelError> {
     startup_tests().unwrap();
 
     // Create the first process
-    printkln!("loading the first processs (/bin/sh) from elf binary file");
+    notice!("loading the first processs (/bin/sh) from elf binary file");
     binaries::load_process("/bin/sh").unwrap();
 
     SystemTimer::init(1);
 
-    printkln!("kernel initialization complete");
+    notice!("kernel initialization complete");
 
     Ok(())
 }
 
 fn startup_tests() -> Result<(), KernelError> {
-    printkln!("\nRunning some hardcoded tests before completing the startup");
+    notice!("\nRunning some hardcoded tests before completing the startup");
 
-    printkln!("\nMounting the tmpfs filesystem (simple in-memory file system)");
+    notice!("\nMounting the tmpfs filesystem (simple in-memory file system)");
     vfs::open(None, "/tmp", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
     vfs::mount(None, "/tmp", "tmpfs", None, 0).unwrap();
 
-    printkln!("\nCreating a directory and a file inside of it");
+    notice!("\nCreating a directory and a file inside of it");
     vfs::open(None, "testdir", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
     let file = vfs::open(None, "testdir/file.txt", OpenFlags::Create, FileAccess::DefaultFile, 0).unwrap();
     vfs::write(file.clone(), b"This is a test").unwrap();
     vfs::seek(file.clone(), 0, Seek::FromStart).unwrap();
     let mut buffer = [0; 100];
     let n = vfs::read(file.clone(), &mut buffer).unwrap();
-    printkln!("Read file {}: {}", n, core::str::from_utf8(&buffer).unwrap());
+    notice!("Read file {}: {}", n, core::str::from_utf8(&buffer).unwrap());
 
 
-    printkln!("\nOpening the console device file and writing to it");
+    notice!("\nOpening the console device file and writing to it");
     let file = vfs::open(None, "/dev/console0", OpenFlags::ReadOnly, FileAccess::DefaultFile, 0).unwrap();
     vfs::write(file.clone(), b"the device file can write\n").unwrap();
     //vfs::close(file).unwrap();
@@ -117,12 +117,12 @@ fn startup_tests() -> Result<(), KernelError> {
 
 
 
-    printkln!("\nOpening the testapp binary through the vfs interface and reading some data");
+    notice!("\nOpening the testapp binary through the vfs interface and reading some data");
     let file = vfs::open(None, "/bin/sh", OpenFlags::ReadOnly, FileAccess::DefaultFile, 0).unwrap();
     let mut data = [0; 1024];
     loop {
         let nbytes = vfs::read(file.clone(), &mut data).unwrap();
-        printkln!("read in {} bytes", nbytes);
+        notice!("read in {} bytes", nbytes);
         printk_dump_slice(&data);
         //if nbytes != 1024 {
             break;
@@ -132,26 +132,26 @@ fn startup_tests() -> Result<(), KernelError> {
 
 
 
-    printkln!("\nOpening a new file and writing some data into it");
+    notice!("\nOpening a new file and writing some data into it");
     let file = vfs::open(None, "/test2", OpenFlags::ReadWrite.plus(OpenFlags::Create), FileAccess::DefaultFile, 0).unwrap();
     vfs::write(file.clone(), b"this is some test data").unwrap();
     //vfs::close(file)?;
 
-    printkln!("\nReading back the data written previously");
+    notice!("\nReading back the data written previously");
     let file = vfs::open(None, "/test2", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0).unwrap();
     let mut data = [0; 128];
     vfs::read(file.clone(), &mut data).unwrap();
     printk_dump_slice(&data);
     //vfs::close(file)?;
 
-    printkln!("\nPrinting the contents of the root directory (ext2 mount)");
+    notice!("\nPrinting the contents of the root directory (ext2 mount)");
     let file = vfs::open(None, "/", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0).unwrap();
     while let Some(dirent) = vfs::readdir(file.clone()).unwrap() {
-        printkln!("reading dir {} with inode {}", dirent.as_str(), dirent.inode);
+        notice!("reading dir {} with inode {}", dirent.as_str(), dirent.inode);
     }
 
     /*
-    printkln!("\nOpening a new file and writing a whole bunch of data into it");
+    notice!("\nOpening a new file and writing a whole bunch of data into it");
     let file = vfs::open(None, "/test3", OpenFlags::ReadWrite.plus(OpenFlags::Create), FileAccess::DefaultFile, 0).unwrap();
     let data = [0; 4096];
     for _ in 0..20 {
@@ -177,7 +177,7 @@ fn startup_tests() -> Result<(), KernelError> {
     cache.print();
     */
 
-    printkln!("\nFinished tests\n");
+    notice!("\nFinished tests\n");
 
     Ok(())
 }

@@ -1,6 +1,6 @@
 
 use ruxpin_kernel::block;
-use ruxpin_kernel::printkln;
+use ruxpin_kernel::debug;
 use ruxpin_kernel::errors::KernelError;
 
 use super::inodes::Ext2Vnode;
@@ -48,7 +48,7 @@ impl Ext2Vnode {
             let block_num = self.get_file_block_num(znum, GetFileBlockOp::Allocate)?.unwrap();
             let buf = block::get_buf(device_id, block_num)?;
 
-            printkln!("ext2: writing to block {}", block_num);
+            debug!("ext2: writing to block {}", block_num);
             let zlen = if block_size - zpos <= nbytes { block_size - zpos } else { nbytes };
             let subslice = &buffer[offset..offset + zlen];
             (&mut buf.lock_mut()[zpos..zpos + zlen]).copy_from_slice(subslice);

@@ -65,23 +65,20 @@ pub fn main() {
         if words[0] != "" {
             words[0] = substitute_path(&mut fullpath, "/bin/", words[0]);
 
-            println!("executing {}", words[0]);
             let pid = fork().unwrap();
             if pid == 0 {
                 exec(words[0], &words[..argc], &[]);
             } else {
-                println!("child pid is {}", pid);
                 let mut status = 0;
                 let result = waitpid(pid, &mut status, 0);
                 match result {
                     Ok(pid) => { println!("pid {} exited with {}", pid, status); },
                     Err(err) => { println!("Error while waiting for process: {:?}", err); },
                 }
-                println!("child pid is {}", status);
             }
         }
     }
 
-    println!("done");
+    println!("shell exited");
 }
 

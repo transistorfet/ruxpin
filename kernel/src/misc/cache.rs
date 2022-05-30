@@ -7,7 +7,7 @@ use core::sync::atomic::{self, AtomicUsize, Ordering};
 
 use alloc::vec::Vec;
 
-use crate::printkln;
+use crate::debug;
 use crate::misc::linkedlist::{UnownedLinkedList, UnownedLinkedListNode};
 
 
@@ -76,7 +76,7 @@ impl<K: Copy + PartialEq, T> Cache<K, T> {
                     self.order.remove_node(node);
                     self.order.insert_head(node);
                 }
-                //printkln!("cache: returning existing");
+                //debug!("cache: returning existing");
                 return Ok(unsafe { node.get_mut() }.wrap_inner());
             }
         }
@@ -96,7 +96,7 @@ impl<K: Copy + PartialEq, T> Cache<K, T> {
             unsafe {
                 self.order.insert_head(self.items[i].as_node_ptr());
             }
-            //printkln!("cache: returning new");
+            //debug!("cache: returning new");
             return Ok(self.items[i].wrap_inner());
         }
 
@@ -110,7 +110,7 @@ impl<K: Copy + PartialEq, T> Cache<K, T> {
                     self.order.remove_node(node);
                     self.order.insert_head(node);
                 }
-                //printkln!("cache: recycling old");
+                //debug!("cache: recycling old");
                 return Ok(unsafe { node.get_mut() }.wrap_inner());
             }
         }
@@ -123,10 +123,10 @@ impl<K, T: Debug> Cache<K, T> {
     pub fn print(&mut self) {
         let mut i = 0;
         let mut iter = self.order.iter();
-        printkln!("Cache contents:");
+        debug!("Cache contents:");
         while let Some(node) = iter.next() {
             let item = unsafe { node.get() };
-            printkln!("{}: {:?}", i, item.data);
+            debug!("{}: {:?}", i, item.data);
             i += 1;
         }
     }

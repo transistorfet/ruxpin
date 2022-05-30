@@ -5,6 +5,7 @@ use core::arch::asm;
 
 use ruxpin_syscall::{SyscallRequest, SyscallFunction};
 
+use crate::notice;
 use super::types::{PhysicalAddress, VirtualAddress, KernelVirtualAddress};
 use super::mmu::TranslationTable;
 
@@ -112,7 +113,7 @@ impl Context {
 impl Context {
     pub fn dump_current() {
         unsafe {
-            crate::printkln!("{}", &*CURRENT_CONTEXT);
+            notice!("{}", &*CURRENT_CONTEXT);
         }
     }
 

@@ -2,7 +2,7 @@
 use ruxpin_syscall::{SyscallRequest, SyscallFunction};
 use ruxpin_types::ApiError;
 
-use crate::printkln;
+use crate::error;
 use crate::arch::context::Context;
 use crate::proc::scheduler::{get_current, check_restart_syscall};
 
@@ -11,7 +11,7 @@ mod proc;
 
 
 pub fn handle_syscall() {
-    //crate::printkln!("A SYSCALL for {:?}!", syscall.function);
+    //crate::info!("A SYSCALL for {:?}!", syscall.function);
 
     let mut syscall = Context::syscall_from_current_context();
     get_current().try_lock().unwrap().syscall = syscall.clone();
@@ -81,7 +81,7 @@ pub fn process_syscall(syscall: &mut SyscallRequest) {
             self::file::handle_syscall_getcwd(syscall);
         },
         _ => {
-            printkln!("syscall: invalid function number: {}", syscall.function as usize);
+            error!("syscall: invalid function number: {}", syscall.function as usize);
             syscall.store_result(Err(ApiError::BadSystemCall));
         }
     }

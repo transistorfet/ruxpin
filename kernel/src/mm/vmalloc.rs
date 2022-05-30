@@ -2,6 +2,7 @@
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 
+use crate::trace;
 use crate::mm::pages;
 use crate::misc::align_up;
 use crate::sync::Spinlock;
@@ -97,7 +98,7 @@ impl VirtualAddressSpace {
 
     pub fn copy_segments(&mut self, parent: &mut Self) {
         for segment in parent.segments.iter() {
-            //crate::printkln!("cloning segment {:x} to {:x}", usize::from(segment.start), usize::from(segment.end));
+            //crate::debug!("cloning segment {:x} to {:x}", usize::from(segment.start), usize::from(segment.end));
             self.segments.push(segment.clone());
             self.copy_segment_map(&mut parent.table, &*segment.lock());
         }
@@ -178,7 +179,7 @@ impl VirtualAddressSpace {
         let page_vaddr = far.align_down(mmu::page_size());
         let (page, previous_cow) = self.table.reset_copy_on_write(page_vaddr).unwrap();
         if previous_cow {
-            crate::printkln!("copying page on write {:?}", page);
+            trace!("copying page on write {:?}", page);
             let pages = pages::get_page_area();
 
             // Allocate new page and map it in the current address space

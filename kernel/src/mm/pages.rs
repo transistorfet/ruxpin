@@ -5,7 +5,7 @@ use core::slice;
 
 use alloc::vec::Vec;
 
-use crate::printkln;
+use crate::{notice, trace};
 use crate::arch::mmu;
 use crate::arch::types::PhysicalAddress;
 use crate::misc::{ceiling_div, align_up};
@@ -59,7 +59,7 @@ impl PagePool {
     pub fn alloc_page(&mut self) -> PhysicalAddress {
         for region in &mut self.regions {
             if let Some(addr) = region.alloc_page() {
-                //printkln!("pages: allocating page at {:#x}", usize::from(addr));
+                trace!("pages: allocating page at {:#x}", usize::from(addr));
                 return addr;
             }
         }
@@ -77,7 +77,7 @@ impl PagePool {
     pub fn free_page(&mut self, ptr: PhysicalAddress) {
         for region in &mut self.regions {
             if ptr >= region.pages_start && ptr <= region.pages_start.add(region.total_pages() * mmu::page_size()) {
-                //printkln!("pages: freeing page at {:x}", usize::from(ptr));
+                trace!("pages: freeing page at {:x}", usize::from(ptr));
                 region.free_page(ptr);
                 return;
             }
@@ -88,7 +88,7 @@ impl PagePool {
     pub fn ref_page(&mut self, ptr: PhysicalAddress) -> PhysicalAddress {
         for region in &mut self.regions {
             if ptr >= region.pages_start && ptr <= region.pages_start.add(region.total_pages() * mmu::page_size()) {
-                printkln!("pages: incrementing page ref at {:#x}", usize::from(ptr));
+                trace!("pages: incrementing page ref at {:#x}", usize::from(ptr));
                 return region.ref_page(ptr);
             }
         }
@@ -108,9 +108,9 @@ impl PageRegion {
         let total_table_pages = ceiling_div(total_table_size, page_size);
         let usable_pages = total_pages - total_table_pages;
 
-        printkln!("virtual memory: using region at {:?}, size {} MiB, pages {}", start, total_size / 1024 / 1024, usable_pages);
-        printkln!("using {} pages ({} bytes) for descriptors (ratio of {})", total_table_pages, total_table_size, total_pages / total_table_pages);
-        printkln!("alloc {} {}, desc {} {}", alloc_table_size, alloc_table_size / page_size, desc_table_size, desc_table_size / page_size);
+        notice!("virtual memory: using region at {:?}, size {} MiB, pages {}", start, total_size / 1024 / 1024, usable_pages);
+        notice!("using {} pages ({} bytes) for descriptors (ratio of {})", total_table_pages, total_table_size, total_pages / total_table_pages);
+        notice!("alloc {} {}, desc {} {}", alloc_table_size, alloc_table_size / page_size, desc_table_size, desc_table_size / page_size);
 
         let alloc_table = init_alloc_table(start, usable_pages);
         let desc_table = init_desc_table(start.add(alloc_table_size), usable_pages);
@@ -138,11 +138,11 @@ impl PageRegion {
     }
 
     pub fn free_page(&mut self, ptr: PhysicalAddress) {
-        //printkln!("pages: decrementing page ref at {:x}", usize::from(ptr));
+        trace!("pages: decrementing page ref at {:x}", usize::from(ptr));
         let bit = (usize::from(ptr) - usize::from(self.pages_start)) / mmu::page_size();
         self.desc_table[bit].refcount -= 1;
         if self.desc_table[bit].refcount == 0 {
-            //printkln!("pages: freeing page at {:x}", usize::from(ptr));
+            trace!("pages: freeing page at {:x}", usize::from(ptr));
             self.free_bit(bit);
         }
     }

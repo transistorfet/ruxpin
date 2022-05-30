@@ -2,7 +2,7 @@
 use alloc::boxed::Box;
 
 use ruxpin_kernel::block;
-use ruxpin_kernel::printkln;
+use ruxpin_kernel::{notice, debug};
 use ruxpin_kernel::errors::KernelError;
 use ruxpin_kernel::block::BlockOperations;
 use ruxpin_kernel::arch::types::KernelVirtualAddress;
@@ -29,7 +29,7 @@ enum ReadWrite {
 
 impl EmmcDevice {
     pub fn register() -> Result<(), KernelError> {
-        printkln!("{}: initializing", EMMC_DRIVER_NAME);
+        notice!("{}: initializing", EMMC_DRIVER_NAME);
         let driver_id = block::register_block_driver(EMMC_DRIVER_NAME)?;
         let device_id = block::register_block_device(driver_id, Box::new(EmmcDevice::new(0, 0)))?;
         let raw_device = DeviceID(driver_id, device_id);
@@ -41,11 +41,11 @@ impl EmmcDevice {
 
         if let Some(iter) = Partition::read_mbr_partition_table_iter(&buffer) {
             for (i, partition) in iter.enumerate() {
-                printkln!("{}: found partition {} at {:x}, {} MiB", EMMC_DRIVER_NAME, i, partition.base, partition.size / 2048);
+                notice!("{}: found partition {} at {:x}, {} MiB", EMMC_DRIVER_NAME, i, partition.base, partition.size / 2048);
                 block::register_block_device(driver_id, Box::new(EmmcDevice::new(partition.base as u64 * 512, partition.size as u64 * 512)))?;
             }
         } else {
-            printkln!("{}: no partition table found", EMMC_DRIVER_NAME);
+            notice!("{}: no partition table found", EMMC_DRIVER_NAME);
         }
 
         Ok(())
@@ -132,7 +132,7 @@ impl EmmcDevice {
         let blocksize = 512;
         let numblocks = ceiling_div(buffer.len(), blocksize);
 
-        printkln!("mmc: reading {} blocks of {} each at offset {:x}", numblocks, blocksize, offset);
+        debug!("mmc: reading {} blocks of {} each at offset {:x}", numblocks, blocksize, offset);
         EmmcHost::setup_data_transfer(Command::ReadMultiple, offset / blocksize as u64, numblocks, blocksize)?;
 
         let mut i = 0;
@@ -263,7 +263,7 @@ impl EmmcHost {
             EMMC1.set(registers::INTERRUPT_FLAGS, EMMC1.get(registers::INTERRUPT_FLAGS));
 
             // TODO without the print statement here, it times out on the raspi3 =/ 
-            printkln!("mmc: sending command {:?} {:x}", cmd, arg1);
+            debug!("mmc: sending command {:?} {:x}", cmd, arg1);
             EMMC1.set(registers::ARG1, arg1);
             EMMC1.set(registers::COMMAND, command_code(cmd));
 
@@ -271,7 +271,7 @@ impl EmmcHost {
 
             let flags = EMMC1.get(registers::INTERRUPT_FLAGS);
             if flags & EMMC1_INT_ANY_ERROR != 0 {
-                //printkln!("mmc: error occurred: {:x}", flags);
+                //debug!("mmc: error occurred: {:x}", flags);
                 // TODO this is temporary until the error issue is solved
                 Ok(0)
             } else {
@@ -279,7 +279,7 @@ impl EmmcHost {
                 let _r1 = EMMC1.get(registers::RESPONSE1);
                 let _r2 = EMMC1.get(registers::RESPONSE2);
                 let _r3 = EMMC1.get(registers::RESPONSE3);
-                //printkln!("mmc: received response {:x} {:x} {:x} {:x}", r0, _r1, _r2, _r3);
+                //debug!("mmc: received response {:x} {:x} {:x} {:x}", r0, _r1, _r2, _r3);
                 Ok(r0)
             }
         }
@@ -295,7 +295,7 @@ impl EmmcHost {
             // In order to reset the interrupt flags, they must be set to 1 (not 0), so writing it to itself will do that
             EMMC1.set(registers::INTERRUPT_FLAGS, EMMC1.get(registers::INTERRUPT_FLAGS));
 
-            //printkln!("mmc: sending command {:?} {:x}", cmd, offset);
+            //debug!("mmc: sending command {:?} {:x}", cmd, offset);
             EMMC1.set(registers::ARG1, offset as u32);
             EMMC1.set(registers::ARG2, (offset >> 32) as u32);
             EMMC1.set(registers::COMMAND, command_code(cmd));
@@ -304,7 +304,7 @@ impl EmmcHost {
 
             let flags = EMMC1.get(registers::INTERRUPT_FLAGS);
             if flags & EMMC1_INT_ANY_ERROR != 0 {
-                //printkln!("mmc: error occurred: {:x}", flags);
+                //debug!("mmc: error occurred: {:x}", flags);
                 Err(KernelError::IOError)
             } else {
                 Ok(())

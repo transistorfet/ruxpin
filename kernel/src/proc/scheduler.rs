@@ -4,13 +4,12 @@ use alloc::vec::Vec;
 use ruxpin_types::{Tid, Pid};
 use ruxpin_syscall::{SyscallFunction};
 
+use crate::info;
 use crate::api::process_syscall;
 use crate::arch::Context;
 use crate::arch::types::VirtualAddress;
 use crate::errors::KernelError;
 use crate::misc::queue::{Queue, QueueNode, QueueNodeRef};
-use crate::mm::MemoryPermissions;
-use crate::mm::segments::SegmentType;
 use crate::sync::Spinlock;
 
 use super::tasks::{TaskCloneArgs, TaskState, TaskRecord};
@@ -158,7 +157,7 @@ impl TaskManager {
     }
 
     fn exit(&mut self, task: Task, status: isize) {
-        crate::printkln!("Exiting process {}", task.try_lock().unwrap().process_id);
+        info!("Exiting process {}", task.try_lock().unwrap().process_id);
 
         self.detach(task.clone());
         task.try_lock().unwrap().exit_and_free_resources(status);

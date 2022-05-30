@@ -1,6 +1,7 @@
 
 use core::slice;
 
+use crate::debug;
 use crate::errors::KernelError;
 use crate::mm::pages::PagePool;
 use crate::mm::{MemoryType, MemoryPermissions};
@@ -147,7 +148,7 @@ impl TranslationTable {
                 let new_page = pages.alloc_page_zeroed();
 
                 // Copy data into new page
-                crate::printkln!("copying physical page {:?} to {:?}", PhysicalAddress::from(*descriptor & TT_BLOCK_MASK), new_page);
+                debug!("copying physical page {:?} to {:?}", PhysicalAddress::from(*descriptor & TT_BLOCK_MASK), new_page);
                 let page_buffer = get_page_slice(PhysicalAddress::from(*descriptor & TT_BLOCK_MASK));
                 let new_page_buffer = get_page_slice(new_page);
                 for i in 0..page_buffer.len() {

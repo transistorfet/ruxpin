@@ -33,13 +33,13 @@ pub extern "C" fn kernel_start() -> ! {
         register_devices().unwrap();
     }
 
-    printkln!("scheduler: starting multitasking");
+    notice!("scheduler: starting multitasking");
     start_multitasking();
 }
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    printkln!("Rust Panic: {}", info);
+    error!("Rust Panic: {}", info);
     loop {}
 }
 
