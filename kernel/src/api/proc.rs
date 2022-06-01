@@ -7,7 +7,8 @@ use crate::proc::scheduler::Task;
 use crate::proc::tasks::TaskCloneArgs;
 use crate::misc::strarray::{StrArray, StandardArrayOfStrings};
 use crate::proc::scheduler::{get_current, clone_current, exit_current, find_exited, suspend, clean_up};
-use crate::proc::binaries::elf::loader;
+
+use super::binaries::elf::loader;
 
 
 #[syscall_handler]

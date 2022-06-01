@@ -1,8 +1,20 @@
 
-* make different logging levels so you can disable messages
+* should binaries move to api to better reflect that it's integrating code that uses multiple subsystems, rather than being an isolated subsystem
+  Or should you even move it to its own crate, so that it can be selectively compiled in? but it would still need to be used by the api... can the
+  api (as an integrating layer) be separate from the kernel crate?
+* i'm definitely leaning to just moving binaries to api::binaries
+
+
+* there is a bug in shell, where it prints the '%' prompt two or three times before executing the command.  It's actually calling the read
+  syscall stub on the application side multiple times, and the first few return 0.  It's actually double printing the ">>" string twice
+  before the rest of the same debug message, which seems very odd.
+  * could it be the syscall is restarting when it shouldn't? (it would actually be calling write multiple times during the read syscall...
+  * could it be the context switching is broken in a way that only now is manifesting? (uncommonly used registers?? or recent breaking change)
 
 * there is currently no checking for illegal characters in each path component
-* you were also going to implement rename(), and getcwd()
+* you were also going to implement rename(), but you need to access the directory through two vnodes at the same time, which isn't possible
+  because only one is unwrapped at the same time
+* also getcwd()
 * implement link
 
 * when a segment is copied, it only copies the pages loaded into memory at that time, and puts 0 for all other pages, but that means when
@@ -19,9 +31,6 @@
 * fix the blocking/unblocking code (including exits) to use multiple queues and an event system of some sorts to improve the performance of checks
 * make methods on File for fs operations (including unlink/rename?), so you don't have to always use vfs::read(file)
 
-* should binaries move to api to better reflect that it's integrating code that uses multiple subsystems, rather than being an isolated subsystem
-  Or should you even move it to its own crate, so that it can be selectively compiled in? but it would still need to be used by the api... can the
-  api (as an integrating layer) be separate from the kernel crate?
 
 * modify the proc macro for encoding system calls to be a bit cleaner (not have to put the {} at the end, fit it all in one line, etc)
 

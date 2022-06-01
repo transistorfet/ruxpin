@@ -4,9 +4,10 @@ pub mod elf;
 use ruxpin_types::{OpenFlags, FileAccess};
 
 use crate::errors::KernelError;
-use crate::proc::binaries::elf::loader;
 use crate::proc::scheduler::create_task;
 use crate::misc::strarray::StandardArrayOfStrings;
+
+use self::elf::loader;
 
 pub fn load_process(cmd: &str) -> Result<(), KernelError> {
     let proc = create_task(None);

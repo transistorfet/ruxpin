@@ -8,6 +8,7 @@ use crate::proc::scheduler::{get_current, check_restart_syscall};
 
 mod file;
 mod proc;
+pub mod binaries;
 
 
 pub fn handle_syscall() {

@@ -13,7 +13,7 @@ use ruxpin_kernel::arch::types::PhysicalAddress;
 use ruxpin_kernel::irqs;
 use ruxpin_kernel::fs::vfs;
 use ruxpin_kernel::tasklets;
-use ruxpin_kernel::proc::binaries;
+use ruxpin_kernel::api::binaries;
 use ruxpin_kernel::proc::scheduler;
 use ruxpin_kernel::mm::kmalloc::init_kernel_heap;
 use ruxpin_kernel::mm::vmalloc::init_virtual_memory;
