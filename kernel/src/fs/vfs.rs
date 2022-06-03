@@ -61,6 +61,13 @@ fn _link_mount_to_vnode(mount: Mount, vnode: Option<Vnode>) -> Result<(), Kernel
     Ok(())
 }
 
+pub fn sync_all() -> Result<(), KernelError> {
+    for mount in MOUNTPOINTS.try_lock()?.iter() {
+        mount.try_lock()?.sync()?;
+    }
+    Ok(())
+}
+
 
 pub fn link() {
     // TODO this implementations are missing

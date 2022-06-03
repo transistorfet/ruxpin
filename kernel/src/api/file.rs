@@ -93,3 +93,8 @@ fn get_current_cwd_and_uid() -> Result<(Option<Vnode>, UserID), KernelError> {
     Ok((cwd, current_uid))
 }
 
+#[syscall_handler]
+pub fn syscall_sync() -> Result<(), KernelError> {
+    vfs::sync_all()
+}
+

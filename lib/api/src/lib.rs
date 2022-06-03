@@ -50,6 +50,9 @@ pub fn mkdir(path: &str, access: FileAccess) -> Result<(), ApiError> {}
 #[syscall_function(GetCwd)]
 pub fn getcwd(path: &mut [u8]) -> Result<(), ApiError> {}
 
+#[syscall_function(Sync)]
+pub fn sync() -> Result<(), ApiError> {}
+
 
 //pub static STDIN: UnbufferedFile = UnbufferedFile(FileDesc(0));
 //pub static STDOUT: UnbufferedFile = UnbufferedFile(FileDesc(1));

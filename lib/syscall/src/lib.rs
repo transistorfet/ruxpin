@@ -25,6 +25,7 @@ pub enum SyscallFunction {
     Rename,
     MkDir,
     GetCwd,
+    Sync,
 
     Sbrk,
 }

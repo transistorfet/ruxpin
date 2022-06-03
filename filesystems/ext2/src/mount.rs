@@ -38,6 +38,9 @@ impl MountOperations for Ext2Mount {
     }
 
     fn sync(&mut self) -> Result<(), KernelError> {
+        self.store_inodes()?;
+        self.superblock.store()?;
+        block::commit_all(self.device_id)?;
         Ok(())
     }
 

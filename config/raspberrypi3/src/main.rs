@@ -45,18 +45,25 @@ pub fn register_devices() -> Result<(), KernelError> {
     vfs::initialize()?;
     scheduler::initialize()?;
 
+    // Register File Systems
     vfs::register_filesystem(DevFilesystem::new())?;
     vfs::register_filesystem(ProcFilesystem::new())?;
     vfs::register_filesystem(TmpFilesystem::new())?;
     vfs::register_filesystem(Ext2Filesystem::new())?;
 
+    // Register Drivers
     console::register()?;
     EmmcDevice::register()?;
 
+    // Mount Root Partition
     vfs::mount(None, "/", "ext2", Some(DeviceID(0, 2)), 0).unwrap();
-    vfs::open(None, "/dev", OpenFlags::Create, FileAccess::DefaultDir, 0).unwrap();
+
+    // Create Mountpoints, If They Don't Exist
+    check_create_directory("/dev").unwrap();
+    check_create_directory("/proc").unwrap();
+    check_create_directory("/tmp").unwrap();
+
     vfs::mount(None, "/dev", "devfs", None, 0).unwrap();
-    vfs::open(None, "/proc", OpenFlags::Create, FileAccess::DefaultDir, 0).unwrap();
     vfs::mount(None, "/proc", "procfs", None, 0).unwrap();
 
     startup_tests().unwrap();
@@ -73,10 +80,14 @@ pub fn register_devices() -> Result<(), KernelError> {
 }
 
 fn startup_tests() -> Result<(), KernelError> {
+    if vfs::open(None, "testdir", OpenFlags::ReadOnly, FileAccess::DefaultDir, 0).is_ok() {
+        notice!("\nSkipping tests because test files already exist");
+        return Ok(())
+    }
+
     notice!("\nRunning some hardcoded tests before completing the startup");
 
     notice!("\nMounting the tmpfs filesystem (simple in-memory file system)");
-    vfs::open(None, "/tmp", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
     vfs::mount(None, "/tmp", "tmpfs", None, 0).unwrap();
 
     notice!("\nCreating a directory and a file inside of it");
@@ -117,7 +128,7 @@ fn startup_tests() -> Result<(), KernelError> {
 
 
 
-    notice!("\nOpening the testapp binary through the vfs interface and reading some data");
+    notice!("\nOpening the shell binary through the vfs interface and reading some data");
     let file = vfs::open(None, "/bin/sh", OpenFlags::ReadOnly, FileAccess::DefaultFile, 0).unwrap();
     let mut data = [0; 1024];
     loop {
@@ -182,3 +193,9 @@ fn startup_tests() -> Result<(), KernelError> {
     Ok(())
 }
 
+fn check_create_directory(path: &str) -> Result<(), KernelError> {
+    if let Err(KernelError::FileNotFound) = vfs::open(None, path, OpenFlags::ReadOnly, FileAccess::DefaultDir, 0) {
+        vfs::open(None, path, OpenFlags::Create, FileAccess::DefaultDir, 0).unwrap();
+    }
+    Ok(())
+}

@@ -81,6 +81,9 @@ pub fn process_syscall(syscall: &mut SyscallRequest) {
         SyscallFunction::GetCwd => {
             self::file::handle_syscall_getcwd(syscall);
         },
+        SyscallFunction::Sync => {
+            self::file::handle_syscall_sync(syscall);
+        },
         _ => {
             error!("syscall: invalid function number: {}", syscall.function as usize);
             syscall.store_result(Err(ApiError::BadSystemCall));

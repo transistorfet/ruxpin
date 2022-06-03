@@ -165,6 +165,12 @@ impl Ext2Mount {
         Ok((*vnode).clone())
     }
 
+    pub(super) fn store_inodes(&mut self) -> Result<(), KernelError> {
+        self.vnode_cache.commit(|_, vnode| {
+            vnode.lock().commit()
+        })
+    }
+
     fn load_inode(&mut self, vnode: &mut Ext2Vnode, inode_num: Ext2InodeNum) -> Result<(), KernelError> {
         let (block_num, byte_offset) = self.superblock.get_inode_entry_location(inode_num)?;
         self.superblock.check_inode_is_allocated(inode_num)?;

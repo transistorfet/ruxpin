@@ -137,6 +137,7 @@ impl Ext2Vnode {
         // No existing entries can be split, so we add a new block
         let block_num = self.get_file_block_num(znum, GetFileBlockOp::Allocate)?.unwrap();
         self.attrs.size += block_size;
+        self.dirty = true;
         let buf = block::get_buf(device_id, block_num)?;
         let locked_buf = &mut *buf.lock_mut();
 
