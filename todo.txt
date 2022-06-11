@@ -1,8 +1,18 @@
 
-* fix the ugly stack manipulation used for the command line arguments.  Can you make one set of arguments available to the process and also
-  to procfs (via the task record)?
-* once the page cache is in place, you can make the entire binary file cacheable such that you wont need to copy data the way you are in
-  the elf loader for the program headers when reading in the file
+* for bufcache, and the issue of block size vs page size, you could maybe make it so that all bufcaches are page sized, but it will give
+  the filesystem whatever block size it requests by returning a subslice of the actual page
+* need to eventually convert kmalloc to use the paging system (with a kernel page flag if necessary)
+* need to merge the bufcache and page cache
+
+* for ext2, link() should be called on the new parent, and given a ref to the original file, since it only needs the inode from the orig
+  to create a link, but it needs access to the Ext2Vnode to create a directory in the new location
+* with the change above, is it possible to implement rename with link and unlink?
+
+
+HIGH PRIORITY ISSUES:
+
+* you were also going to implement rename(), but you need to access the directory through two vnodes at the same time, which isn't possible
+  because only one is unwrapped at the same time
 
 * there is a bug in shell, where it prints the '%' prompt two or three times before executing the command.  It's actually calling the read
   syscall stub on the application side multiple times, and the first few return 0.  It's actually double printing the ">>" string twice
@@ -10,20 +20,32 @@
   * could it be the syscall is restarting when it shouldn't? (it would actually be calling write multiple times during the read syscall...
   * could it be the context switching is broken in a way that only now is manifesting? (uncommonly used registers?? or recent breaking change)
 
-* there is currently no checking for illegal characters in each path component
-* you were also going to implement rename(), but you need to access the directory through two vnodes at the same time, which isn't possible
-  because only one is unwrapped at the same time
-* also getcwd()
-* implement link
 
+* need to fix the data segment/heap/sbrk stuff because it doesn't change the stack size, and there is no checking or
+  support for stack resizing or allocating new stacks in the address space, which is needed for multithread stacks
+* can you replace the process vec with a hashmap?  The issue is iterating over the list for procfs readdir support
+
+
+TODO:
+
+* implement page cache
+* once the page cache is in place, you can make the entire binary file cacheable such that you wont need to copy data the way you are in
+  the elf loader for the program headers when reading in the file
 * when a segment is copied, it only copies the pages loaded into memory at that time, and puts 0 for all other pages, but that means when
   those pages are loaded, they will be duplicated.  The solution is to have a cache for each file/exec that is being used which holds a
   reference to each page, and once it is dropped, those pages will be freed, and when a page is loaded, the cache is searched first.  I'm
   not yet sure how I'd like to implement this, and I still haven't exactly figured out how other OSes do it
-
 * fix the sbrk growing/shrinking
 * need to change how segments are shared, and how pages are shared (need a page cache)
 
+* add a function to libapp to help parse simple command line arguments
+
+* there is currently no checking for illegal characters in each path component
+* implement api getcwd()
+* implement vfs::link()
+
+* should the api be an external crate that integrates the public interfaces (only) of the kernel?
+* modify the proc macro for encoding system calls to be a bit cleaner (not have to put the {} at the end, fit it all in one line, etc)
 
 * think about multicore and what that would mean for everything
 
@@ -31,8 +53,50 @@
 * make methods on File for fs operations (including unlink/rename?), so you don't have to always use vfs::read(file)
 
 
-* should the api be an external crate that integrates the public interfaces (only) of the kernel?
-* modify the proc macro for encoding system calls to be a bit cleaner (not have to put the {} at the end, fit it all in one line, etc)
+* get ext2 writing working.  File contents seems to be unavailable with cat inside the OS.  When mounting the image in linux, the testdir
+  directory appears to have stuff in it, but is reported as empty
+* fix the ugly stack manipulation used for the command line arguments.  Can you make one set of arguments available to the process and also
+  to procfs (via the task record)?
+
+
+* add threading support in api
+* add an events system for processes to wait on (IO blocking, process exit, select/poll, etc)
+
+* add a stack guard page to each stack segment, with permissions/mapping in the translation table such that it will cause a fault
+  instead of crashing into the adjacent segment.  Linux has this adjustable in size I think
+
+* add more data to procfs
+* add . and .. to procfs, as well as devfs and tmpfs
+* add mounts to procfs (and make mount command)
+
+* add arrow key support to canonical input
+* need to handle the case of accessing ".." on a mounted vnode.  It must correctly fetch the parent node
+
+* add commands: cp, echo, mkdir, mv, ps, pwd, rm, mount, umount
+
+
+ISSUES:
+
+* think about threads.  I think linux makes every system thread a process with optional sharing of memory and file descriptors, but I
+  had been thinking of making thredas separate, making them scheduled, and since there could be a current thread and a current process
+  tracked separately by their respective managers (first thing in queue), then a page fault wouldn't have to look up the context, and
+  a system call that accessed files would have to fetch both (but not find one via the others)
+
+* need to sort out the tty devices. how irqs can access the device object. whether only the tty subsystem or the driver as well, has
+  a reference to the devices as well. how the config will create the device object, and where it stores it (or does it assume each
+  driver will register and save global references to the devices if needed?  Is there a better way than using so many global references?
+
+* there's an issue with serial input on the hardware, where it wont show up until a certain number of keys are pressed, but it's a bit
+  unpredictable.  I think it might be an issue with when the interrupt occurs based on the buffer fullness??  Could be totally wrong
+
+* sort out issues of copying to/from user space
+* there is no userspace/kernelspace copying in the api, which could cause a fatal error if the user program doesn't give a valid
+  input, so at some point this needs to be added
+* does the linux copy user/kernel function do manual page lookups, including triggering page loading?  Or does it do soemthing else?
+
+* there is an issue with the emmc driver such that when the image used with qemu is below 2GB or less, the Read command gives a byte
+  offset, but when it's 4GB or larger, it gives a sector offset (byte offset / 512).  I'm not sure if this happens with the pi as well
+  since I only have an 8GB card.  If there was a way to detect the card size, this could be solved
 
 
 WHAT IFS:
@@ -51,68 +115,6 @@ WHAT IFS:
   be granted explicitly, so that APIs security-wise are opt-in, kind of like a web api, or like WASI
 * I'm leaning a lot more to the idea of splitting up the APIs into different groups with a different svc number for
   each.  The aarch64 stuff can have the svc-to-api decoding because it might need to be platform specific
-
-
-
-HIGH PRIORITY ISSUES:
-
-* should you move to per-page reference counting like linux instead of trying to get away with a single bit
-
-* need to fix the data segment/heap/sbrk stuff because it doesn't change the stack size, and there is no checking or
-  support for stack resizing or allocating new stacks in the address space, which is needed for multithread stacks
-* can you replace the process vec with a hashmap?  The issue is iterating over the list for procfs readdir support
-
-* think about threads.  I think linux makes every system thread a process with optional sharing of memory and file descriptors, but I
-  had been thinking of making thredas separate, making them scheduled, and since there could be a current thread and a current process
-  tracked separately by their respective managers (first thing in queue), then a page fault wouldn't have to look up the context, and
-  a system call that accessed files would have to fetch both (but not find one via the others)
-
-* need to sort out the tty devices. how irqs can access the device object. whether only the tty subsystem or the driver as well, has
-  a reference to the devices as well. how the config will create the device object, and where it stores it (or does it assume each
-  driver will register and save global references to the devices if needed?  Is there a better way than using so many global references?
-
-
-TODO:
-
-* add threading support in api
-* add an events system for processes to wait on (IO blocking, process exit, select/poll, etc)
-
-* add a stack guard page to each stack segment, with permissions/mapping in the translation table such that it will cause a fault
-  instead of crashing into the adjacent segment.  Linux has this adjustable in size I think
-
-* add more data to procfs
-* add . and .. to procfs, as well as devfs and tmpfs
-* add mounts to procfs (and make mount command)
-* add arrow key support to canonical input
-* need to handle the case of accessing ".." on a mounted vnode.  It must correctly fetch the parent node
-
-* add commands: cp, echo, mkdir, mv, ps, pwd, rm, mount, umount
-
-
-* there's an issue with serial input on the hardware, where it wont show up until a certain number of keys are pressed, but it's a bit
-  unpredictable.  I think it might be an issue with when the interrupt occurs based on the buffer fullness??  Could be totally wrong
-
-
-LOWER PRIORITY ISSUES:
-
-* syscall macros need to be more automatic, the entire marshal/unmarshal should be based only on types.  The macros need a lot of
-  work to improve, possibly even using proc macros (eg. an attribute on a syscall function that automagically generates the decoding
-  and calling for that function
-
-* sort out issues of copying to/from user space
-* there is no userspace/kernelspace copying in the api, which could cause a fatal error if the user program doesn't give a valid
-  input, so at some point this needs to be added
-* does the linux copy user/kernel function do manual page lookups, including triggering page loading?  Or does it do soemthing else?
-
-* if you put separate locks on the fields of proc, or sub-arc<locks> on at least files and space, so that either can be manipulated
-  independently (so a syscall that locks the proc to write a file can still handle a page fault that tries to lock the same proc to
-  load the next page
-
-* there is an issue with the emmc driver such that when the image used with qemu is below 2GB or less, the Read command gives a byte
-  offset, but when it's 4GB or larger, it gives a sector offset (byte offset / 512).  I'm not sure if this happens with the pi as well
-  since I only have an 8GB card.  If there was a way to detect the card size, this could be solved
-
-* could you add feature flags to disable the file subsystem, so you don't need a filesystem at all??
 
 
 

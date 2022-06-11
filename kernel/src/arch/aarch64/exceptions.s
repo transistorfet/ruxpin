@@ -85,8 +85,8 @@ _save_context:
 	// Save the two values on the stack now that we have temp regs
 	ldp	x8, x9, [sp, 0]
 	stp	x8, x1, [x0, 0]
-	mrs	x8, SP_EL0
-	stp	x9, x8, [x0, 240]
+	mrs	x10, SP_EL0
+	stp	x9, x10, [x0, 240]
 
 	// Reposition offset
 	add	x0, x0, #256
@@ -111,9 +111,9 @@ _save_context:
 
 	add	x0, x0, #512
 
-	mrs	x8, ELR_EL1
-	mrs	x9, SPSR_EL1
-	stp	x8, x9, [x0, 0]
+	mrs	x9, ELR_EL1
+	mrs	x10, SPSR_EL1
+	stp	x9, x10, [x0, 0]
 
 	sub	x0, x0, #(512 + 256)
 

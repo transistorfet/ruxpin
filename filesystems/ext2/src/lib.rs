@@ -102,12 +102,13 @@ impl VnodeOperations for Ext2Vnode {
         Err(KernelError::FileNotFound)
     }
 
-    //fn link(&mut self, newparent: Vnode, filename: &str) -> Result<(), KernelError> {
-    //    newparent.add_directory_to_vnode(filename, self.attrs.inode, self.attrs.access)?;
-    //    self.attrs.nlinks += 1;
-    //    self.dirty = true;
-    //    Ok(())
-    //}
+    fn link(&mut self, target: Vnode, filename: &str) -> Result<(), KernelError> {
+        self.add_directory_to_vnode(filename, target.lock().attributes()?.inode, self.attrs.access)?;
+        target.lock().attributes_mut(&mut |attrs| {
+            attrs.nlinks += 1;
+        })?;
+        Ok(())
+    }
 
     fn unlink(&mut self, target: Vnode, filename: &str) -> Result<(), KernelError> {
         if is_directory(target.clone())? && !is_directory_empty(target.clone())? {
@@ -124,13 +125,18 @@ impl VnodeOperations for Ext2Vnode {
         Ok(())
     }
 
-    fn rename(&mut self, old_name: &str, new_parent: Vnode, new_name: &str) -> Result<(), KernelError> {
+    fn rename(&mut self, old_name: &str, new_parent: Option<Vnode>, new_name: &str) -> Result<(), KernelError> {
+        let target = self.lookup(old_name)?;
+        if let Some(new_parent) = new_parent {
+            new_parent.lock().link(target, new_name)?;
+        } else {
+            self.link(target, new_name)?;
+        }
 
-        // TODO find dir entry of old parent
-        //      if entry_len is less than new name, reuse, otherwise find new one
-        //      write inode to new entry, delete old entry
-
-        Err(KernelError::OperationNotPermitted)
+        self.remove_directory_entry(old_name)?;
+        self.attrs.nlinks -= 1;
+        self.dirty = true;
+        Ok(())
     }
 
     fn truncate(&mut self) -> Result<(), KernelError> {
@@ -142,9 +148,11 @@ impl VnodeOperations for Ext2Vnode {
         Ok(&mut self.attrs)
     }
 
-    //fn attributes_mut(&mut self, f: &mut dyn FnMut(&mut FileAttributes)) -> Result<(), KernelError> {
-    //    Err(KernelError::OperationNotPermitted)
-    //}
+    fn attributes_mut(&mut self, func: &mut dyn FnMut(&mut FileAttributes)) -> Result<(), KernelError> {
+        func(&mut self.attrs);
+        self.dirty = true;
+        Ok(())
+    }
 
     fn open(&mut self, _file: &mut FilePointer, _flags: OpenFlags) -> Result<(), KernelError> {
         Ok(())

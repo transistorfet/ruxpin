@@ -103,6 +103,12 @@ pub fn rename(cwd: Option<Vnode>, old_path: &str, new_path: &str, current_uid: U
     let (old_parent, old_dir, old_name) = rename_get_parent(cwd.clone(), old_path, current_uid)?;
     let (new_parent, new_dir, new_name) = rename_get_parent(cwd, new_path, current_uid)?;
 
+    let new_parent = if Arc::ptr_eq(&old_parent, &new_parent) {
+        None
+    } else {
+        Some(new_parent)
+    };
+
     // TODO verify that both locations are on the same device
 
     old_parent.lock().rename(old_name, new_parent, new_name)?;
