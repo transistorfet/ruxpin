@@ -129,13 +129,13 @@ impl TaskManager {
     }
 
     fn restart_blocked_by_syscall(&mut self, function: SyscallFunction) {
-        for node in self.blocked.iter() {
-            if node.try_lock().unwrap().syscall.function == function {
-                if node.try_lock().unwrap().state == TaskState::Blocked {
-                    node.try_lock().unwrap().state = TaskState::Running;
-                    self.blocked.remove_node(node.clone());
-                    self.scheduled.insert_head(node.clone());
-                    node.lock().restart_syscall = true;
+        for task in self.blocked.iter() {
+            if task.try_lock().unwrap().syscall.function == function {
+                if task.try_lock().unwrap().state == TaskState::Blocked {
+                    task.try_lock().unwrap().state = TaskState::Running;
+                    self.blocked.remove_node(task.clone());
+                    self.scheduled.insert_head(task.clone());
+                    task.try_lock().unwrap().restart_syscall = true;
                 }
             }
         }
@@ -248,10 +248,9 @@ pub fn find_exited(pid: Option<Pid>, parent: Option<Pid>, process_group: Option<
 
 pub fn schedule() {
     TASK_MANAGER.try_lock().unwrap().schedule();
-    check_restart_syscall();
 }
 
-pub(crate) fn check_restart_syscall() {
+pub fn check_restart_syscall() {
     let current_task = get_current();
     if current_task.lock().restart_syscall {
         current_task.lock().restart_syscall = false;

@@ -6,7 +6,7 @@ use alloc::sync::Arc;
 use ruxpin_types::{DeviceID, FileAccess, UserID, GroupID};
 
 use ruxpin_kernel::block;
-use ruxpin_kernel::{info, debug, trace};
+use ruxpin_kernel::{info, trace};
 use ruxpin_kernel::sync::Spinlock;
 use ruxpin_kernel::errors::KernelError;
 use ruxpin_kernel::misc::byteorder::{leu16, leu32};

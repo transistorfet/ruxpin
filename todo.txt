@@ -4,15 +4,10 @@
 * need to eventually convert kmalloc to use the paging system (with a kernel page flag if necessary)
 * need to merge the bufcache and page cache
 
-* for ext2, link() should be called on the new parent, and given a ref to the original file, since it only needs the inode from the orig
-  to create a link, but it needs access to the Ext2Vnode to create a directory in the new location
-* with the change above, is it possible to implement rename with link and unlink?
-
 
 HIGH PRIORITY ISSUES:
 
-* you were also going to implement rename(), but you need to access the directory through two vnodes at the same time, which isn't possible
-  because only one is unwrapped at the same time
+* should you have a heap in the kernel with mapped pages, and if so, where in virtual memory would it be located?
 
 * there is a bug in shell, where it prints the '%' prompt two or three times before executing the command.  It's actually calling the read
   syscall stub on the application side multiple times, and the first few return 0.  It's actually double printing the ">>" string twice
@@ -43,9 +38,11 @@ TODO:
 * there is currently no checking for illegal characters in each path component
 * implement api getcwd()
 * implement vfs::link()
+* fix rename on ext2 to more intelligently rename (if the parents are the same and the direntry can be reuse, then do that)
 
 * should the api be an external crate that integrates the public interfaces (only) of the kernel?
 * modify the proc macro for encoding system calls to be a bit cleaner (not have to put the {} at the end, fit it all in one line, etc)
+* add networking
 
 * think about multicore and what that would mean for everything
 

@@ -380,7 +380,7 @@ _default_exceptions_table:
 	HANDLE_KERNEL_EXCEPTION handle_kernel_exception
 
 .balign 0x80	// IRQ
-	HANDLE_KERNEL_EXCEPTION handle_irq
+	HANDLE_KERNEL_EXCEPTION handle_kernel_irq
 
 .balign 0x80	// Fast IRQ
 	b	_exception_fatal
@@ -393,7 +393,7 @@ _default_exceptions_table:
 	HANDLE_CONTEXT_SWITCH handle_user_exception
 
 .balign 0x80	// IRQ
-	HANDLE_CONTEXT_SWITCH handle_irq
+	HANDLE_CONTEXT_SWITCH handle_user_irq
 
 .balign 0x80	// Fast IRQ
 	b	_exception_fatal

@@ -95,7 +95,7 @@ impl VnodeOperations for Ext2Vnode {
             };
             position += nbytes;
             if dirent.as_str() == filename {
-                trace!("ext2: looking for {:?}, found inode {}", filename, dirent.inode); 
+                trace!("ext2: looking for {:?}, found inode {}", filename, dirent.inode);
                 return self.get_inode(dirent.inode);
             }
         }
@@ -167,16 +167,16 @@ impl VnodeOperations for Ext2Vnode {
             return Err(KernelError::IsADirectory);
         }
 
-	let nbytes = if buffer.len() > self.attrs.size - file.position {
-	    self.attrs.size - file.position
+        let nbytes = if buffer.len() > self.attrs.size - file.position {
+            self.attrs.size - file.position
         } else {
             buffer.len()
         };
 
         let offset = self.read_from_vnode(buffer, nbytes, file.position)?;
 
-	file.position += offset;
-	Ok(offset)
+        file.position += offset;
+        Ok(offset)
     }
 
     fn write(&mut self, file: &mut FilePointer, buffer: &[u8]) -> Result<usize, KernelError> {
@@ -186,13 +186,13 @@ impl VnodeOperations for Ext2Vnode {
 
         let offset = self.write_to_vnode(buffer, buffer.len(), file.position)?;
 
-	file.position += offset;
-	if file.position > self.attrs.size {
-	    self.attrs.size = file.position;
-	}
+        file.position += offset;
+        if file.position > self.attrs.size {
+            self.attrs.size = file.position;
+        }
         self.writeback()?;
 
-	Ok(offset)
+        Ok(offset)
     }
 
     fn seek(&mut self, file: &mut FilePointer, offset: usize, whence: Seek) -> Result<usize, KernelError> {

@@ -82,7 +82,7 @@ pub extern "C" fn fatal_kernel_error(_sp: u64, elr: u64, esr: u64, far: u64) -> 
 
 #[no_mangle]
 extern "C" fn handle_user_exception(context: &Context, elr: u64, esr: u64, far: u64, _sp: u64) {
-    //debug!("Handle an exception of {:x} for sp {:x}", esr, sp);
+    trace!("Handle an exception of ESR: {:x} from ELR: {:x}", esr, elr);
 
     match esr >> 26 {
         // SVC from Aarch64
@@ -109,9 +109,18 @@ extern "C" fn handle_user_exception(context: &Context, elr: u64, esr: u64, far: 
         }
     }
 
-    enable_all_irq();
-    crate::tasklets::run_tasklets();
-    disable_all_irq();
+    run_tasklets_with_interrupts();
+    scheduler::check_restart_syscall();
+}
+
+#[no_mangle]
+extern "C" fn handle_user_irq(_context: &Context, _elr: u64, _esr: u64, _far: u64, _sp: u64) {
+    //trace!("Handle an irq of {:x} for sp {:x}", _esr, _sp);
+
+    irqs::handle_irqs();
+
+    run_tasklets_with_interrupts();
+    scheduler::check_restart_syscall();
 }
 
 #[no_mangle]
@@ -136,11 +145,15 @@ extern "C" fn handle_kernel_exception(sp: u64, elr: u64, esr: u64, far: u64) {
 }
 
 #[no_mangle]
-extern "C" fn handle_irq(_context: &Context, _elr: u64, _esr: u64, _far: u64, _sp: u64) {
+extern "C" fn handle_kernel_irq(_context: &Context, _elr: u64, _esr: u64, _far: u64, _sp: u64) {
     //trace!("Handle an irq of {:x} for sp {:x}", _esr, _sp);
 
     irqs::handle_irqs();
 
+    run_tasklets_with_interrupts();
+}
+
+fn run_tasklets_with_interrupts() {
     enable_all_irq();
     crate::tasklets::run_tasklets();
     disable_all_irq();
