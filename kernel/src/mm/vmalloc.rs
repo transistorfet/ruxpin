@@ -19,7 +19,7 @@ const MAX_SEGMENTS: usize = 6;
 static mut KERNEL_ADDRESS_SPACE: Option<SharableVirtualAddressSpace> = None;
 
 
-pub fn init_virtual_memory(start: PhysicalAddress, end: PhysicalAddress) {
+pub fn initialize(start: PhysicalAddress, end: PhysicalAddress) {
     pages::init_pages_area(start, end);
 
     let space = VirtualAddressSpace {
@@ -63,55 +63,61 @@ impl VirtualAddressSpace {
         Arc::new(Spinlock::new(Self::new()))
     }
 
-    pub fn add_memory_segment(&mut self, stype: SegmentType, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) {
+    pub fn add_memory_segment(&mut self, stype: SegmentType, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) -> Result<(), KernelError> {
         let segment = Arc::new(Spinlock::new(Segment::new_memory(permissions, vaddr, vaddr.add(len))));
         if stype != SegmentType::Stack && (self.data.is_none() || vaddr > self.data.as_mut().unwrap().lock().start) {
             self.data = Some(segment.clone());
         }
         self.segments.push(segment);
-        self.map_on_demand(permissions, vaddr, align_up(len, mmu::page_size()));
+        self.map_on_demand(permissions, vaddr, align_up(len, mmu::page_size()))?;
+        Ok(())
     }
 
-    pub fn add_file_backed_segment(&mut self, stype: SegmentType, permissions: MemoryPermissions, file: File, file_offset: usize, file_size: usize, vaddr: VirtualAddress, mem_offset: usize, mem_size: usize) {
+    pub fn add_file_backed_segment(&mut self, stype: SegmentType, permissions: MemoryPermissions, file: File, file_offset: usize, file_size: usize, vaddr: VirtualAddress, mem_offset: usize, mem_size: usize) -> Result<(), KernelError> {
         let segment = Arc::new(Spinlock::new(Segment::new_file_backed(file, file_offset, file_size, permissions, mem_offset, vaddr, vaddr.add(mem_size).add(mem_offset).align_up(mmu::page_size()))));
         if stype != SegmentType::Stack && (self.data.is_none() || vaddr > self.data.as_mut().unwrap().lock().start) {
             self.data = Some(segment.clone());
         }
         self.segments.push(segment);
-        self.map_on_demand(permissions, vaddr, align_up(mem_size + mem_offset, mmu::page_size()));
+        self.map_on_demand(permissions, vaddr, align_up(mem_size + mem_offset, mmu::page_size()))?;
+        Ok(())
     }
 
-    pub fn add_memory_segment_allocated(&mut self, _stype: SegmentType, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) {
+    pub fn add_memory_segment_allocated(&mut self, _stype: SegmentType, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) -> Result<(), KernelError> {
         let segment = Arc::new(Spinlock::new(Segment::new_memory(permissions, vaddr, vaddr.add(len))));
         self.segments.push(segment);
-        self.alloc_mapped(permissions, vaddr, align_up(len, mmu::page_size()));
+        self.alloc_mapped(permissions, vaddr, align_up(len, mmu::page_size()))?;
+        Ok(())
     }
 
-    pub fn clear_segments(&mut self) {
+    pub fn clear_segments(&mut self) -> Result<(), KernelError> {
         for i in 0..self.segments.len() {
             let start = self.segments[i].lock().start;
             let len = self.segments[i].lock().page_aligned_len();
-            self.unmap_range(start, len);
+            self.unmap_range(start, len)?;
         }
         self.segments.clear();
+        Ok(())
     }
 
-    pub fn copy_segments(&mut self, parent: &mut Self) {
+    pub fn copy_segments(&mut self, parent: &mut Self) -> Result<(), KernelError> {
         for segment in parent.segments.iter() {
             //crate::debug!("cloning segment {:x} to {:x}", usize::from(segment.start), usize::from(segment.end));
             self.segments.push(segment.clone());
-            self.copy_segment_map(&mut parent.table, &*segment.lock());
+            self.copy_segment_map(&mut parent.table, &*segment.lock())?;
         }
+        Ok(())
     }
 
     // TODO technically increment should be isize, and can be negative to shrink the size
     pub fn adjust_stack_break(&mut self, increment: usize) -> Result<VirtualAddress, KernelError> {
+        trace!("vmalloc: adjusting sbrk size by {}", increment);
         let inc_aligned = align_up(increment, mmu::page_size());
         let segment = self.data.clone().unwrap();
         let mut locked_seg = segment.try_lock()?;
         let previous_end = locked_seg.end;
         locked_seg.end = locked_seg.end.add(inc_aligned);
-        self.map_on_demand(locked_seg.permissions, previous_end, inc_aligned);
+        self.map_on_demand(locked_seg.permissions, previous_end, inc_aligned)?;
         Ok(previous_end)
     }
 

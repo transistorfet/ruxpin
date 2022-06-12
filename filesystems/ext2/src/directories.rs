@@ -5,10 +5,10 @@ use ruxpin_types::{FileAccess, DirEntry};
 
 use ruxpin_kernel::block;
 use ruxpin_kernel::block::Buf;
+use ruxpin_kernel::misc::memory;
 use ruxpin_kernel::misc::align_up;
 use ruxpin_kernel::block::BlockNum;
 use ruxpin_kernel::errors::KernelError;
-use ruxpin_kernel::misc::memory::{cast_to_ref, cast_to_ref_mut};
 use ruxpin_kernel::misc::byteorder::{leu16, leu32};
 
 use super::Ext2InodeNum;
@@ -54,7 +54,7 @@ impl Ext2Vnode {
         // Get the directory entry's position in the block
         let offset = position % block_size;
         let entry_on_disk: &Ext2DirEntryHeader = unsafe {
-            cast_to_ref(&locked_buf[offset..])
+            memory::cast_to_ref(&locked_buf[offset..])
         };
 
         let entry_len = u16::from(entry_on_disk.entry_len) as usize;
@@ -78,7 +78,7 @@ impl Ext2Vnode {
         let locked_buf = &mut *buf.lock_mut();
 
         let mut entry_on_disk: &mut Ext2DirEntryHeader = unsafe {
-            cast_to_ref_mut(&mut locked_buf[offset..])
+            memory::cast_to_ref_mut(&mut locked_buf[offset..])
         };
 
         // Split the entry if needed
@@ -89,7 +89,7 @@ impl Ext2Vnode {
 
             offset += entry_min_len;
             entry_on_disk = unsafe {
-                cast_to_ref_mut(&mut locked_buf[offset..])
+                memory::cast_to_ref_mut(&mut locked_buf[offset..])
             };
             entry_on_disk.entry_len = (entry_len - entry_min_len as u16).into();
         }
@@ -118,7 +118,7 @@ impl Ext2Vnode {
             let mut offset = 0;
             while offset < block_size {
                 let entry_on_disk: &Ext2DirEntryHeader = unsafe {
-                    cast_to_ref(&locked_buf[offset..])
+                    memory::cast_to_ref(&locked_buf[offset..])
                 };
 
                 let entry_len = u16::from(entry_on_disk.entry_len) as usize;
@@ -142,7 +142,7 @@ impl Ext2Vnode {
         let locked_buf = &mut *buf.lock_mut();
 
         let entry_on_disk: &mut Ext2DirEntryHeader = unsafe {
-            cast_to_ref_mut(locked_buf)
+            memory::cast_to_ref_mut(locked_buf)
         };
 
         // Initialize the entry before returning, in case it contains non-zero data
@@ -176,7 +176,7 @@ impl Ext2Vnode {
                     } else {
                         let locked_buf = &mut *buf.lock_mut();
                         let mut previous_entry_on_disk: &mut Ext2DirEntryHeader = unsafe {
-                            cast_to_ref_mut(&mut locked_buf[previous_position.unwrap()..])
+                            memory::cast_to_ref_mut(&mut locked_buf[previous_position.unwrap()..])
                         };
 
                         previous_entry_on_disk.entry_len = (u16::from(previous_entry_on_disk.entry_len) + entry_len as u16).into();
@@ -199,7 +199,7 @@ fn compare_filename_from_buf(buf: &Buf, offset: usize, filename: &str) -> (bool,
     let locked_buf = &*buf.lock();
 
     let entry_on_disk: &Ext2DirEntryHeader = unsafe {
-        cast_to_ref(&locked_buf[offset..])
+        memory::cast_to_ref(&locked_buf[offset..])
     };
 
     let inode = u32::from(entry_on_disk.inode);

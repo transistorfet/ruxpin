@@ -77,7 +77,7 @@ impl PagePool {
     pub fn free_page(&mut self, ptr: PhysicalAddress) {
         for region in &mut self.regions {
             if ptr >= region.pages_start && ptr <= region.pages_start.add(region.total_pages() * mmu::page_size()) {
-                trace!("pages: freeing page at {:x}", usize::from(ptr));
+                //trace!("pages: freeing page at {:x}", usize::from(ptr));
                 region.free_page(ptr);
                 return;
             }
@@ -142,7 +142,7 @@ impl PageRegion {
         let bit = (usize::from(ptr) - usize::from(self.pages_start)) / mmu::page_size();
         self.desc_table[bit].refcount -= 1;
         if self.desc_table[bit].refcount == 0 {
-            trace!("pages: freeing page at {:x}", usize::from(ptr));
+            trace!("pages: refcount reached zero, freeing page at {:x}", usize::from(ptr));
             self.free_bit(bit);
         }
     }

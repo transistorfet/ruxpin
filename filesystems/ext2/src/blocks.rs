@@ -4,9 +4,9 @@ use core::mem;
 use ruxpin_types::DeviceID;
 
 use ruxpin_kernel::block;
+use ruxpin_kernel::misc::memory;
 use ruxpin_kernel::block::BlockNum;
 use ruxpin_kernel::errors::KernelError;
-use ruxpin_kernel::misc::memory::{cast_to_slice, cast_to_slice_mut};
 
 use super::Ext2InodeNum;
 use super::Ext2BlockNumber;
@@ -64,7 +64,7 @@ impl Ext2Vnode {
 
         let block = {
             let locked_buf = buf.lock();
-            let table = unsafe { cast_to_slice(&*locked_buf) };
+            let table = unsafe { memory::cast_to_slice(&*locked_buf) };
             table[index]
         };
 
@@ -74,7 +74,7 @@ impl Ext2Vnode {
             Ok(None)
         } else {
             let mut locked_buf = buf.lock_mut();
-            let table = unsafe { cast_to_slice_mut(&mut *locked_buf) };
+            let table = unsafe { memory::cast_to_slice_mut(&mut *locked_buf) };
             table[index] = self.get_mount().alloc_block(self.attrs.inode as Ext2InodeNum)?;
             Ok(Some(table[index]))
         }
@@ -123,7 +123,7 @@ impl Ext2Vnode {
 
         let buf = block::get_buf(device_id, table_block)?;
         let mut locked_buf = buf.lock_mut();
-        let table_data = unsafe { cast_to_slice_mut(&mut *locked_buf) };
+        let table_data = unsafe { memory::cast_to_slice_mut(&mut *locked_buf) };
 
         for index in 0..table_data.len() {
             if table_data[index] != 0 {

@@ -2,9 +2,9 @@
 use core::str;
 use core::mem;
 
+use crate::misc::memory;
 use crate::misc::align_up;
 use crate::arch::types::VirtualAddress;
-use crate::misc::memory::cast_to_slice_mut;
 use crate::errors::KernelError;
 
 pub struct StrArray<const LENGTH: usize> {
@@ -107,7 +107,7 @@ impl<const LENGTH: usize, const WORDS: usize> ArrayOfStrings<LENGTH, WORDS> {
 
     pub fn marshall(&self, dest: &mut [u8], base_addr: VirtualAddress) {
         let buffer_start = (self.offsets_len + 1) * mem::size_of::<usize>();
-        let dest_usize: &mut [usize] = unsafe { cast_to_slice_mut(dest) };
+        let dest_usize: &mut [usize] = unsafe { memory::cast_to_slice_mut(dest) };
 
         for i in 0..self.offsets_len {
             dest_usize[i] = usize::from(base_addr.add(buffer_start).add(self.offsets[i]));

@@ -22,11 +22,11 @@ pub fn initialize() -> Result<(), KernelError> {
     Ok(())
 }
 
-pub fn schedule_tasklet(func: Box<dyn FnOnce() -> Result<(), KernelError>>) {
+pub fn schedule(func: Box<dyn FnOnce() -> Result<(), KernelError>>) {
     TASKLET_QUEUE.lock().as_mut().unwrap().push_back(Tasklet { func });
 }
 
-pub fn run_tasklets() {
+pub fn run() {
     while let Some(task) = TASKLET_QUEUE.lock().as_mut().unwrap().pop_front() {
         match (task.func)() {
             Ok(()) => { },

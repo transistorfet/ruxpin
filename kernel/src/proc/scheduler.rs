@@ -4,8 +4,8 @@ use alloc::vec::Vec;
 use ruxpin_types::{Tid, Pid};
 use ruxpin_syscall::{SyscallFunction};
 
+use crate::api;
 use crate::info;
-use crate::api::process_syscall;
 use crate::arch::Context;
 use crate::arch::types::VirtualAddress;
 use crate::errors::KernelError;
@@ -160,7 +160,7 @@ impl TaskManager {
         info!("Exiting process {}", task.try_lock().unwrap().process_id);
 
         self.detach(task.clone());
-        task.try_lock().unwrap().exit_and_free_resources(status);
+        let _ = task.try_lock().unwrap().exit_and_free_resources(status); // Ignore the error
         self.restart_blocked_by_syscall(SyscallFunction::WaitPid);
     }
 
@@ -223,14 +223,14 @@ pub fn get_current() -> Task {
     TASK_MANAGER.try_lock().unwrap().get_current()
 }
 
-pub fn clone_current(args: TaskCloneArgs) -> Task {
-    let mut manager = TASK_MANAGER.try_lock().unwrap();
+pub fn clone_current(args: TaskCloneArgs) -> Result<Task, KernelError> {
+    let mut manager = TASK_MANAGER.try_lock()?;
     let current_task = manager.get_current();
     let new_proc = manager.create_task(Some(current_task.clone()));
 
-    new_proc.try_lock().unwrap().clone_resources(&*current_task.try_lock().unwrap(), args);
+    new_proc.try_lock()?.clone_resources(&*current_task.try_lock()?, args)?;
 
-    new_proc
+    Ok(new_proc)
 }
 
 pub fn abort(task: Task) {
@@ -255,7 +255,7 @@ pub fn check_restart_syscall() {
     if current_task.lock().restart_syscall {
         current_task.lock().restart_syscall = false;
         let mut syscall = current_task.lock().syscall.clone();
-        process_syscall(&mut syscall);
+        api::process_syscall(&mut syscall);
     }
 }
 

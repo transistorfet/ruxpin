@@ -3,14 +3,14 @@ use ruxpin_types::{FileDesc, OpenFlags, FileAccess, DirEntry, UserID};
 use ruxpin_syscall_proc::syscall_handler;
 
 use crate::fs::vfs;
+use crate::proc::scheduler;
 use crate::fs::types::Vnode;
 use crate::errors::KernelError;
-use crate::proc::scheduler::get_current;
 
 
 #[syscall_handler]
 pub fn syscall_open(path: &str, flags: OpenFlags, access: FileAccess) -> Result<FileDesc, KernelError> {
-    let proc = get_current();
+    let proc = scheduler::get_current();
 
     let (cwd, current_uid, file_num) = {
         let locked_proc = proc.try_lock()?;
@@ -28,26 +28,26 @@ pub fn syscall_open(path: &str, flags: OpenFlags, access: FileAccess) -> Result<
 
 #[syscall_handler]
 pub fn syscall_close(file: FileDesc) -> Result<(), KernelError> {
-    let proc = get_current();
+    let proc = scheduler::get_current();
     let result = proc.try_lock()?.files.try_lock()?.clear_slot(file);
     result
 }
 
 #[syscall_handler]
 pub fn syscall_read(file: FileDesc, buffer: &mut [u8]) -> Result<usize, KernelError> {
-    let file = get_current().try_lock()?.files.try_lock()?.get_file(file)?;
+    let file = scheduler::get_current().try_lock()?.files.try_lock()?.get_file(file)?;
     vfs::read(file, buffer)
 }
 
 #[syscall_handler]
 pub fn syscall_write(file: FileDesc, buffer: &[u8]) -> Result<usize, KernelError> {
-    let file = get_current().try_lock()?.files.try_lock()?.get_file(file)?;
+    let file = scheduler::get_current().try_lock()?.files.try_lock()?.get_file(file)?;
     vfs::write(file, buffer)
 }
 
 #[syscall_handler]
 pub fn syscall_readdir(file: FileDesc, dirent: &mut DirEntry) -> Result<bool, KernelError> {
-    let file = get_current().try_lock()?.files.try_lock()?.get_file(file)?;
+    let file = scheduler::get_current().try_lock()?.files.try_lock()?.get_file(file)?;
     match vfs::readdir(file)? {
         Some(result) => {
             *dirent = result;
@@ -85,7 +85,7 @@ pub fn syscall_getcwd(path: &mut [u8]) -> Result<(), KernelError> {
 }
 
 fn get_current_cwd_and_uid() -> Result<(Option<Vnode>, UserID), KernelError> {
-    let proc = get_current();
+    let proc = scheduler::get_current();
     let locked_proc = proc.try_lock()?;
 
     let cwd = locked_proc.files.try_lock()?.get_cwd();

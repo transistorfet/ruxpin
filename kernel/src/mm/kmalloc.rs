@@ -24,7 +24,7 @@ fn out_of_memory(_: Layout) -> ! {
     panic!("Out Of Memory");
 }
 
-pub fn init_kernel_heap(start: PhysicalAddress, end: PhysicalAddress) {
+pub fn initialize(start: PhysicalAddress, end: PhysicalAddress) {
     unsafe {
         MAIN_HEAP.init(start, end);
     }

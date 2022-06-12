@@ -6,9 +6,10 @@ use ruxpin_syscall::SyscallRequest;
 use ruxpin_types::{Tid, Pid, UserID};
 
 use crate::arch::Context;
+use crate::sync::Spinlock;
+use crate::errors::KernelError;
 use crate::fs::filedesc::{FileDescriptors, SharableFileDescriptors};
 use crate::mm::vmalloc::{VirtualAddressSpace, SharableVirtualAddressSpace};
-use crate::sync::Spinlock;
 
 use super::scheduler::Task;
 
@@ -126,26 +127,28 @@ impl TaskRecord {
         }
     }
 
-    pub fn exit_and_free_resources(&mut self, status: isize) {
+    pub fn exit_and_free_resources(&mut self, status: isize) -> Result<(), KernelError> {
         self.exit_status = Some(status);
-        self.free_resources();
+        self.free_resources()
     }
 
-    pub fn free_resources(&mut self) {
-        self.files.try_lock().unwrap().close_all();
-        self.space.try_lock().unwrap().clear_segments();
+    pub fn free_resources(&mut self) -> Result<(), KernelError> {
+        self.files.try_lock()?.close_all();
+        self.space.try_lock()?.clear_segments()?;
+        Ok(())
     }
 
-    pub fn clone_resources(&mut self, source: &TaskRecord, _args: TaskCloneArgs) {
+    pub fn clone_resources(&mut self, source: &TaskRecord, _args: TaskCloneArgs) -> Result<(), KernelError> {
         self.current_uid = source.current_uid;
-        self.files = source.files.try_lock().unwrap().duplicate_table();
-        self.space.try_lock().unwrap().copy_segments(&mut source.space.try_lock().unwrap());
-        let ttbr = self.space.try_lock().unwrap().get_ttbr();
+        self.files = source.files.try_lock()?.duplicate_table();
+        self.space.try_lock()?.copy_segments(&mut *source.space.try_lock()?)?;
+        let ttbr = self.space.try_lock()?.get_ttbr();
         self.context = source.context.clone();
         self.context.set_ttbr(ttbr);
 
         // The return result will be 0 to indicate it's the child process
         self.context.write_result(Ok(0));
+        Ok(())
     }
 }
 

@@ -1,7 +1,9 @@
 
 use core::arch::asm;
 
+use crate::api;
 use crate::irqs;
+use crate::tasklets;
 use crate::{error, debug, trace};
 use crate::printk::printk_dump;
 use crate::proc::scheduler;
@@ -87,8 +89,7 @@ extern "C" fn handle_user_exception(context: &Context, elr: u64, esr: u64, far: 
     match esr >> 26 {
         // SVC from Aarch64
         0b010101 => {
-            use crate::api::handle_syscall;
-            handle_syscall();
+            api::handle_syscall();
         },
 
         // Instruction or Data Abort from lower EL
@@ -155,7 +156,7 @@ extern "C" fn handle_kernel_irq(_context: &Context, _elr: u64, _esr: u64, _far: 
 
 fn run_tasklets_with_interrupts() {
     enable_all_irq();
-    crate::tasklets::run_tasklets();
+    tasklets::run();
     disable_all_irq();
 }
 

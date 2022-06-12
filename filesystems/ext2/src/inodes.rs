@@ -6,12 +6,12 @@ use alloc::sync::Arc;
 use ruxpin_types::{DeviceID, FileAccess, UserID, GroupID};
 
 use ruxpin_kernel::block;
+use ruxpin_kernel::misc::memory;
 use ruxpin_kernel::{info, trace};
 use ruxpin_kernel::sync::Spinlock;
 use ruxpin_kernel::errors::KernelError;
 use ruxpin_kernel::misc::byteorder::{leu16, leu32};
 use ruxpin_kernel::fs::types::{Vnode, FileAttributes};
-use ruxpin_kernel::misc::memory::{cast_to_ref, cast_to_ref_mut};
 
 use super::Ext2InodeNum;
 use super::Ext2BlockNumber;
@@ -178,7 +178,7 @@ impl Ext2Mount {
         let buf = block::get_buf(self.device_id, block_num)?;
         let locked_buf = &*buf.lock();
         let data: &Ext2InodeOnDisk = unsafe {
-            cast_to_ref(&locked_buf[byte_offset..])
+            memory::cast_to_ref(&locked_buf[byte_offset..])
         };
 
         for i in 0..vnode.blocks.len() {
@@ -206,7 +206,7 @@ impl Ext2Mount {
         let buf = block::get_buf(self.device_id, block_num)?;
         let locked_buf = &mut *buf.lock_mut();
         let data: &mut Ext2InodeOnDisk = unsafe {
-            cast_to_ref_mut(&mut locked_buf[byte_offset..])
+            memory::cast_to_ref_mut(&mut locked_buf[byte_offset..])
         };
 
         for i in 0..vnode.blocks.len() {

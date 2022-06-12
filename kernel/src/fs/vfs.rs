@@ -100,8 +100,8 @@ pub fn unlink(cwd: Option<Vnode>, path: &str, current_uid: UserID) -> Result<(),
 }
 
 pub fn rename(cwd: Option<Vnode>, old_path: &str, new_path: &str, current_uid: UserID) -> Result<(), KernelError> {
-    let (old_parent, old_dir, old_name) = rename_get_parent(cwd.clone(), old_path, current_uid)?;
-    let (new_parent, new_dir, new_name) = rename_get_parent(cwd, new_path, current_uid)?;
+    let (old_parent, old_name) = rename_get_parent(cwd.clone(), old_path, current_uid)?;
+    let (new_parent, new_name) = rename_get_parent(cwd, new_path, current_uid)?;
 
     let new_parent = if Arc::ptr_eq(&old_parent, &new_parent) {
         None
@@ -115,7 +115,7 @@ pub fn rename(cwd: Option<Vnode>, old_path: &str, new_path: &str, current_uid: U
     Ok(())
 }
 
-fn rename_get_parent<'a>(cwd: Option<Vnode>, path: &'a str, current_uid: UserID) -> Result<(Vnode, &'a str, &'a str), KernelError> {
+fn rename_get_parent<'a>(cwd: Option<Vnode>, path: &'a str, current_uid: UserID) -> Result<(Vnode, &'a str), KernelError> {
     let (dirname, filename) = get_path_component_reverse(path);
     if filename == "." || filename == ".." {
         return Err(KernelError::InvalidArgument);
@@ -128,7 +128,7 @@ fn rename_get_parent<'a>(cwd: Option<Vnode>, path: &'a str, current_uid: UserID)
         return Err(KernelError::OperationNotPermitted);
     }
 
-    Ok((parent, dirname, filename))
+    Ok((parent, filename))
 }
 
 

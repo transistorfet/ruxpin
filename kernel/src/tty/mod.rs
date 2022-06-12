@@ -5,10 +5,10 @@ use alloc::boxed::Box;
 use ruxpin_syscall::SyscallFunction;
 use ruxpin_types::{OpenFlags, DeviceID, DriverID, MinorDeviceID};
 
+use crate::tasklets;
 use crate::proc::scheduler;
 use crate::sync::Spinlock;
 use crate::errors::KernelError;
-use crate::tasklets::schedule_tasklet;
 
 mod canonical;
 use self::canonical::CanonicalReader;
@@ -95,7 +95,7 @@ pub fn read(device_id: DeviceID, buffer: &mut [u8]) -> Result<usize, KernelError
 
     if nbytes == 0 {
         let current = scheduler::get_current();
-        schedule_tasklet(Box::new(move || {
+        tasklets::schedule(Box::new(move || {
             scheduler::suspend(current);
             Ok(())
         }));
@@ -111,7 +111,7 @@ pub fn write(device_id: DeviceID, buffer: &[u8]) -> Result<usize, KernelError> {
 }
 
 pub fn schedule_update(device_id: DeviceID) {
-    schedule_tasklet(Box::new(move || {
+    tasklets::schedule(Box::new(move || {
         let mut drivers_list = TTY_DRIVERS.lock();
         let device = get_device(&mut *drivers_list, device_id)?;
         if let Some(reader) = device.reader.as_mut() {

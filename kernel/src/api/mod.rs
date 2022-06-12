@@ -3,8 +3,8 @@ use ruxpin_syscall::{SyscallRequest, SyscallFunction};
 use ruxpin_types::ApiError;
 
 use crate::error;
+use crate::proc::scheduler;
 use crate::arch::context::Context;
-use crate::proc::scheduler::{get_current, check_restart_syscall};
 
 mod file;
 mod proc;
@@ -15,13 +15,12 @@ pub fn handle_syscall() {
     //crate::info!("A SYSCALL for {:?}!", syscall.function);
 
     let mut syscall = Context::syscall_from_current_context();
-    get_current().try_lock().unwrap().syscall = syscall.clone();
+    scheduler::get_current().try_lock().unwrap().syscall = syscall.clone();
     process_syscall(&mut syscall);
-    check_restart_syscall();
 }
 
 pub fn process_syscall(syscall: &mut SyscallRequest) {
-    let current_proc = get_current();
+    let current_proc = scheduler::get_current();
 
     if syscall.function == SyscallFunction::Exec {
         self::proc::handle_syscall_exec(syscall);

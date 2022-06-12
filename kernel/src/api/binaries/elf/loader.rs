@@ -5,12 +5,12 @@ use alloc::string::ToString;
 use ruxpin_types::{OpenFlags, FileAccess, Seek};
 
 use crate::debug;
-use crate::arch::mmu;
 use crate::fs::vfs;
+use crate::arch::mmu;
+use crate::misc::memory;
 use crate::fs::types::File;
 use crate::errors::KernelError;
 use crate::misc::strarray::StandardArrayOfStrings;
-use crate::misc::memory::read_struct;
 use crate::proc::scheduler::Task;
 use crate::proc::tasks::TaskRecord;
 use crate::arch::types::VirtualAddress;
@@ -64,7 +64,7 @@ pub fn load_binary(proc: Task, path: &str, argv: &StandardArrayOfStrings, envp: 
 
             let permissions = flags_to_permissions(segment.p_flags)?;
             let stype = if permissions == MemoryPermissions::ReadWrite { SegmentType::Data } else { SegmentType::Text };
-            locked_proc.space.try_lock()?.add_file_backed_segment(stype, permissions, file.clone(), segment.p_offset as usize, segment.p_filesz as usize, vaddr, offset, segment.p_memsz as usize);
+            locked_proc.space.try_lock()?.add_file_backed_segment(stype, permissions, file.clone(), segment.p_offset as usize, segment.p_filesz as usize, vaddr, offset, segment.p_memsz as usize)?;
 
             // TODO this is a hack to forcefully load the page because the page fault in kernel space doesn't work
             //locked_proc.space.try_lock()?.alloc_page_at(vaddr)?;
@@ -90,7 +90,7 @@ fn read_file_data_into_struct<T>(file: File) -> Result<T, KernelError> {
     }
 
     let result: T = unsafe {
-        read_struct(&buffer)
+        memory::read_struct(&buffer)
     };
 
     Ok(result)
@@ -116,7 +116,7 @@ fn set_up_stack(locked_proc: &mut TaskRecord, entrypoint: VirtualAddress, argv: 
     let stack_size = page_size * page_size;
     let stack_start = 0x1_0000_0000 as u64;
 
-    locked_proc.space.try_lock()?.add_memory_segment(SegmentType::Stack, MemoryPermissions::ReadWrite, VirtualAddress::from(stack_start - stack_size as u64), stack_size);
+    locked_proc.space.try_lock()?.add_memory_segment(SegmentType::Stack, MemoryPermissions::ReadWrite, VirtualAddress::from(stack_start - stack_size as u64), stack_size)?;
 
     let argv_size = argv.calculate_size();
     let envp_size = envp.calculate_size();

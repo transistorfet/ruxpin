@@ -13,10 +13,10 @@ use ruxpin_kernel::arch::types::PhysicalAddress;
 use ruxpin_kernel::irqs;
 use ruxpin_kernel::fs::vfs;
 use ruxpin_kernel::tasklets;
+use ruxpin_kernel::mm::kmalloc;
+use ruxpin_kernel::mm::vmalloc;
 use ruxpin_kernel::api::binaries;
 use ruxpin_kernel::proc::scheduler;
-use ruxpin_kernel::mm::kmalloc::init_kernel_heap;
-use ruxpin_kernel::mm::vmalloc::init_virtual_memory;
 
 use ruxpin_types::{OpenFlags, FileAccess, Seek, DeviceID};
 
@@ -37,8 +37,8 @@ pub fn register_devices() -> Result<(), KernelError> {
 
     notice!("starting kernel...");
 
-    init_kernel_heap(PhysicalAddress::from(0x20_0000), PhysicalAddress::from(0x100_0000));
-    init_virtual_memory(PhysicalAddress::from(0x100_0000), PhysicalAddress::from(0x1000_0000));
+    kmalloc::initialize(PhysicalAddress::from(0x20_0000), PhysicalAddress::from(0x100_0000));
+    vmalloc::initialize(PhysicalAddress::from(0x100_0000), PhysicalAddress::from(0x1000_0000));
     irqs::register_interrupt_controller(Box::new(GenericInterruptController::new()));
 
     tasklets::initialize()?;

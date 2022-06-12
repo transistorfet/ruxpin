@@ -4,12 +4,12 @@ use alloc::vec::Vec;
 use ruxpin_types::DeviceID;
 
 use ruxpin_kernel::block;
-use ruxpin_kernel::{debug, notice, error};
+use ruxpin_kernel::misc::memory;
 use ruxpin_kernel::block::BlockNum;
 use ruxpin_kernel::misc::ceiling_div;
 use ruxpin_kernel::errors::KernelError;
+use ruxpin_kernel::{debug, notice, error};
 use ruxpin_kernel::misc::byteorder::{leu16, leu32};
-use ruxpin_kernel::misc::memory::{cast_to_slice, cast_to_slice_mut};
 
 use super::Ext2InodeNum;
 use super::Ext2BlockNumber;
@@ -222,7 +222,7 @@ impl Ext2BlockGroup {
         let locked_buf = &*buf.lock();
 
         let data: &[Ext2GroupDescriptorOnDisk] = unsafe {
-            cast_to_slice(locked_buf)
+            memory::cast_to_slice(locked_buf)
         };
 
         for i in 0..total_block_groups {
@@ -246,7 +246,7 @@ impl Ext2BlockGroup {
         let locked_buf = &mut *buf.lock_mut();
 
         let data: &mut [Ext2GroupDescriptorOnDisk] = unsafe {
-            cast_to_slice_mut(locked_buf)
+            memory::cast_to_slice_mut(locked_buf)
         };
 
         for (i, group) in groups.iter().enumerate() {

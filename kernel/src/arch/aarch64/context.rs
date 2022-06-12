@@ -6,7 +6,7 @@ use core::arch::asm;
 use ruxpin_syscall::{SyscallRequest, SyscallFunction};
 
 use crate::notice;
-use super::types::{PhysicalAddress, VirtualAddress, KernelVirtualAddress};
+use super::types::VirtualAddress;
 use super::mmu::TranslationTable;
 
 extern "C" {
