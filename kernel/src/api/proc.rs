@@ -50,9 +50,7 @@ pub fn syscall_exec(path: &str, argv: &[&str], envp: &[&str]) -> Result<(), Kern
 fn setup_process(proc: Task, path: &str, argv: &StandardArrayOfStrings, envp: &StandardArrayOfStrings) -> Result<(), KernelError> {
     // This function can return an error safely
 
-    proc.try_lock()?.free_resources()?;
-
-    proc.try_lock()?.files.try_lock()?.open(None, "/dev/console0", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0)?;
+    proc.try_lock()?.free_memory()?;
 
     loader::load_binary(proc.clone(), path, argv, envp)?;
 

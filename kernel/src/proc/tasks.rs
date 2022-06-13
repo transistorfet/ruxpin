@@ -138,6 +138,11 @@ impl TaskRecord {
         Ok(())
     }
 
+    pub fn free_memory(&mut self) -> Result<(), KernelError> {
+        self.space.try_lock()?.clear_segments()?;
+        Ok(())
+    }
+
     pub fn clone_resources(&mut self, source: &TaskRecord, _args: TaskCloneArgs) -> Result<(), KernelError> {
         self.current_uid = source.current_uid;
         self.files = source.files.try_lock()?.duplicate_table();

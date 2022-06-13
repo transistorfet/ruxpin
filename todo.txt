@@ -1,8 +1,19 @@
 
+
 * for bufcache, and the issue of block size vs page size, you could maybe make it so that all bufcaches are page sized, but it will give
   the filesystem whatever block size it requests by returning a subslice of the actual page
 * need to eventually convert kmalloc to use the paging system (with a kernel page flag if necessary)
 * need to merge the bufcache and page cache
+
+* implement page cache
+* once the page cache is in place, you can make the entire binary file cacheable such that you wont need to copy data the way you are in
+  the elf loader for the program headers when reading in the file
+* when a segment is copied, it only copies the pages loaded into memory at that time, and puts 0 for all other pages, but that means when
+  those pages are loaded, they will be duplicated.  The solution is to have a cache for each file/exec that is being used which holds a
+  reference to each page, and once it is dropped, those pages will be freed, and when a page is loaded, the cache is searched first.  I'm
+  not yet sure how I'd like to implement this, and I still haven't exactly figured out how other OSes do it
+* fix the sbrk growing/shrinking
+* need to change how segments are shared, and how pages are shared (need a page cache)
 
 
 HIGH PRIORITY ISSUES:
@@ -17,43 +28,31 @@ HIGH PRIORITY ISSUES:
   support for stack resizing or allocating new stacks in the address space, which is needed for multithread stacks
 * can you replace the process vec with a hashmap?  The issue is iterating over the list for procfs readdir support
 
+* should you split the api into a linux one and a ruxpin-specific one that is very rusty?  If you did, it would make sense to
+  make the various api's modular and external to the kernel, in their own crates
+
 
 TODO:
 
+* add dup2() syscall so you can set up the file redirects from the shell
 * need to handle the case of accessing ".." on a mounted vnode.  It must correctly fetch the parent node
-
-* implement page cache
-* once the page cache is in place, you can make the entire binary file cacheable such that you wont need to copy data the way you are in
-  the elf loader for the program headers when reading in the file
-* when a segment is copied, it only copies the pages loaded into memory at that time, and puts 0 for all other pages, but that means when
-  those pages are loaded, they will be duplicated.  The solution is to have a cache for each file/exec that is being used which holds a
-  reference to each page, and once it is dropped, those pages will be freed, and when a page is loaded, the cache is searched first.  I'm
-  not yet sure how I'd like to implement this, and I still haven't exactly figured out how other OSes do it
-* fix the sbrk growing/shrinking
-* need to change how segments are shared, and how pages are shared (need a page cache)
 
 * add a function to libapp to help parse simple command line arguments
 
-* there is currently no checking for illegal characters in each path component
 * implement api getcwd()
 * implement vfs::link()
-* fix rename on ext2 to more intelligently rename (if the parents are the same and the direntry can be reuse, then do that)
-
+* get ext2 writing working.  File contents seems to be unavailable with cat inside the OS.  When mounting the image in linux, the testdir
+  directory appears to have stuff in it, but is reported as empty
 * make methods on File for fs operations (including unlink/rename?), so you don't have to always use vfs::read(file)
 * modify the proc macro for encoding system calls to be a bit cleaner (not have to put the {} at the end, fit it all in one line, etc)
 
 * add networking
-
+* add threading support in api
 * think about multicore and what that would mean for everything
 
-
-* get ext2 writing working.  File contents seems to be unavailable with cat inside the OS.  When mounting the image in linux, the testdir
-  directory appears to have stuff in it, but is reported as empty
 * fix the ugly stack manipulation used for the command line arguments.  Can you make one set of arguments available to the process and also
   to procfs (via the task record)?
 
-
-* add threading support in api
 * add an events system for processes to wait on (IO blocking, process exit, select/poll, etc)
 * fix the blocking/unblocking code (including exits) to use multiple queues and an event system of some sorts to improve the performance of checks
 
@@ -136,6 +135,9 @@ FILESYSTEM TODO:
 
 
 LOW PRIORITY TODO:
+
+* there is currently no checking for illegal characters in each path component
+* fix rename on ext2 to more intelligently rename (if the parents are the same and the direntry can be reuse, then do that)
 
 * it turns out there's a from_le and from_be function for u32 and others, so maybe you can simplify the byteorder stuff using them
 * can you use a weak reference of some kind for the mount link, instead of NonNull?
