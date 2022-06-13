@@ -62,7 +62,7 @@ impl Filesystem for Ext2Filesystem {
 }
 
 impl VnodeOperations for Ext2Vnode {
-    fn get_mount_mut<'a>(&'a mut self) -> Result<&'a mut Option<Vnode>, KernelError> {
+    fn get_mounted_mut<'a>(&'a mut self) -> Result<&'a mut Option<Vnode>, KernelError> {
         Ok(&mut self.mounted_vnode)
     }
 

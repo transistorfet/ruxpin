@@ -7,14 +7,11 @@
 
 HIGH PRIORITY ISSUES:
 
+* there is now an issue with ".." and "." such that you can't get the *wrapped* vnode for `self`, so you can't create the "." and ".."
+  special entries in directories for non-ext2 filesystems (dev, proc, tmp).  This also prevents you from implementing the ability to
+  go up with ".." across a mount point
+
 * should you have a heap in the kernel with mapped pages, and if so, where in virtual memory would it be located?
-
-* there is a bug in shell, where it prints the '%' prompt two or three times before executing the command.  It's actually calling the read
-  syscall stub on the application side multiple times, and the first few return 0.  It's actually double printing the ">>" string twice
-  before the rest of the same debug message, which seems very odd.
-  * could it be the syscall is restarting when it shouldn't? (it would actually be calling write multiple times during the read syscall...
-  * could it be the context switching is broken in a way that only now is manifesting? (uncommonly used registers?? or recent breaking change)
-
 
 * need to fix the data segment/heap/sbrk stuff because it doesn't change the stack size, and there is no checking or
   support for stack resizing or allocating new stacks in the address space, which is needed for multithread stacks
@@ -22,6 +19,8 @@ HIGH PRIORITY ISSUES:
 
 
 TODO:
+
+* need to handle the case of accessing ".." on a mounted vnode.  It must correctly fetch the parent node
 
 * implement page cache
 * once the page cache is in place, you can make the entire binary file cacheable such that you wont need to copy data the way you are in
@@ -40,14 +39,12 @@ TODO:
 * implement vfs::link()
 * fix rename on ext2 to more intelligently rename (if the parents are the same and the direntry can be reuse, then do that)
 
-* should the api be an external crate that integrates the public interfaces (only) of the kernel?
+* make methods on File for fs operations (including unlink/rename?), so you don't have to always use vfs::read(file)
 * modify the proc macro for encoding system calls to be a bit cleaner (not have to put the {} at the end, fit it all in one line, etc)
+
 * add networking
 
 * think about multicore and what that would mean for everything
-
-* fix the blocking/unblocking code (including exits) to use multiple queues and an event system of some sorts to improve the performance of checks
-* make methods on File for fs operations (including unlink/rename?), so you don't have to always use vfs::read(file)
 
 
 * get ext2 writing working.  File contents seems to be unavailable with cat inside the OS.  When mounting the image in linux, the testdir
@@ -58,6 +55,7 @@ TODO:
 
 * add threading support in api
 * add an events system for processes to wait on (IO blocking, process exit, select/poll, etc)
+* fix the blocking/unblocking code (including exits) to use multiple queues and an event system of some sorts to improve the performance of checks
 
 * add a stack guard page to each stack segment, with permissions/mapping in the translation table such that it will cause a fault
   instead of crashing into the adjacent segment.  Linux has this adjustable in size I think
@@ -67,7 +65,6 @@ TODO:
 * add mounts to procfs (and make mount command)
 
 * add arrow key support to canonical input
-* need to handle the case of accessing ".." on a mounted vnode.  It must correctly fetch the parent node
 
 * add commands: cp, echo, mkdir, mv, ps, pwd, rm, mount, umount
 
@@ -94,6 +91,8 @@ ISSUES:
 * there is an issue with the emmc driver such that when the image used with qemu is below 2GB or less, the Read command gives a byte
   offset, but when it's 4GB or larger, it gives a sector offset (byte offset / 512).  I'm not sure if this happens with the pi as well
   since I only have an 8GB card.  If there was a way to detect the card size, this could be solved
+
+* should the api be an external crate that integrates the public interfaces (only) of the kernel?
 
 
 WHAT IFS:

@@ -54,7 +54,7 @@ pub fn mount(cwd: Option<Vnode>, path: &str, fstype: &str, device_id: Option<Dev
 fn _link_mount_to_vnode(mount: Mount, vnode: Option<Vnode>) -> Result<(), KernelError> {
     let root = mount.lock().get_root()?;
     if let Some(vnode) = vnode.as_ref() {
-        *vnode.lock().get_mount_mut()? = Some(root);
+        *vnode.lock().get_mounted_mut()? = Some(root);
     } else {
         *ROOT_NODE.lock() = Some(root);
     }
@@ -266,7 +266,7 @@ pub(super) fn lookup(cwd: Option<Vnode>, path: &str, current_uid: UserID) -> Res
     };
 
     loop {
-        let mounted_root_node = current.lock().get_mount_mut().ok().map(|mount| if let Some(mount) = mount { Some(mount.clone()) } else { None }).flatten();
+        let mounted_root_node = current.lock().get_mounted_mut().ok().map(|mount| if let Some(mount) = mount { Some(mount.clone()) } else { None }).flatten();
         if mounted_root_node.is_some() {
             current = mounted_root_node.unwrap();
         }

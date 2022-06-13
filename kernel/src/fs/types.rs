@@ -20,7 +20,7 @@ pub trait MountOperations: Sync + Send {
 }
 
 pub trait VnodeOperations: Sync + Send {
-    fn get_mount_mut<'a>(&'a mut self) -> Result<&'a mut Option<Vnode>, KernelError> {
+    fn get_mounted_mut<'a>(&'a mut self) -> Result<&'a mut Option<Vnode>, KernelError> {
         Err(KernelError::OperationNotPermitted)
     }
 

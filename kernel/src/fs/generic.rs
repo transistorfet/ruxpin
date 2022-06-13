@@ -17,17 +17,19 @@ pub struct GenericDirEntry {
 }
 
 impl GenericDirEntry {
-    pub fn new(name: &str, access: FileAccess, uid: UserID, gid: GroupID) -> Self {
-        let vnode: Vnode = if access.is_dir() {
-            Arc::new(Spinlock::new(GenericDirectoryVnode::new(access, uid, gid)))
-        } else {
-            Arc::new(Spinlock::new(GenericFileVnode::empty(access, uid, gid)))
-        };
-
+    pub fn new(name: &str, vnode: Vnode) -> Self {
         Self {
             name: name.try_into().unwrap(),
             vnode,
         }
+    }
+}
+
+fn create_generic_vnode(access: FileAccess, uid: UserID, gid: GroupID) -> Vnode {
+    if access.is_dir() {
+        Arc::new(Spinlock::new(GenericDirectoryVnode::new(access, uid, gid)))
+    } else {
+        Arc::new(Spinlock::new(GenericFileVnode::empty(access, uid, gid)))
     }
 }
 
@@ -48,13 +50,13 @@ impl GenericDirectoryVnode {
 }
 
 impl VnodeOperations for GenericDirectoryVnode {
-    fn get_mount_mut<'a>(&'a mut self) -> Result<&'a mut Option<Vnode>, KernelError> {
+    fn get_mounted_mut<'a>(&'a mut self) -> Result<&'a mut Option<Vnode>, KernelError> {
         Ok(&mut self.mounted_vnode)
     }
 
     fn create(&mut self, filename: &str, access: FileAccess, uid: UserID, gid: GroupID) -> Result<Vnode, KernelError> {
-        let entry = GenericDirEntry::new(filename, access, uid, gid);
-        let vnode = entry.vnode.clone();
+        let vnode = create_generic_vnode(access, uid, gid);
+        let entry = GenericDirEntry::new(filename, vnode.clone());
         self.contents.push(entry);
         Ok(vnode)
     }
@@ -86,9 +88,10 @@ impl VnodeOperations for GenericDirectoryVnode {
         Ok(&mut self.attrs)
     }
 
-    //fn attributes_mut(&mut self, f: &mut dyn FnMut(&mut FileAttributes)) -> Result<(), KernelError> {
-    //    Err(KernelError::OperationNotPermitted)
-    //}
+    fn attributes_mut(&mut self, func: &mut dyn FnMut(&mut FileAttributes)) -> Result<(), KernelError> {
+        func(&mut self.attrs);
+        Ok(())
+    }
 
     fn open(&mut self, _file: &mut FilePointer, _flags: OpenFlags) -> Result<(), KernelError> {
         Ok(())
@@ -143,10 +146,10 @@ impl VnodeOperations for GenericFileVnode {
         Ok(&mut self.attrs)
     }
 
-    //fn attributes_mut<'a>(&'a mut self) -> Result<&'a mut FileAttributes, KernelError> {
-    //    // TODO this isn't right because you need to update
-    //    Ok(&mut self.attrs)
-    //}
+    fn attributes_mut(&mut self, func: &mut dyn FnMut(&mut FileAttributes)) -> Result<(), KernelError> {
+        func(&mut self.attrs);
+        Ok(())
+    }
 
     fn open(&mut self, _file: &mut FilePointer, _flags: OpenFlags) -> Result<(), KernelError> {
         Ok(())
@@ -234,9 +237,10 @@ impl<T: 'static + Sync + Send> VnodeOperations for GenericStaticDirectoryVnode<T
         Ok(&mut self.attrs)
     }
 
-    //fn attributes_mut(&mut self, f: &mut dyn FnMut(&mut FileAttributes)) -> Result<(), KernelError> {
-    //    Err(KernelError::OperationNotPermitted)
-    //}
+    fn attributes_mut(&mut self, func: &mut dyn FnMut(&mut FileAttributes)) -> Result<(), KernelError> {
+        func(&mut self.attrs);
+        Ok(())
+    }
 
     fn lookup(&mut self, filename: &str) -> Result<Vnode, KernelError> {
         let data = self.get_data_by_name(filename)?;

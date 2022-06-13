@@ -101,10 +101,6 @@ impl VnodeOperations for ProcFsRootVnode {
         Ok(&mut self.attrs)
     }
 
-    //fn attributes_mut(&mut self, f: &mut dyn FnMut(&mut FileAttributes)) -> Result<(), KernelError> {
-    //    Err(KernelError::OperationNotPermitted)
-    //}
-
     fn open(&mut self, _file: &mut FilePointer, _flags: OpenFlags) -> Result<(), KernelError> {
         Ok(())
     }
