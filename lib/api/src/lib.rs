@@ -38,7 +38,7 @@ pub fn write(file: FileDesc, buffer: &[u8]) -> Result<usize, ApiError> {}
 #[syscall_function(ReadDir)]
 pub fn readdir(file: FileDesc, dirent: &mut DirEntry) -> Result<bool, ApiError> {}
 
-#[syscall_function(ReadDir)]
+#[syscall_function(Dup2)]
 pub fn dup2(old_fd: FileDesc, new_fd: FileDesc) -> Result<(), ApiError> {}
 
 #[syscall_function(Unlink)]
@@ -56,6 +56,10 @@ pub fn getcwd(path: &mut [u8]) -> Result<(), ApiError> {}
 #[syscall_function(Sync)]
 pub fn sync() -> Result<(), ApiError> {}
 
+
+pub const STDIN_FILENO: FileDesc = FileDesc(0);
+pub const STDOUT_FILENO: FileDesc = FileDesc(1);
+pub const STDERR_FILENO: FileDesc = FileDesc(2);
 
 //pub static STDIN: UnbufferedFile = UnbufferedFile(FileDesc(0));
 //pub static STDOUT: UnbufferedFile = UnbufferedFile(FileDesc(1));

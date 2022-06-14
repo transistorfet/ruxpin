@@ -1,5 +1,5 @@
 
-use ruxpin_types::{Pid, OpenFlags, FileAccess};
+use ruxpin_types::Pid;
 use ruxpin_syscall_proc::syscall_handler;
 
 use crate::proc::scheduler;

@@ -93,6 +93,10 @@ ISSUES:
 
 * should the api be an external crate that integrates the public interfaces (only) of the kernel?
 
+* should you move SyscallFunction type to libapi, since the functions are defined there?  Could you use generics for the syscall itself?
+  How will that work for saving the syscall in the task/process?  Could you make a separate place to save that data in the api, on a
+  per-task basis?
+
 
 WHAT IFS:
 

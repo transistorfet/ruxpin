@@ -143,7 +143,9 @@ pub fn access(cwd: Option<Vnode>, path: &str, access: FileAccess, current_uid: U
 
 pub fn open(cwd: Option<Vnode>, path: &str, flags: OpenFlags, access: FileAccess, current_uid: UserID) -> Result<File, KernelError> {
     let vnode = if flags.is_set(OpenFlags::Create) {
-        create(cwd, path, access, current_uid)?
+        lookup(cwd.clone(), path, current_uid).or_else(|_| {
+            create(cwd, path, access, current_uid)
+        })?
     } else {
         lookup(cwd, path, current_uid)?
     };
