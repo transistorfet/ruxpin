@@ -38,6 +38,9 @@ pub fn write(file: FileDesc, buffer: &[u8]) -> Result<usize, ApiError> {}
 #[syscall_function(ReadDir)]
 pub fn readdir(file: FileDesc, dirent: &mut DirEntry) -> Result<bool, ApiError> {}
 
+#[syscall_function(ReadDir)]
+pub fn dup2(old_fd: FileDesc, new_fd: FileDesc) -> Result<(), ApiError> {}
+
 #[syscall_function(Unlink)]
 pub fn unlink(path: &str) -> Result<(), ApiError> {}
 
@@ -61,8 +64,16 @@ pub fn sync() -> Result<(), ApiError> {}
 pub struct UnbufferedFile(pub FileDesc);
 
 impl UnbufferedFile {
-    pub fn stdout() -> UnbufferedFile {
+    pub fn stdin() -> UnbufferedFile {
         UnbufferedFile(FileDesc(0))
+    }
+
+    pub fn stdout() -> UnbufferedFile {
+        UnbufferedFile(FileDesc(1))
+    }
+
+    pub fn stderr() -> UnbufferedFile {
+        UnbufferedFile(FileDesc(2))
     }
 }
 

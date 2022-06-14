@@ -52,13 +52,19 @@ impl FileDescriptors {
     }
 
     pub fn set_slot(&mut self, file_num: FileDesc, file: File) -> Result<(), KernelError> {
+        if file_num.as_usize() > MAX_OPEN_FILES {
+            return Err(KernelError::TooManyFilesOpen);
+        }
+
+        if file_num.as_usize() >= self.list.len() {
+            self.list.resize(file_num.as_usize() + 1, None);
+        }
+
         self.list[file_num.as_usize()] = Some(file);
         Ok(())
     }
 
     pub fn clear_slot(&mut self, file_num: FileDesc) -> Result<(), KernelError> {
-        //let file = self.get_file(file_num)?;
-        //vfs::close(file)?;
         self.list[file_num.as_usize()] = None;
         Ok(())
     }

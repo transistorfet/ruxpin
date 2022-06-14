@@ -21,6 +21,7 @@ pub enum SyscallFunction {
     Read,
     Write,
     ReadDir,
+    Dup2,
     Unlink,
     Rename,
     MkDir,

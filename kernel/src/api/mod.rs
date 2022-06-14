@@ -68,6 +68,9 @@ pub fn process_syscall(syscall: &mut SyscallRequest) {
         SyscallFunction::ReadDir => {
             self::file::handle_syscall_readdir(syscall);
         },
+        SyscallFunction::Dup2 => {
+            self::file::handle_syscall_dup2(syscall);
+        },
         SyscallFunction::Unlink => {
             self::file::handle_syscall_unlink(syscall);
         },

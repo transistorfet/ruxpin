@@ -58,6 +58,19 @@ pub fn syscall_readdir(file: FileDesc, dirent: &mut DirEntry) -> Result<bool, Ke
 }
 
 #[syscall_handler]
+pub fn syscall_dup2(old_fd: FileDesc, new_fd: FileDesc) -> Result<(), KernelError> {
+    if old_fd == new_fd {
+        return Ok(());
+    }
+
+    let files = scheduler::get_current().try_lock()?.files.clone();
+    let mut locked_files = files.try_lock()?;
+    let file = locked_files.get_file(old_fd)?;
+    locked_files.set_slot(new_fd, file)?;       // Overwriting the old file pointer will make it close when dropped
+    Ok(())
+}
+
+#[syscall_handler]
 pub fn syscall_unlink(path: &str) -> Result<(), KernelError> {
     let (cwd, current_uid) = get_current_cwd_and_uid()?;
     vfs::unlink(cwd, path, current_uid)?;
