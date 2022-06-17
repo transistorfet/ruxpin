@@ -7,7 +7,7 @@ use ruxpin_types::{DeviceID, FileAccess, UserID, GroupID};
 
 use ruxpin_kernel::block;
 use ruxpin_kernel::misc::memory;
-use ruxpin_kernel::{info, trace};
+use ruxpin_kernel::{info, debug, trace};
 use ruxpin_kernel::sync::Spinlock;
 use ruxpin_kernel::errors::KernelError;
 use ruxpin_kernel::misc::byteorder::{leu16, leu32};
@@ -223,7 +223,8 @@ impl Ext2Mount {
         data.mtime = u32::from(vnode.attrs.mtime).into();
         data.ctime = u32::from(vnode.attrs.ctime).into();
 
-        trace!("storing inode {}: {:#?}", inode_num, (*data));
+        debug!("storing inode {}", inode_num);
+        trace!("inode as written {}: {:#?}", inode_num, (*data));
         Ok(())
     }
 }

@@ -59,6 +59,7 @@ impl Ext2Vnode {
             zpos = 0;
 	}
 
+        self.dirty = true;
         Ok(offset)
     }
 }

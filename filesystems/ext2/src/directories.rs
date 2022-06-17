@@ -99,6 +99,7 @@ impl Ext2Vnode {
         entry_on_disk.file_type = to_file_type(access);
         offset += 8;
         locked_buf[offset..offset + name_len].copy_from_slice(filename.as_bytes());
+        self.dirty = true;
         Ok(())
     }
 
@@ -180,6 +181,7 @@ impl Ext2Vnode {
                         };
 
                         previous_entry_on_disk.entry_len = (u16::from(previous_entry_on_disk.entry_len) + entry_len as u16).into();
+                        self.dirty = true;
                         return Ok(inode);
                     }
                 }
