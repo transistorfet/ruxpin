@@ -1,11 +1,19 @@
 
+* unify bufcache and page cache
+* implement page cache and fix segments
+* implement the "." and ".." directories (various issues)
+
+
+* do you set the . and .. dirs for ext2 directories that are created? or is it just not doing that?
+
+
+HIGH PRIORITY ISSUES:
 
 * for bufcache, and the issue of block size vs page size, you could maybe make it so that all bufcaches are page sized, but it will give
   the filesystem whatever block size it requests by returning a subslice of the actual page
 * need to eventually convert kmalloc to use the paging system (with a kernel page flag if necessary)
 * need to merge the bufcache and page cache
 
-* implement page cache
 * once the page cache is in place, you can make the entire binary file cacheable such that you wont need to copy data the way you are in
   the elf loader for the program headers when reading in the file
 * when a segment is copied, it only copies the pages loaded into memory at that time, and puts 0 for all other pages, but that means when
@@ -16,11 +24,11 @@
 * need to change how segments are shared, and how pages are shared (need a page cache)
 
 
-HIGH PRIORITY ISSUES:
-
 * there is now an issue with ".." and "." such that you can't get the *wrapped* vnode for `self`, so you can't create the "." and ".."
   special entries in directories for non-ext2 filesystems (dev, proc, tmp).  This also prevents you from implementing the ability to
   go up with ".." across a mount point
+    * ext2 is not a problem now
+    * tmpfs, devfs, and procfs, need to return vnodes without a lookup (ext2 uses a cache which changes how it has to store things)
 
 * should you have a heap in the kernel with mapped pages, and if so, where in virtual memory would it be located?
 
@@ -34,15 +42,14 @@ HIGH PRIORITY ISSUES:
 
 TODO:
 
-* add dup2() syscall so you can set up the file redirects from the shell
+* implement page cache
 * need to handle the case of accessing ".." on a mounted vnode.  It must correctly fetch the parent node
+* add . and .. to procfs, as well as devfs and tmpfs
 
 * add a function to libapp to help parse simple command line arguments
 
 * implement api getcwd()
 * implement vfs::link()
-* get ext2 writing working.  File contents seems to be unavailable with cat inside the OS.  When mounting the image in linux, the testdir
-  directory appears to have stuff in it, but is reported as empty
 * make methods on File for fs operations (including unlink/rename?), so you don't have to always use vfs::read(file)
 * modify the proc macro for encoding system calls to be a bit cleaner (not have to put the {} at the end, fit it all in one line, etc)
 
@@ -60,12 +67,11 @@ TODO:
   instead of crashing into the adjacent segment.  Linux has this adjustable in size I think
 
 * add more data to procfs
-* add . and .. to procfs, as well as devfs and tmpfs
 * add mounts to procfs (and make mount command)
 
 * add arrow key support to canonical input
 
-* add commands: cp, echo, mkdir, mv, ps, pwd, rm, mount, umount
+* add commands: cp, pwd, mount, umount
 
 
 ISSUES:

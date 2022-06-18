@@ -134,11 +134,17 @@ impl Ext2Mount {
         NonNull::new(self as *mut Self).unwrap()
     }
 
-    pub(super) fn alloc_inode(&mut self, start_from: Ext2InodeNum, access: FileAccess, uid: UserID, gid: GroupID) -> Result<(Ext2InodeNum, Vnode), KernelError> {
+    pub(super) fn alloc_inode(&mut self, parent_inode: Ext2InodeNum, access: FileAccess, uid: UserID, gid: GroupID) -> Result<(Ext2InodeNum, Vnode), KernelError> {
         let mount_ptr = self.as_ptr();
-        let inode_num = self.superblock.alloc_inode(start_from)?;
+        let inode_num = self.superblock.alloc_inode(parent_inode)?;
         let mut vnode = Ext2Vnode::new(mount_ptr, access, uid, gid);
         vnode.attrs.inode = inode_num;
+
+        if access.is_dir() {
+            vnode.add_directory_to_vnode(".", inode_num, FileAccess::DefaultDir)?;
+            vnode.add_directory_to_vnode("..", parent_inode, FileAccess::DefaultDir)?;
+        }
+
         self.store_inode(&vnode, inode_num)?;
         info!("ext2: allocating inode {}", inode_num);
 
