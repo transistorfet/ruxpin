@@ -65,6 +65,7 @@ pub fn register_devices() -> Result<(), KernelError> {
 
     vfs::mount(None, "/dev", "devfs", None, 0).unwrap();
     vfs::mount(None, "/proc", "procfs", None, 0).unwrap();
+    vfs::mount(None, "/tmp", "tmpfs", None, 0).unwrap();
 
     startup_tests().unwrap();
 
@@ -86,9 +87,6 @@ fn startup_tests() -> Result<(), KernelError> {
     }
 
     notice!("\nRunning some hardcoded tests before completing the startup");
-
-    notice!("\nMounting the tmpfs filesystem (simple in-memory file system)");
-    vfs::mount(None, "/tmp", "tmpfs", None, 0).unwrap();
 
     notice!("\nCreating a directory and a file inside of it");
     vfs::open(None, "testdir", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();

@@ -1,5 +1,5 @@
 
-use alloc::sync::Arc;
+use alloc::sync::{Arc, Weak};
 
 use ruxpin_types::{OpenFlags, FileAccess, Seek, UserID, GroupID, InodeNum, DeviceID, Timestamp, DirEntry};
 
@@ -10,7 +10,7 @@ use crate::errors::KernelError;
 pub trait Filesystem: Sync + Send {
     fn fstype(&self) -> &'static str; 
     fn init(&self) -> Result<(), KernelError>;
-    fn mount(&mut self, parent: Option<Vnode>, device_id: Option<DeviceID>) -> Result<Mount, KernelError>;
+    fn mount(&mut self, parent: Option<WeakVnode>, device_id: Option<DeviceID>) -> Result<Mount, KernelError>;
 }
 
 pub trait MountOperations: Sync + Send {
@@ -20,6 +20,10 @@ pub trait MountOperations: Sync + Send {
 }
 
 pub trait VnodeOperations: Sync + Send {
+    fn set_self(&mut self, _vnode: WeakVnode) {
+        /* The default is to ignore this, which is the behaviour for files, but not directories */
+    }
+
     fn get_mounted_mut<'a>(&'a mut self) -> Result<&'a mut Option<Vnode>, KernelError> {
         Err(KernelError::OperationNotPermitted)
     }
@@ -110,6 +114,7 @@ pub struct FileAttributes {
 
 pub type Mount = Arc<Spinlock<dyn MountOperations>>;
 pub type Vnode = Arc<Spinlock<dyn VnodeOperations>>;
+pub type WeakVnode = Weak<Spinlock<dyn VnodeOperations>>;
 
 pub struct FilePointer {
     pub vnode: Vnode,
@@ -118,6 +123,15 @@ pub struct FilePointer {
 
 pub type File = Arc<Spinlock<FilePointer>>;
 
+
+pub fn new_vnode<T>(inner: T) -> Vnode
+where
+    T: VnodeOperations + 'static
+{
+    let vnode: Vnode = Arc::new(Spinlock::new(inner));
+    vnode.lock().set_self(Arc::downgrade(&vnode));
+    vnode
+}
 
 impl FilePointer {
     pub(super) fn new(vnode: Vnode) -> Self {

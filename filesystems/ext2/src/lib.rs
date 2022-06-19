@@ -12,7 +12,7 @@ use ruxpin_kernel::sync::Spinlock;
 use ruxpin_kernel::errors::KernelError;
 
 use ruxpin_kernel::fs::vfs;
-use ruxpin_kernel::fs::types::{Filesystem, Mount, Vnode, VnodeOperations, FileAttributes, FilePointer};
+use ruxpin_kernel::fs::types::{Filesystem, Mount, Vnode, WeakVnode, VnodeOperations, FileAttributes, FilePointer};
 
 mod blocks;
 mod directories;
@@ -24,8 +24,8 @@ mod superblock;
 pub(self) type Ext2InodeNum = u32;
 pub(self) type Ext2BlockNumber = u32;
 
-use self::mount::Ext2Mount;
 use self::inodes::Ext2Vnode;
+use self::mount::{Ext2Mount, EXT2_ROOT_INODE_NUM};
 
 
 pub struct Ext2Filesystem {
@@ -50,7 +50,7 @@ impl Filesystem for Ext2Filesystem {
         Ok(())
     }
 
-    fn mount(&mut self, parent: Option<Vnode>, device_id: Option<DeviceID>) -> Result<Mount, KernelError> {
+    fn mount(&mut self, parent: Option<WeakVnode>, device_id: Option<DeviceID>) -> Result<Mount, KernelError> {
         let device_id = device_id.ok_or(KernelError::NoSuchDevice)?;
         block::open(device_id, OpenFlags::ReadOnly)?;
 
@@ -84,6 +84,14 @@ impl VnodeOperations for Ext2Vnode {
     fn lookup(&mut self, filename: &str) -> Result<Vnode, KernelError> {
         if !self.attrs.access.is_dir() {
             return Err(KernelError::NotADirectory);
+        }
+
+        if filename == ".." && self.attrs.inode == EXT2_ROOT_INODE_NUM {
+            if let Some(vnode) = &self.get_mount().mounted_on {
+                return Ok(vnode.upgrade().unwrap());
+            } else {
+                return self.get_inode(EXT2_ROOT_INODE_NUM);
+            }
         }
 
         let mut position = 0;

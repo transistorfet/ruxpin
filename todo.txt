@@ -1,10 +1,12 @@
 
+* for dirs... actually maybe you should put all generic handling of . and .. in vfs which has the right nodes,
+  to avoid cyclical locking (and timing out), and also preventing vnode cycles (which ext2 doesn't suffer from)
+    * this won't work because the readdir() function also needs to be patched
+
+
 * unify bufcache and page cache
 * implement page cache and fix segments
 * implement the "." and ".." directories (various issues)
-
-
-* do you set the . and .. dirs for ext2 directories that are created? or is it just not doing that?
 
 
 HIGH PRIORITY ISSUES:

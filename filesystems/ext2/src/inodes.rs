@@ -1,17 +1,14 @@
 
 use core::ptr::NonNull;
 
-use alloc::sync::Arc;
-
 use ruxpin_types::{DeviceID, FileAccess, UserID, GroupID};
 
 use ruxpin_kernel::block;
 use ruxpin_kernel::misc::memory;
 use ruxpin_kernel::{info, debug, trace};
-use ruxpin_kernel::sync::Spinlock;
 use ruxpin_kernel::errors::KernelError;
 use ruxpin_kernel::misc::byteorder::{leu16, leu32};
-use ruxpin_kernel::fs::types::{Vnode, FileAttributes};
+use ruxpin_kernel::fs::types::{new_vnode, Vnode, FileAttributes};
 
 use super::Ext2InodeNum;
 use super::Ext2BlockNumber;
@@ -150,7 +147,7 @@ impl Ext2Mount {
 
         // Insert the node into the cache
         let arc_vnode = self.vnode_cache.insert(inode_num, || {
-            Ok(Arc::new(Spinlock::new(vnode)))
+            Ok(new_vnode(vnode))
         }, |_, vnode| {
             vnode.lock().commit()
         })?;
@@ -163,7 +160,7 @@ impl Ext2Mount {
         let vnode = self.vnode_cache.get(inode_num, || {
             let mut vnode = Ext2Vnode::new_default(mount_ptr);
             get_mount(mount_ptr).load_inode(&mut vnode, inode_num)?;
-            Ok(Arc::new(Spinlock::new(vnode)))
+            Ok(new_vnode(vnode))
         }, |_, vnode| {
             vnode.lock().commit()
         })?;

@@ -177,6 +177,7 @@ impl FileDesc {
 
 const DIR_ENTRY_MAX_LEN: usize = 256;
 
+#[derive(Clone)]
 pub struct DirEntry {
     pub inode: InodeNum,
     pub name_len: u8,

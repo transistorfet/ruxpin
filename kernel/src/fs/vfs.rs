@@ -40,9 +40,12 @@ pub fn mount(cwd: Option<Vnode>, path: &str, fstype: &str, device_id: Option<Dev
         return Err(KernelError::OperationNotPermitted);
     }
 
-    let mount = fs.lock().mount(vnode.clone(), device_id)?;
+    let parent = vnode.clone()
+        .map(|vnode| vnode.try_lock().ok().and_then(|mut locked| locked.lookup("..").ok())).flatten()
+        .map(|parent| Arc::downgrade(&parent));
+    let mount = fs.lock().mount(parent, device_id)?;
 
-    if let Err(err) = _link_mount_to_vnode(mount.clone(), vnode) {
+    if let Err(err) = link_mount_to_vnode(mount.clone(), vnode) {
         mount.lock().unmount()?;
         return Err(err);
     }
@@ -51,7 +54,7 @@ pub fn mount(cwd: Option<Vnode>, path: &str, fstype: &str, device_id: Option<Dev
     Ok(())
 }
 
-fn _link_mount_to_vnode(mount: Mount, vnode: Option<Vnode>) -> Result<(), KernelError> {
+fn link_mount_to_vnode(mount: Mount, vnode: Option<Vnode>) -> Result<(), KernelError> {
     let root = mount.lock().get_root()?;
     if let Some(vnode) = vnode.as_ref() {
         *vnode.lock().get_mounted_mut()? = Some(root);

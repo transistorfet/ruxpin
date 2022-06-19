@@ -16,7 +16,7 @@ use ruxpin_kernel::misc::writer::SliceWriter;
 use ruxpin_kernel::proc::scheduler;
 use ruxpin_kernel::proc::tasks::TaskState;
 use ruxpin_kernel::fs::generic::{GenericStaticDirectoryVnode, GenericStaticFileData};
-use ruxpin_kernel::fs::types::{Filesystem, Mount, MountOperations, Vnode, VnodeOperations, FileAttributes, FilePointer};
+use ruxpin_kernel::fs::types::{new_vnode, Filesystem, Mount, MountOperations, Vnode, WeakVnode, VnodeOperations, FileAttributes, FilePointer};
 
 
 pub struct ProcFilesystem {
@@ -25,7 +25,6 @@ pub struct ProcFilesystem {
 
 struct ProcMount {
     root_node: Vnode,
-    mounted_on: Option<Vnode>,
 }
 
 
@@ -39,12 +38,11 @@ impl Filesystem for ProcFilesystem {
         Ok(())
     }
 
-    fn mount(&mut self, parent: Option<Vnode>, _device_id: Option<DeviceID>) -> Result<Mount, KernelError> {
-        let root_node = Arc::new(Spinlock::new(ProcFsRootVnode::new()));
+    fn mount(&mut self, parent: Option<WeakVnode>, _device_id: Option<DeviceID>) -> Result<Mount, KernelError> {
+        let root_node = new_vnode(ProcFsRootVnode::new(parent));
 
         let mount = Arc::new(Spinlock::new(ProcMount {
             root_node,
-            mounted_on: parent,
         }));
 
         Ok(mount)
@@ -76,25 +74,45 @@ impl MountOperations for ProcMount {
 
 
 struct ProcFsRootVnode {
+    self_vnode: Option<WeakVnode>,
+    parent_vnode: Option<WeakVnode>,
     attrs: FileAttributes,
 }
 
 
 impl ProcFsRootVnode {
-    fn new() -> Self {
+    fn new(parent_vnode: Option<WeakVnode>) -> Self {
         Self {
+            self_vnode: None,
+            parent_vnode: parent_vnode,
             attrs: FileAttributes::new(FileAccess::DefaultDir, 0, 0),
         }
     }
 }
 
 impl VnodeOperations for ProcFsRootVnode {
+    fn set_self(&mut self, vnode: WeakVnode) {
+        self.self_vnode = Some(vnode);
+    }
+
     fn lookup(&mut self, filename: &str) -> Result<Vnode, KernelError> {
+        let weak_ref = if filename == "." {
+            self.self_vnode.as_ref()
+        } else if filename == ".." {
+            self.parent_vnode.as_ref()
+        } else {
+            None
+        };
+
+        if let Some(vnode) = weak_ref {
+            return vnode.upgrade().ok_or(KernelError::FileNotFound);
+        }
+
         let process_id = match filename.parse::<Pid>() {
             Ok(process_id) if scheduler::get_process(process_id).is_some() => Ok(process_id),
             _ => Err(KernelError::FileNotFound),
         }?;
-        Ok(Arc::new(Spinlock::new(GenericStaticDirectoryVnode::new(FileAccess::DefaultReadOnlyFile, 0, 0, PROCESS_ENTRIES, process_id))))
+        Ok(new_vnode(GenericStaticDirectoryVnode::new(self.self_vnode.clone(), FileAccess::DefaultReadOnlyFile, 0, 0, PROCESS_ENTRIES, process_id)))
     }
 
     fn attributes<'a>(&'a mut self) -> Result<&'a FileAttributes, KernelError> {
@@ -110,23 +128,31 @@ impl VnodeOperations for ProcFsRootVnode {
     }
 
     fn readdir(&mut self, file: &mut FilePointer) -> Result<Option<DirEntry>, KernelError> {
-        if file.position >= scheduler::slot_len() {
+        if file.position >= scheduler::slot_len() + 2 {
             return Ok(None);
         }
 
-        let proc = match scheduler::get_slot(file.position) {
-            None => { return Ok(None) },
-            Some(proc) => proc,
-        };
+        if file.position == 0 {
+            file.position += 1;
+            Ok(Some(DirEntry::new(0, ".".as_bytes())))
+        } else if file.position == 1 {
+            file.position += 1;
+            Ok(Some(DirEntry::new(0, "..".as_bytes())))
+        } else {
+            let proc = match scheduler::get_slot(file.position - 2) {
+                None => { return Ok(None) },
+                Some(proc) => proc,
+            };
 
-        let mut result = DirEntry::new(0, b"");
-        let mut writer = SliceWriter::new(&mut result.name);
-        write!(writer, "{}", proc.lock().process_id).map_err(|_| KernelError::InvalidArgument)?;
-        let len = writer.len();
-        unsafe { result.set_len(len); }
+            let mut result = DirEntry::new(0, b"");
+            let mut writer = SliceWriter::new(&mut result.name);
+            write!(writer, "{}", proc.lock().process_id).map_err(|_| KernelError::InvalidArgument)?;
+            let len = writer.len();
+            unsafe { result.set_len(len); }
 
-        file.position += 1;
-        Ok(Some(result))
+            file.position += 1;
+            Ok(Some(result))
+        }
     }
 }
 
