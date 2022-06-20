@@ -2,6 +2,17 @@
 use core::fmt;
 use core::fmt::Write;
 
+#[macro_export]
+macro_rules! write_bytes {
+    ($buffer:expr, $fmt:expr, $($args:tt)*) => {
+        {
+            let mut writer = $crate::misc::writer::SliceWriter::new(&mut $buffer);
+            write!(writer, $fmt, $($args)*).map_err(|_| $crate::errors::KernelError::InvalidArgument)?;
+            writer.len()
+        }
+    }
+}
+
 pub struct SliceWriter<'a> {
     slice: &'a mut [u8],
     position: usize,

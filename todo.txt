@@ -1,12 +1,7 @@
 
-* for dirs... actually maybe you should put all generic handling of . and .. in vfs which has the right nodes,
-  to avoid cyclical locking (and timing out), and also preventing vnode cycles (which ext2 doesn't suffer from)
-    * this won't work because the readdir() function also needs to be patched
-
 
 * unify bufcache and page cache
 * implement page cache and fix segments
-* implement the "." and ".." directories (various issues)
 
 
 HIGH PRIORITY ISSUES:
@@ -25,13 +20,6 @@ HIGH PRIORITY ISSUES:
 * fix the sbrk growing/shrinking
 * need to change how segments are shared, and how pages are shared (need a page cache)
 
-
-* there is now an issue with ".." and "." such that you can't get the *wrapped* vnode for `self`, so you can't create the "." and ".."
-  special entries in directories for non-ext2 filesystems (dev, proc, tmp).  This also prevents you from implementing the ability to
-  go up with ".." across a mount point
-    * ext2 is not a problem now
-    * tmpfs, devfs, and procfs, need to return vnodes without a lookup (ext2 uses a cache which changes how it has to store things)
-
 * should you have a heap in the kernel with mapped pages, and if so, where in virtual memory would it be located?
 
 * need to fix the data segment/heap/sbrk stuff because it doesn't change the stack size, and there is no checking or
@@ -45,15 +33,12 @@ HIGH PRIORITY ISSUES:
 TODO:
 
 * implement page cache
-* need to handle the case of accessing ".." on a mounted vnode.  It must correctly fetch the parent node
-* add . and .. to procfs, as well as devfs and tmpfs
 
 * add a function to libapp to help parse simple command line arguments
 
 * implement api getcwd()
 * implement vfs::link()
 * make methods on File for fs operations (including unlink/rename?), so you don't have to always use vfs::read(file)
-* modify the proc macro for encoding system calls to be a bit cleaner (not have to put the {} at the end, fit it all in one line, etc)
 
 * add networking
 * add threading support in api
@@ -148,6 +133,7 @@ FILESYSTEM TODO:
 
 LOW PRIORITY TODO:
 
+* modify the proc macro for encoding system calls to be a bit cleaner (not have to put the {} at the end, fit it all in one line, etc)
 * there is currently no checking for illegal characters in each path component
 * fix rename on ext2 to more intelligently rename (if the parents are the same and the direntry can be reuse, then do that)
 

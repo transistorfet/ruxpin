@@ -242,11 +242,21 @@ pub struct GenericStaticDirectoryVnode<T: 'static + Sync + Send> {
     self_vnode: Option<WeakVnode>,
     parent_vnode: Option<WeakVnode>,
     attrs: FileAttributes,
-    contents: &'static [(&'static str, GenericStaticFileData<T>)],
+    contents: GenericStaticFileList<T>,
     data: T,
 }
 
 pub type GenericStaticFileData<T> = fn(&T) -> Result<Vec<u8>, KernelError>;
+pub type GenericStaticFileList<T> = &'static [(&'static str, GenericStaticFileData<T>)];
+
+pub fn get_data_from_file_list<T>(contents: GenericStaticFileList<T>, data: &T, filename: &str) -> Result<Vec<u8>, KernelError> {
+    for (name, func) in contents {
+        if *name == filename {
+            return func(data);
+        }
+    }
+    Err(KernelError::FileNotFound)
+}
 
 impl<T: 'static + Sync + Send> GenericStaticDirectoryVnode<T> {
     pub fn new(parent_vnode: Option<WeakVnode>, access: FileAccess, uid: UserID, gid: GroupID, contents: &'static [(&'static str, GenericStaticFileData<T>)], data: T) -> Self {
@@ -264,12 +274,7 @@ impl<T: 'static + Sync + Send> GenericStaticDirectoryVnode<T> {
     }
 
     fn get_data_by_name(&self, filename: &str) -> Result<Vec<u8>, KernelError> {
-        for (name, func) in self.contents {
-            if *name == filename {
-                return func(&self.data);
-            }
-        }
-        Err(KernelError::FileNotFound)
+        get_data_from_file_list(self.contents, &self.data, filename)
     }
 }
 

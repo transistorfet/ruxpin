@@ -10,12 +10,14 @@ use alloc::sync::Arc;
 
 use ruxpin_types::{OpenFlags, FileAccess, DeviceID, Pid, DirEntry};
 
+use ruxpin_kernel::fs::vfs;
+use ruxpin_kernel::write_bytes;
 use ruxpin_kernel::sync::Spinlock;
 use ruxpin_kernel::errors::KernelError;
 use ruxpin_kernel::misc::writer::SliceWriter;
 use ruxpin_kernel::proc::scheduler;
 use ruxpin_kernel::proc::tasks::TaskState;
-use ruxpin_kernel::fs::generic::{GenericStaticDirectoryVnode, GenericStaticFileData};
+use ruxpin_kernel::fs::generic::{self, GenericStaticDirectoryVnode, GenericFileVnode, GenericStaticFileData};
 use ruxpin_kernel::fs::types::{new_vnode, Filesystem, Mount, MountOperations, Vnode, WeakVnode, VnodeOperations, FileAttributes, FilePointer};
 
 
@@ -72,7 +74,6 @@ impl MountOperations for ProcMount {
 }
 
 
-
 struct ProcFsRootVnode {
     self_vnode: Option<WeakVnode>,
     parent_vnode: Option<WeakVnode>,
@@ -108,11 +109,16 @@ impl VnodeOperations for ProcFsRootVnode {
             return vnode.upgrade().ok_or(KernelError::FileNotFound);
         }
 
-        let process_id = match filename.parse::<Pid>() {
-            Ok(process_id) if scheduler::get_process(process_id).is_some() => Ok(process_id),
-            _ => Err(KernelError::FileNotFound),
-        }?;
-        Ok(new_vnode(GenericStaticDirectoryVnode::new(self.self_vnode.clone(), FileAccess::DefaultReadOnlyFile, 0, 0, PROCESS_ENTRIES, process_id)))
+        if let Ok(process_id) = filename.parse::<Pid>() {
+            if scheduler::get_process(process_id).is_some() {
+                Ok(new_vnode(GenericStaticDirectoryVnode::new(self.self_vnode.clone(), FileAccess::DefaultReadOnlyFile, 0, 0, PROCESS_ENTRIES, process_id)))
+            } else {
+                Err(KernelError::FileNotFound)
+            }
+        } else {
+            let data = generic::get_data_from_file_list(ROOT_ENTRIES, &(), filename)?;
+            Ok(new_vnode(GenericFileVnode::with_data(FileAccess::DefaultReadOnlyFile, 0, 0, data)))
+        }
     }
 
     fn attributes<'a>(&'a mut self) -> Result<&'a FileAttributes, KernelError> {
@@ -128,7 +134,7 @@ impl VnodeOperations for ProcFsRootVnode {
     }
 
     fn readdir(&mut self, file: &mut FilePointer) -> Result<Option<DirEntry>, KernelError> {
-        if file.position >= scheduler::slot_len() + 2 {
+        if file.position >= scheduler::slot_len() + ROOT_ENTRIES.len() + 2 {
             return Ok(None);
         }
 
@@ -138,23 +144,47 @@ impl VnodeOperations for ProcFsRootVnode {
         } else if file.position == 1 {
             file.position += 1;
             Ok(Some(DirEntry::new(0, "..".as_bytes())))
-        } else {
+        } else if file.position < scheduler::slot_len() + 2 {
             let proc = match scheduler::get_slot(file.position - 2) {
                 None => { return Ok(None) },
                 Some(proc) => proc,
             };
 
             let mut result = DirEntry::new(0, b"");
-            let mut writer = SliceWriter::new(&mut result.name);
-            write!(writer, "{}", proc.lock().process_id).map_err(|_| KernelError::InvalidArgument)?;
-            let len = writer.len();
+            let len = write_bytes!(result.name, "{}", proc.lock().process_id);
             unsafe { result.set_len(len); }
 
             file.position += 1;
             Ok(Some(result))
+        } else {
+            let index = file.position - scheduler::slot_len() - 2;
+
+            file.position += 1;
+            Ok(Some(DirEntry::new(0, ROOT_ENTRIES[index].0.as_bytes())))
         }
     }
 }
+
+
+const ROOT_ENTRIES: &'static [(&'static str, GenericStaticFileData<()>)] = &[
+    ("mounts", file_data_mount),
+];
+
+fn file_data_mount(_nothing: &()) -> Result<Vec<u8>, KernelError> {
+    let mut data = vec![0; 128];
+    let mut writer = SliceWriter::new(data.as_mut_slice());
+
+    vfs::for_each_mount(|mount| {
+        // TODO implement mount data
+        write!(writer, "a mount\n");
+        Ok(())
+    })?;
+
+    let len = writer.len();
+    unsafe { data.set_len(len); }
+    Ok(data)
+}
+
 
 const PROCESS_ENTRIES: &'static [(&'static str, GenericStaticFileData<Pid>)] = &[
     ("stat", file_data_stat),

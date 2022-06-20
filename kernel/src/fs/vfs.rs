@@ -54,6 +54,15 @@ pub fn mount(cwd: Option<Vnode>, path: &str, fstype: &str, device_id: Option<Dev
     Ok(())
 }
 
+fn find_filesystem(fstype: &str) -> Result<Arc<Spinlock<dyn Filesystem>>, KernelError> {
+    for fs in FILESYSTEMS.lock().iter() {
+        if fs.lock().fstype() == fstype {
+            return Ok(fs.clone());
+        }
+    }
+    Err(KernelError::NoSuchFilesystem)
+}
+
 fn link_mount_to_vnode(mount: Mount, vnode: Option<Vnode>) -> Result<(), KernelError> {
     let root = mount.lock().get_root()?;
     if let Some(vnode) = vnode.as_ref() {
@@ -67,6 +76,16 @@ fn link_mount_to_vnode(mount: Mount, vnode: Option<Vnode>) -> Result<(), KernelE
 pub fn sync_all() -> Result<(), KernelError> {
     for mount in MOUNTPOINTS.try_lock()?.iter() {
         mount.try_lock()?.sync()?;
+    }
+    Ok(())
+}
+
+pub fn for_each_mount<F>(mut f: F) -> Result<(), KernelError>
+where
+    F: FnMut(&Mount) -> Result<(), KernelError>
+{
+    for mount in MOUNTPOINTS.try_lock()?.iter() {
+        f(mount)?;
     }
     Ok(())
 }
@@ -318,15 +337,6 @@ fn get_path_component_reverse<'a>(path: &'a str) -> (&'a str, &'a str) {
         i -= 1;
     }
     ("", &path)
-}
-
-fn find_filesystem(fstype: &str) -> Result<Arc<Spinlock<dyn Filesystem>>, KernelError> {
-    for fs in FILESYSTEMS.lock().iter() {
-        if fs.lock().fstype() == fstype {
-            return Ok(fs.clone());
-        }
-    }
-    Err(KernelError::NoSuchFilesystem)
 }
 
 fn verify_file_access(current_uid: UserID, require_access: FileAccess, file_attributes: &FileAttributes) -> bool {
