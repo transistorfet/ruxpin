@@ -6,7 +6,7 @@ use ruxpin_syscall::{SyscallFunction};
 
 use crate::api;
 use crate::info;
-use crate::arch::Context;
+use crate::arch::{self, Context};
 use crate::arch::types::VirtualAddress;
 use crate::errors::KernelError;
 use crate::misc::queue::{Queue, QueueNode, QueueNodeRef};
@@ -33,7 +33,7 @@ pub fn initialize() -> Result<(), KernelError> {
 }
 
 fn idle_task() {
-    loop {}
+    arch::loop_forever();
 }
 
 

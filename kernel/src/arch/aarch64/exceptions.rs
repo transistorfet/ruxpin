@@ -8,8 +8,8 @@ use crate::{error, debug, trace};
 use crate::printk::printk_dump;
 use crate::proc::scheduler;
 
-use super::context::Context;
 use super::types::VirtualAddress;
+use super::context::{self, Context};
 
 
 pub type IrqFlags = u64;
@@ -73,13 +73,13 @@ pub extern "C" fn fatal_error(context: &Context, elr: u64, esr: u64, far: u64) -
         unsafe { printk_dump(u64::from(sp), 128); }
     }
 
-    loop {}
+    context::loop_forever();
 }
 
 #[no_mangle]
 pub extern "C" fn fatal_kernel_error(_sp: u64, elr: u64, esr: u64, far: u64) -> ! {
     error!("\nFatal Kernel Error: ESR: {:#010x}, FAR: {:#x}, ELR: {:#x}", esr, far, elr);
-    loop {}
+    context::loop_forever();
 }
 
 #[no_mangle]

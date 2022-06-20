@@ -44,14 +44,13 @@ TODO:
 * add threading support in api
 * think about multicore and what that would mean for everything
 
-* fix the ugly stack manipulation used for the command line arguments.  Can you make one set of arguments available to the process and also
-  to procfs (via the task record)?
-
 * add an events system for processes to wait on (IO blocking, process exit, select/poll, etc)
 * fix the blocking/unblocking code (including exits) to use multiple queues and an event system of some sorts to improve the performance of checks
 
 * add a stack guard page to each stack segment, with permissions/mapping in the translation table such that it will cause a fault
   instead of crashing into the adjacent segment.  Linux has this adjustable in size I think
+* fix the ugly stack manipulation used for the command line arguments.  Can you make one set of arguments available to the process and also
+  to procfs (via the task record)?
 
 * add more data to procfs
 * add mounts to procfs (and make mount command)

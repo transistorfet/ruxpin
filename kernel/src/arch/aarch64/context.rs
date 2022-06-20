@@ -168,3 +168,11 @@ pub fn start_multitasking() -> ! {
     }
 }
 
+pub fn loop_forever() -> ! {
+    loop {
+        unsafe {
+            asm!("wfe");
+        }
+    }
+}
+

@@ -40,6 +40,6 @@ pub extern "C" fn kernel_start() -> ! {
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     error!("Rust Panic: {}", info);
-    loop {}
+    arch::loop_forever();
 }
 
