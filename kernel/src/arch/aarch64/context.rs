@@ -176,3 +176,15 @@ pub fn loop_forever() -> ! {
     }
 }
 
+pub fn cpu_id() -> usize {
+    unsafe {
+        let mut id;
+        asm!(
+            "mrs	{id}, MPIDR_EL1",
+            "and	{id}, {id}, 0x03",
+            id = out(reg) id,
+        );
+        id
+    }
+}
+

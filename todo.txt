@@ -2,6 +2,7 @@
 
 * unify bufcache and page cache
 * implement page cache and fix segments
+* for multi-core support, you first need per-cpu memory allocation (and maybe go into rust before kernel_start)
 
 
 HIGH PRIORITY ISSUES:

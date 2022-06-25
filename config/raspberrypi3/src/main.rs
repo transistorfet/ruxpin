@@ -88,20 +88,22 @@ fn startup_tests() -> Result<(), KernelError> {
 
     notice!("\nRunning some hardcoded tests before completing the startup");
 
-    notice!("\nCreating a directory and a file inside of it");
-    vfs::open(None, "testdir", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
-    let file = vfs::open(None, "testdir/file.txt", OpenFlags::Create, FileAccess::DefaultFile, 0).unwrap();
-    vfs::write(file.clone(), b"This is a test").unwrap();
-    vfs::seek(file.clone(), 0, Seek::FromStart).unwrap();
-    let mut buffer = [0; 100];
-    let n = vfs::read(file.clone(), &mut buffer).unwrap();
-    notice!("Read file {}: {}", n, core::str::from_utf8(&buffer).unwrap());
+    {
+        notice!("\nCreating a directory and a file inside of it");
+        vfs::open(None, "testdir", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
+        let file = vfs::open(None, "testdir/file.txt", OpenFlags::Create, FileAccess::DefaultFile, 0).unwrap();
+        vfs::write(file.clone(), b"This is a test").unwrap();
+        vfs::seek(file.clone(), 0, Seek::FromStart).unwrap();
+        let mut buffer = [0; 100];
+        let n = vfs::read(file, &mut buffer).unwrap();
+        notice!("Read file {}: {}", n, core::str::from_utf8(&buffer).unwrap());
+    }
 
-
-    notice!("\nOpening the console device file and writing to it");
-    let file = vfs::open(None, "/dev/console0", OpenFlags::ReadOnly, FileAccess::DefaultFile, 0).unwrap();
-    vfs::write(file.clone(), b"the device file can write\n").unwrap();
-    //vfs::close(file).unwrap();
+    {
+        notice!("\nOpening the console device file and writing to it");
+        let file = vfs::open(None, "/dev/console0", OpenFlags::ReadOnly, FileAccess::DefaultFile, 0).unwrap();
+        vfs::write(file, b"the device file can write\n").unwrap();
+    }
 
     /*
     let device_id = DeviceID(0, 0);
@@ -125,38 +127,35 @@ fn startup_tests() -> Result<(), KernelError> {
     */
 
 
-
-    notice!("\nOpening the shell binary through the vfs interface and reading some data");
-    let file = vfs::open(None, "/bin/sh", OpenFlags::ReadOnly, FileAccess::DefaultFile, 0).unwrap();
-    let mut data = [0; 1024];
-    loop {
-        let nbytes = vfs::read(file.clone(), &mut data).unwrap();
+    {
+        notice!("\nOpening the shell binary through the vfs interface and reading some data");
+        let file = vfs::open(None, "/bin/sh", OpenFlags::ReadOnly, FileAccess::DefaultFile, 0).unwrap();
+        let mut data = [0; 1024];
+        let nbytes = vfs::read(file, &mut data).unwrap();
         notice!("read in {} bytes", nbytes);
         printk_dump_slice(&data);
-        //if nbytes != 1024 {
-            break;
-        //}
     }
-    //vfs::close(file)?;
 
+    {
+        notice!("\nOpening a new file and writing some data into it");
+        let file = vfs::open(None, "/test2", OpenFlags::ReadWrite.plus(OpenFlags::Create), FileAccess::DefaultFile, 0).unwrap();
+        vfs::write(file, b"this is some test data").unwrap();
+    }
 
+    {
+        notice!("\nReading back the data written previously");
+        let file = vfs::open(None, "/test2", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0).unwrap();
+        let mut data = [0; 128];
+        vfs::read(file, &mut data).unwrap();
+        printk_dump_slice(&data);
+    }
 
-    notice!("\nOpening a new file and writing some data into it");
-    let file = vfs::open(None, "/test2", OpenFlags::ReadWrite.plus(OpenFlags::Create), FileAccess::DefaultFile, 0).unwrap();
-    vfs::write(file.clone(), b"this is some test data").unwrap();
-    //vfs::close(file)?;
-
-    notice!("\nReading back the data written previously");
-    let file = vfs::open(None, "/test2", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0).unwrap();
-    let mut data = [0; 128];
-    vfs::read(file.clone(), &mut data).unwrap();
-    printk_dump_slice(&data);
-    //vfs::close(file)?;
-
-    notice!("\nPrinting the contents of the root directory (ext2 mount)");
-    let file = vfs::open(None, "/", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0).unwrap();
-    while let Some(dirent) = vfs::readdir(file.clone()).unwrap() {
-        notice!("reading dir {} with inode {}", dirent.as_str(), dirent.inode);
+    {
+        notice!("\nPrinting the contents of the root directory (ext2 mount)");
+        let file = vfs::open(None, "/", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0).unwrap();
+        while let Some(dirent) = vfs::readdir(file.clone()).unwrap() {
+            notice!("reading dir {} with inode {}", dirent.as_str(), dirent.inode);
+        }
     }
 
     /*

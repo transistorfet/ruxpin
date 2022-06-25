@@ -176,7 +176,7 @@ fn file_data_mount(_nothing: &()) -> Result<Vec<u8>, KernelError> {
 
     vfs::for_each_mount(|mount| {
         // TODO implement mount data
-        write!(writer, "a mount\n");
+        write!(writer, "a mount\n").map_err(|_| KernelError::IOError)?;
         Ok(())
     })?;
 

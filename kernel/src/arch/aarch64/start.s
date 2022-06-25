@@ -1,5 +1,6 @@
 
-.extern kernel_start
+.extern boot_core_start
+.extern non_boot_core_start
 .extern _default_exceptions_table
 .extern _kernel_translation_table_l0
 .extern __KERNEL_BSS_START
@@ -22,9 +23,9 @@ _start:
 	and	x1, x1, 0x03
 	mov	x2, #0
 	cmp	x1, x2
-	b.ne	_suspend_core
+	b.ne	_non_boot_core
 
-    L_init_core_0:
+_boot_core:
 	// Set the stack pointer
 	adr	x1, _INIT_STACK_POINTER
 	msr	SP_EL0, x1
@@ -33,34 +34,14 @@ _start:
 
 	bl	_setup_common_system_registers
 
-	// Switch to EL1
-	mov	x0, #0b1111000101	// Mask interrupts, no thumb, M[3:0] = EL1
-	msr	SPSR_EL2, x0
-
-	adr	x2, L_enter_E1
-	msr	ELR_EL2, x2
-	isb	sy
-	eret
-
-    L_enter_E1:
-	// Configure the translation tables for the MMU
-	adr	x8, _kernel_translation_table_l0
-        msr	TTBR1_EL1, x8
-        msr	TTBR0_EL1, x8
-        //mov	x8, #((0b101 << 32) | (0b10 << 30) | (0b00 << 14) | (64 - 42))
-        //ldr	x8, =0x585100510   //(0b101 << 32) | (0b10 << 30) | (0b01 << 26) | (0b01 << 24) | ((64 - 48) << 16) | (0b00 << 14) | (0b01 << 10) | (0b01 << 8) | (64 - 48)
-	ldr	x8, =0x5B5503510
-        msr	TCR_EL1, x8
-	mov	x8, #0x0477	// Set ID 1 to Device Mem nGnRE, ID 0 to Normal memory, Outer Write-Back Transient, R+W Allocate
-	msr	MAIR_EL1, x8
-        isb
-
-	// Enable the MMU
-        mrs	x8, SCTLR_EL1
-	mov	x9, #0x1005	// Enable the MMU and also Data and Instruction Caches
-        orr	x8, x8, x9
-        msr	SCTLR_EL1, x8
-        isb
+	// Enable the 3 secondary (non-boot) cores
+	//adr	x15, _non_boot_core
+	//mov	x16, #0xe0
+	//str	x15, [x16]
+	//add	x16, x16, #8
+	//str	x15, [x16]
+	//add	x16, x16, #8
+	//str	x15, [x16]
 
 	// Patch the program counter to use the kernel address space
 	adr	x8, L_switch_to_kernel_vspace
@@ -86,8 +67,49 @@ _start:
 	cmp	x1, x2
 	b.lt	L_bss_init
 
+
 	// Enter the kernel's Rust code
-	bl	kernel_start
+	bl	boot_core_start
+
+
+_non_boot_core:
+	// Print a '2' for debugging
+	ldr	x4, =0x3F201000
+	mov	w5, #0x32
+	strb	w5, [x4]
+
+	// Set up a default stack
+	adr	x0, #0x20000
+	mul	x0, x0, x1	// The Core ID
+	msr	SP_EL0, x0
+	msr	SP_EL1, x0
+	mov	sp, x0
+
+	bl	_setup_common_system_registers
+
+	// Patch the program counter to use the kernel address space
+	adr	x8, L_switch_to_kernel_vspace_non_boot
+	ldr	x9, =__KERNEL_VIRTUAL_BASE_ADDR
+	add	x8, x8, x9
+	br	x8
+
+    L_switch_to_kernel_vspace_non_boot:
+	// Reset the Stack Pointer to use a Kernel Space vaddress
+	mrs	x1, MPIDR_EL1
+	and	x1, x1, 0x03
+	adr	x0, #0x20000	// Stack Size
+	mul	x0, x0, x1	// The Core ID
+	mov	sp, x0
+
+	// Set up Exceptions Table for EL1
+	adrp	x1, _default_exceptions_table
+	msr	VBAR_EL1, x1
+
+	bl	non_boot_core_start
+
+    L_loop_forever:
+	wfe
+	b L_loop_forever
 
 
 _setup_common_system_registers:
@@ -155,22 +177,37 @@ _setup_common_system_registers:
 
 	isb	sy
 
+	// Switch to EL1
+	mov	x0, #0b1111000101	// Mask interrupts, no thumb, M[3:0] = EL1
+	msr	SPSR_EL2, x0
+
+	adr	x2, L_enter_E1
+	msr	ELR_EL2, x2
+	isb	sy
+	eret
+
+    L_enter_E1:
+
+	// Configure the translation tables for the MMU
+	adr	x8, _kernel_translation_table_l0
+        msr	TTBR1_EL1, x8
+        msr	TTBR0_EL1, x8
+        //mov	x8, #((0b101 << 32) | (0b10 << 30) | (0b00 << 14) | (64 - 42))
+        //ldr	x8, =0x585100510   //(0b101 << 32) | (0b10 << 30) | (0b01 << 26) | (0b01 << 24) | ((64 - 48) << 16) | (0b00 << 14) | (0b01 << 10) | (0b01 << 8) | (64 - 48)
+	ldr	x8, =0x5B5503510
+        msr	TCR_EL1, x8
+	mov	x8, #0x0477	// Set ID 1 to Device Mem nGnRE, ID 0 to Normal memory, Outer Write-Back Transient, R+W Allocate
+	msr	MAIR_EL1, x8
+        isb
+
+	// Enable the MMU
+        mrs	x8, SCTLR_EL1
+	mov	x9, #0x1005	// Enable the MMU and also Data and Instruction Caches
+        orr	x8, x8, x9
+        msr	SCTLR_EL1, x8
+        isb
+
 	ret
-
-
-_suspend_core:
-	// Set up a default stack
-	adr	x0, #0x20000
-	mul	x0, x0, x1	// The Core ID
-	msr	SP_EL0, x0
-	msr	SP_EL1, x0
-	mov	sp, x0
-
-	bl	_setup_common_system_registers
-
-    L_loop_forever:
-	wfe
-	b L_loop_forever
 
 
 _INIT_STACK_POINTER:
