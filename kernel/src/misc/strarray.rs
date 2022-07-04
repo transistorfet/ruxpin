@@ -4,7 +4,7 @@ use core::mem;
 
 use crate::misc::memory;
 use crate::misc::align_up;
-use crate::arch::types::VirtualAddress;
+use crate::arch::VirtualAddress;
 use crate::errors::KernelError;
 
 pub struct StrArray<const LENGTH: usize> {

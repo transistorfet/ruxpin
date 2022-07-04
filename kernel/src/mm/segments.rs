@@ -3,13 +3,14 @@ use alloc::sync::Arc;
 use alloc::boxed::Box;
 
 use crate::arch::mmu::{self, TranslationTable};
-use crate::arch::types::{PhysicalAddress, VirtualAddress};
+use crate::arch::{PhysicalAddress, VirtualAddress};
 use crate::errors::KernelError;
 use crate::misc::align_up;
-use crate::mm::MemoryPermissions;
-use crate::mm::pagecache::PageCacheEntry;
-use crate::mm::pages;
 use crate::sync::Spinlock;
+
+use super::pages;
+use super::MemoryPermissions;
+use super::pagecache::PageCacheEntry;
 
 
 #[derive(Copy, Clone, PartialEq)]

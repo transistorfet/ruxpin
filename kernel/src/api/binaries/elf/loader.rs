@@ -5,17 +5,16 @@ use alloc::string::ToString;
 
 use ruxpin_types::{OpenFlags, FileAccess};
 
+use crate::fs;
 use crate::debug;
-use crate::fs::vfs;
 use crate::arch::mmu;
 use crate::misc::memory;
 use crate::errors::KernelError;
+use crate::arch::VirtualAddress;
 use crate::misc::strarray::StandardArrayOfStrings;
 use crate::proc::scheduler::Task;
 use crate::proc::tasks::TaskRecord;
-use crate::arch::types::VirtualAddress;
-use crate::mm::MemoryPermissions;
-use crate::mm::segments::SegmentType;
+use crate::mm::{MemoryPermissions, SegmentType};
 use crate::mm::pagecache;
 
 use super::defs::*;
@@ -26,8 +25,8 @@ pub fn load_binary(proc: Task, path: &str, argv: &StandardArrayOfStrings, envp: 
     locked_proc.cmd = path.to_string();
 
     // Open the file (if executable) and initialize the cache entry
-    vfs::access(locked_proc.files.try_lock()?.get_cwd(), path, FileAccess::Exec.plus(FileAccess::Regular), locked_proc.current_uid)?;
-    let file = vfs::open(None, path, OpenFlags::ReadOnly, FileAccess::DefaultFile, locked_proc.current_uid)?;
+    fs::access(locked_proc.files.try_lock()?.get_cwd(), path, FileAccess::Exec.plus(FileAccess::Regular), locked_proc.current_uid)?;
+    let file = fs::open(None, path, OpenFlags::ReadOnly, FileAccess::DefaultFile, locked_proc.current_uid)?;
     let cache = pagecache::get_page_entry(file.clone())?;
 
     let header_page = cache.lookup_page_slice(0)?;

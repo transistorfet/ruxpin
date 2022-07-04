@@ -4,7 +4,7 @@ use ruxpin_types::ApiError;
 
 use crate::error;
 use crate::proc::scheduler;
-use crate::arch::context::Context;
+use crate::arch::Context;
 
 mod file;
 mod proc;

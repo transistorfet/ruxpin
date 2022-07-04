@@ -5,7 +5,7 @@ use ruxpin_kernel::block;
 use ruxpin_kernel::errors::KernelError;
 use ruxpin_kernel::misc::cache::Cache;
 
-use ruxpin_kernel::fs::types::{MountOperations, Vnode, WeakVnode};
+use ruxpin_kernel::fs::{MountOperations, Vnode, WeakVnode};
 
 use super::Ext2InodeNum;
 use super::superblock::Ext2SuperBlock;

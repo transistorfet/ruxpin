@@ -7,11 +7,12 @@ use crate::mm::pages;
 use crate::misc::align_up;
 use crate::sync::Spinlock;
 use crate::errors::KernelError;
-use crate::mm::{MemoryType, MemoryPermissions};
-use crate::mm::pagecache::{self, PageCacheEntry};
-use crate::mm::segments::{Segment, ArcSegment, SegmentType};
 use crate::arch::mmu::{self, TranslationTable};
-use crate::arch::types::{VirtualAddress, PhysicalAddress};
+use crate::arch::{VirtualAddress, PhysicalAddress};
+
+use super::{MemoryType, MemoryPermissions};
+use super::pagecache::{self, PageCacheEntry};
+use super::segments::{Segment, ArcSegment, SegmentType};
 
 
 const MAX_SEGMENTS: usize = 6;

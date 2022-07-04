@@ -6,12 +6,12 @@ use alloc::collections::BTreeMap;
 use ruxpin_types::Seek;
 
 use crate::arch::mmu;
-use crate::arch::types::PhysicalAddress;
+use crate::arch::PhysicalAddress;
 use crate::errors::KernelError;
-use crate::fs::types::{Vnode, File};
-use crate::fs::vfs;
-use crate::mm::pages;
+use crate::fs::{self, Vnode, File};
 use crate::sync::Spinlock;
+
+use super::pages;
 
 
 static PAGE_CACHE: Spinlock<Option<PageCache>> = Spinlock::new(None);
@@ -77,9 +77,9 @@ impl PageCacheEntry {
                 let page = pages.alloc_page_zeroed();
 
                 let page_buffer = mmu::get_page_slice(page);
-                vfs::seek(self.file.clone(), offset, Seek::FromStart)?;
+                fs::seek(self.file.clone(), offset, Seek::FromStart)?;
 
-                vfs::read(self.file.clone(), &mut page_buffer[..mmu::page_size()])?;
+                fs::read(self.file.clone(), &mut page_buffer[..mmu::page_size()])?;
 
                 locked_pages.insert(page_offset, pages.ref_page(page));
                 Ok(page)

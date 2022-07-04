@@ -9,7 +9,7 @@ use ruxpin_types::{OpenFlags, FileAccess, Seek, DeviceID};
 use ruxpin_kernel::tty;
 use ruxpin_kernel::sync::Spinlock;
 use ruxpin_kernel::errors::KernelError;
-use ruxpin_kernel::fs::types::{new_vnode, Filesystem, Mount, MountOperations, Vnode, WeakVnode, VnodeOperations, FileAttributes, FilePointer};
+use ruxpin_kernel::fs::{new_vnode, Filesystem, Mount, MountOperations, Vnode, WeakVnode, VnodeOperations, FileAttributes, FilePointer};
 
 
 pub struct DevFilesystem {

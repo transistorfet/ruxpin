@@ -11,8 +11,7 @@ use ruxpin_kernel::block;
 use ruxpin_kernel::sync::Spinlock;
 use ruxpin_kernel::errors::KernelError;
 
-use ruxpin_kernel::fs::vfs;
-use ruxpin_kernel::fs::types::{Filesystem, Mount, Vnode, WeakVnode, VnodeOperations, FileAttributes, FilePointer};
+use ruxpin_kernel::fs::{self, Filesystem, Mount, Vnode, WeakVnode, VnodeOperations, FileAttributes, FilePointer};
 
 mod blocks;
 mod directories;
@@ -120,7 +119,7 @@ impl VnodeOperations for Ext2Vnode {
     }
 
     fn unlink(&mut self, target: Vnode, filename: &str) -> Result<(), KernelError> {
-        if vfs::is_directory(target.clone())? && !vfs::is_directory_empty(target.clone())? {
+        if fs::is_directory(target.clone())? && !fs::is_directory_empty(target.clone())? {
             return Err(KernelError::DirectoryNotEmpty);
         }
 

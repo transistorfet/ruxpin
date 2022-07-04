@@ -4,7 +4,7 @@ use core::mem;
 use core::alloc::{GlobalAlloc, Layout};
 
 use crate::notice;
-use crate::arch::types::PhysicalAddress;
+use crate::arch::PhysicalAddress;
 
 
 struct Block {

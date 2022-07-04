@@ -10,7 +10,6 @@ use alloc::sync::Arc;
 
 use ruxpin_types::{OpenFlags, FileAccess, DeviceID, Pid, DirEntry};
 
-use ruxpin_kernel::fs::vfs;
 use ruxpin_kernel::write_bytes;
 use ruxpin_kernel::sync::Spinlock;
 use ruxpin_kernel::errors::KernelError;
@@ -18,7 +17,7 @@ use ruxpin_kernel::misc::writer::SliceWriter;
 use ruxpin_kernel::proc::scheduler;
 use ruxpin_kernel::proc::tasks::TaskState;
 use ruxpin_kernel::fs::generic::{self, GenericStaticDirectoryVnode, GenericFileVnode, GenericStaticFileData};
-use ruxpin_kernel::fs::types::{new_vnode, Filesystem, Mount, MountOperations, Vnode, WeakVnode, VnodeOperations, FileAttributes, FilePointer};
+use ruxpin_kernel::fs::{self, new_vnode, Filesystem, Mount, MountOperations, Vnode, WeakVnode, VnodeOperations, FileAttributes, FilePointer};
 
 
 pub struct ProcFilesystem {
@@ -174,7 +173,7 @@ fn file_data_mount(_nothing: &()) -> Result<Vec<u8>, KernelError> {
     let mut data = vec![0; 128];
     let mut writer = SliceWriter::new(data.as_mut_slice());
 
-    vfs::for_each_mount(|mount| {
+    fs::for_each_mount(|mount| {
         // TODO implement mount data
         write!(writer, "a mount\n").map_err(|_| KernelError::IOError)?;
         Ok(())

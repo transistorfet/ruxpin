@@ -1,40 +1,25 @@
 
-* need to use copy on write for new file backed segments that are read write (since the pages in the page cache should be read-only)
-* need to add a way to remove from memory cached files that are no longer used
-
-* should you rename unmap_range, map_paged_range, reset_page_copy_on_write, etc to range_unmap, range_map_paged, page_reset_copy_on_write
-
 * modify a user fatal error so that it just terminates the process instead of kernel panic
 
-
 * unify bufcache and page cache
-* implement page cache and fix segments
+* need to add a way to remove from pagecached files that are no longer used
+* when a page is requested beyond the end of the file (BSS) then just allocate a page without a copy-on-write page, and also
+  add a check to page cache to not allocate pages beyond the end of the file
+
 * for multi-core support, you first need per-cpu memory allocation (and maybe go into rust before kernel_start)
-
-
-* re-export symbols from the top level directory when there's a public interface... I'm thinking the fs module, arch (at least types?)
 
 
 HIGH PRIORITY ISSUES:
 
 * for bufcache, and the issue of block size vs page size, you could maybe make it so that all bufcaches are page sized, but it will give
-  the filesystem whatever block size it requests by returning a subslice of the actual page
+  the filesystem whatever block size it requests by returning a subslice of the actual page (only works for page size >= max block size
 * need to eventually convert kmalloc to use the paging system (with a kernel page flag if necessary)
-* need to merge the bufcache and page cache
-
-* once the page cache is in place, you can make the entire binary file cacheable such that you wont need to copy data the way you are in
-  the elf loader for the program headers when reading in the file
-* when a segment is copied, it only copies the pages loaded into memory at that time, and puts 0 for all other pages, but that means when
-  those pages are loaded, they will be duplicated.  The solution is to have a cache for each file/exec that is being used which holds a
-  reference to each page, and once it is dropped, those pages will be freed, and when a page is loaded, the cache is searched first.  I'm
-  not yet sure how I'd like to implement this, and I still haven't exactly figured out how other OSes do it
-* fix the sbrk growing/shrinking
-* need to change how segments are shared, and how pages are shared (need a page cache)
-
-* should you have a heap in the kernel with mapped pages, and if so, where in virtual memory would it be located?
 
 * need to fix the data segment/heap/sbrk stuff because it doesn't change the stack size, and there is no checking or
   support for stack resizing or allocating new stacks in the address space, which is needed for multithread stacks
+
+* should you make the kernel heap use pages instead, and if so, where in virtual memory would the heap space be located?
+
 * can you replace the process vec with a hashmap?  The issue is iterating over the list for procfs readdir support
 
 * should you split the api into a linux one and a ruxpin-specific one that is very rusty?  If you did, it would make sense to
@@ -43,13 +28,12 @@ HIGH PRIORITY ISSUES:
 
 TODO:
 
-* implement page cache
-
 * add a function to libapp to help parse simple command line arguments
 
 * implement api getcwd()
 * implement vfs::link()
 * make methods on File for fs operations (including unlink/rename?), so you don't have to always use vfs::read(file)
+* there's a lot of inconsistency between Ext2BlockNumber and BlockNum in ext2 which should be resolved somehow
 
 * add networking
 * add threading support in api
@@ -72,6 +56,8 @@ TODO:
 
 
 ISSUES:
+
+* should you rename unmap_range, map_paged_range, reset_page_copy_on_write, etc to range_unmap, range_map_paged, page_reset_copy_on_write
 
 * think about threads.  I think linux makes every system thread a process with optional sharing of memory and file descriptors, but I
   had been thinking of making thredas separate, making them scheduled, and since there could be a current thread and a current process
@@ -117,28 +103,6 @@ WHAT IFS:
   be granted explicitly, so that APIs security-wise are opt-in, kind of like a web api, or like WASI
 * I'm leaning a lot more to the idea of splitting up the APIs into different groups with a different svc number for
   each.  The aarch64 stuff can have the svc-to-api decoding because it might need to be platform specific
-
-
-
-FILESYSTEM TODO:
-
-* add block truncation
-* allow for removing directory entries
-* add file renaming
-
-
-* I've tested:
-    - superblock alloc_block/free_block
-    - superblock alloc_inode/free_inode
-    - directory reading
-    - directory adding file
-
-* yet to test:
-    - superblock/block group writing
-    - superblock and group free count being updated correctly
-    - everything to do with blocks.rs/zones
-
-* there's a lot of inconsistency between Ext2BlockNumber and BlockNum in ext2 which should be resolved somehow
 
 
 LOW PRIORITY TODO:

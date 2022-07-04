@@ -8,8 +8,8 @@ use ruxpin_types::{Tid, Pid, UserID};
 use crate::arch::Context;
 use crate::sync::Spinlock;
 use crate::errors::KernelError;
-use crate::fs::filedesc::{FileDescriptors, SharableFileDescriptors};
-use crate::mm::vmalloc::{VirtualAddressSpace, SharableVirtualAddressSpace};
+use crate::fs::{FileDescriptors, SharableFileDescriptors};
+use crate::mm::{VirtualAddressSpace, SharableVirtualAddressSpace};
 
 use super::scheduler::Task;
 

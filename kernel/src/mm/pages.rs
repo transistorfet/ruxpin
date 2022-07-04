@@ -7,7 +7,7 @@ use alloc::vec::Vec;
 
 use crate::{notice, trace};
 use crate::arch::mmu;
-use crate::arch::types::PhysicalAddress;
+use crate::arch::PhysicalAddress;
 use crate::misc::{ceiling_div, align_up};
 
 

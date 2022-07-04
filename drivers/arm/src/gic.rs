@@ -1,6 +1,6 @@
 
 use ruxpin_kernel::notice;
-use ruxpin_kernel::arch::types::KernelVirtualAddress;
+use ruxpin_kernel::arch::KernelVirtualAddress;
 use ruxpin_kernel::misc::deviceio::DeviceRegisters;
 
 use ruxpin_kernel::irqs::InterruptController;

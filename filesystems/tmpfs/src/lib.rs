@@ -9,7 +9,7 @@ use ruxpin_types::{FileAccess, DeviceID};
 use ruxpin_kernel::sync::Spinlock;
 use ruxpin_kernel::errors::KernelError;
 use ruxpin_kernel::fs::generic::GenericDirectoryVnode;
-use ruxpin_kernel::fs::types::{new_vnode, Filesystem, Mount, MountOperations, Vnode, WeakVnode};
+use ruxpin_kernel::fs::{new_vnode, Filesystem, Mount, MountOperations, Vnode, WeakVnode};
 
 
 pub struct TmpFilesystem {

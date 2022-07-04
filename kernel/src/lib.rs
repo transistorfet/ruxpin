@@ -21,7 +21,7 @@ extern crate alloc;
 use core::panic::PanicInfo;
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use crate::arch::context::start_multitasking;
+use crate::arch::start_multitasking;
 use crate::errors::KernelError;
 
 static BOOT_CORE_INITIALIZED: AtomicBool = AtomicBool::new(false);

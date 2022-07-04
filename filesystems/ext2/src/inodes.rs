@@ -8,7 +8,7 @@ use ruxpin_kernel::misc::memory;
 use ruxpin_kernel::{info, debug, trace};
 use ruxpin_kernel::errors::KernelError;
 use ruxpin_kernel::misc::byteorder::{leu16, leu32};
-use ruxpin_kernel::fs::types::{new_vnode, Vnode, FileAttributes};
+use ruxpin_kernel::fs::{new_vnode, Vnode, FileAttributes};
 
 use super::Ext2InodeNum;
 use super::Ext2BlockNumber;

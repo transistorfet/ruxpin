@@ -8,10 +8,10 @@ use alloc::boxed::Box;
 use ruxpin_kernel::notice;
 use ruxpin_kernel::errors::KernelError;
 use ruxpin_kernel::printk::printk_dump_slice;
-use ruxpin_kernel::arch::types::PhysicalAddress;
+use ruxpin_kernel::arch::PhysicalAddress;
 
 use ruxpin_kernel::irqs;
-use ruxpin_kernel::fs::vfs;
+use ruxpin_kernel::fs;
 use ruxpin_kernel::tasklets;
 use ruxpin_kernel::mm::kmalloc;
 use ruxpin_kernel::mm::vmalloc;
@@ -42,30 +42,30 @@ pub fn register_devices() -> Result<(), KernelError> {
     irqs::register_interrupt_controller(Box::new(GenericInterruptController::new()));
 
     tasklets::initialize()?;
-    vfs::initialize()?;
+    fs::initialize()?;
     scheduler::initialize()?;
 
     // Register File Systems
-    vfs::register_filesystem(DevFilesystem::new())?;
-    vfs::register_filesystem(ProcFilesystem::new())?;
-    vfs::register_filesystem(TmpFilesystem::new())?;
-    vfs::register_filesystem(Ext2Filesystem::new())?;
+    fs::register_filesystem(DevFilesystem::new())?;
+    fs::register_filesystem(ProcFilesystem::new())?;
+    fs::register_filesystem(TmpFilesystem::new())?;
+    fs::register_filesystem(Ext2Filesystem::new())?;
 
     // Register Drivers
     console::register()?;
     EmmcDevice::register()?;
 
     // Mount Root Partition
-    vfs::mount(None, "/", "ext2", Some(DeviceID(0, 2)), 0).unwrap();
+    fs::mount(None, "/", "ext2", Some(DeviceID(0, 2)), 0).unwrap();
 
     // Create Mountpoints, If They Don't Exist
     check_create_directory("/dev").unwrap();
     check_create_directory("/proc").unwrap();
     check_create_directory("/tmp").unwrap();
 
-    vfs::mount(None, "/dev", "devfs", None, 0).unwrap();
-    vfs::mount(None, "/proc", "procfs", None, 0).unwrap();
-    vfs::mount(None, "/tmp", "tmpfs", None, 0).unwrap();
+    fs::mount(None, "/dev", "devfs", None, 0).unwrap();
+    fs::mount(None, "/proc", "procfs", None, 0).unwrap();
+    fs::mount(None, "/tmp", "tmpfs", None, 0).unwrap();
 
     startup_tests().unwrap();
 
@@ -81,7 +81,7 @@ pub fn register_devices() -> Result<(), KernelError> {
 }
 
 fn startup_tests() -> Result<(), KernelError> {
-    if vfs::open(None, "testdir", OpenFlags::ReadOnly, FileAccess::DefaultDir, 0).is_ok() {
+    if fs::open(None, "testdir", OpenFlags::ReadOnly, FileAccess::DefaultDir, 0).is_ok() {
         notice!("\nSkipping tests because test files already exist");
         return Ok(())
     }
@@ -90,19 +90,19 @@ fn startup_tests() -> Result<(), KernelError> {
 
     {
         notice!("\nCreating a directory and a file inside of it");
-        vfs::open(None, "testdir", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
-        let file = vfs::open(None, "testdir/file.txt", OpenFlags::Create, FileAccess::DefaultFile, 0).unwrap();
-        vfs::write(file.clone(), b"This is a test").unwrap();
-        vfs::seek(file.clone(), 0, Seek::FromStart).unwrap();
+        fs::open(None, "testdir", OpenFlags::Create, FileAccess::Directory.plus(FileAccess::DefaultDir), 0).unwrap();
+        let file = fs::open(None, "testdir/file.txt", OpenFlags::Create, FileAccess::DefaultFile, 0).unwrap();
+        fs::write(file.clone(), b"This is a test").unwrap();
+        fs::seek(file.clone(), 0, Seek::FromStart).unwrap();
         let mut buffer = [0; 100];
-        let n = vfs::read(file, &mut buffer).unwrap();
+        let n = fs::read(file, &mut buffer).unwrap();
         notice!("Read file {}: {}", n, core::str::from_utf8(&buffer).unwrap());
     }
 
     {
         notice!("\nOpening the console device file and writing to it");
-        let file = vfs::open(None, "/dev/console0", OpenFlags::ReadOnly, FileAccess::DefaultFile, 0).unwrap();
-        vfs::write(file, b"the device file can write\n").unwrap();
+        let file = fs::open(None, "/dev/console0", OpenFlags::ReadOnly, FileAccess::DefaultFile, 0).unwrap();
+        fs::write(file, b"the device file can write\n").unwrap();
     }
 
     /*
@@ -129,43 +129,43 @@ fn startup_tests() -> Result<(), KernelError> {
 
     {
         notice!("\nOpening the shell binary through the vfs interface and reading some data");
-        let file = vfs::open(None, "/bin/sh", OpenFlags::ReadOnly, FileAccess::DefaultFile, 0).unwrap();
+        let file = fs::open(None, "/bin/sh", OpenFlags::ReadOnly, FileAccess::DefaultFile, 0).unwrap();
         let mut data = [0; 1024];
-        let nbytes = vfs::read(file, &mut data).unwrap();
+        let nbytes = fs::read(file, &mut data).unwrap();
         notice!("read in {} bytes", nbytes);
         printk_dump_slice(&data);
     }
 
     {
         notice!("\nOpening a new file and writing some data into it");
-        let file = vfs::open(None, "/test2", OpenFlags::ReadWrite.plus(OpenFlags::Create), FileAccess::DefaultFile, 0).unwrap();
-        vfs::write(file, b"this is some test data").unwrap();
+        let file = fs::open(None, "/test2", OpenFlags::ReadWrite.plus(OpenFlags::Create), FileAccess::DefaultFile, 0).unwrap();
+        fs::write(file, b"this is some test data").unwrap();
     }
 
     {
         notice!("\nReading back the data written previously");
-        let file = vfs::open(None, "/test2", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0).unwrap();
+        let file = fs::open(None, "/test2", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0).unwrap();
         let mut data = [0; 128];
-        vfs::read(file, &mut data).unwrap();
+        fs::read(file, &mut data).unwrap();
         printk_dump_slice(&data);
     }
 
     {
         notice!("\nPrinting the contents of the root directory (ext2 mount)");
-        let file = vfs::open(None, "/", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0).unwrap();
-        while let Some(dirent) = vfs::readdir(file.clone()).unwrap() {
+        let file = fs::open(None, "/", OpenFlags::ReadWrite, FileAccess::DefaultFile, 0).unwrap();
+        while let Some(dirent) = fs::readdir(file.clone()).unwrap() {
             notice!("reading dir {} with inode {}", dirent.as_str(), dirent.inode);
         }
     }
 
     /*
     notice!("\nOpening a new file and writing a whole bunch of data into it");
-    let file = vfs::open(None, "/test3", OpenFlags::ReadWrite.plus(OpenFlags::Create), FileAccess::DefaultFile, 0).unwrap();
+    let file = fs::open(None, "/test3", OpenFlags::ReadWrite.plus(OpenFlags::Create), FileAccess::DefaultFile, 0).unwrap();
     let data = [0; 4096];
     for _ in 0..20 {
-        vfs::write(file.clone(), &data).unwrap();
+        fs::write(file.clone(), &data).unwrap();
     }
-    //vfs::close(file)?;
+    //fs::close(file)?;
     */
 
     /*
@@ -191,8 +191,8 @@ fn startup_tests() -> Result<(), KernelError> {
 }
 
 fn check_create_directory(path: &str) -> Result<(), KernelError> {
-    if let Err(KernelError::FileNotFound) = vfs::open(None, path, OpenFlags::ReadOnly, FileAccess::DefaultDir, 0) {
-        vfs::open(None, path, OpenFlags::Create, FileAccess::DefaultDir, 0).unwrap();
+    if let Err(KernelError::FileNotFound) = fs::open(None, path, OpenFlags::ReadOnly, FileAccess::DefaultDir, 0) {
+        fs::open(None, path, OpenFlags::Create, FileAccess::DefaultDir, 0).unwrap();
     }
     Ok(())
 }

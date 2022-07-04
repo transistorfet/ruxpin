@@ -2,7 +2,7 @@
 use ruxpin_kernel::irqs;
 use ruxpin_kernel::notice;
 use ruxpin_kernel::proc::scheduler;
-use ruxpin_kernel::arch::types::KernelVirtualAddress;
+use ruxpin_kernel::arch::KernelVirtualAddress;
 use ruxpin_kernel::misc::deviceio::DeviceRegisters;
 
 mod registers {

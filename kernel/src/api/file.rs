@@ -2,9 +2,8 @@
 use ruxpin_types::{FileDesc, OpenFlags, FileAccess, DirEntry, UserID};
 use ruxpin_syscall_proc::syscall_handler;
 
-use crate::fs::vfs;
 use crate::proc::scheduler;
-use crate::fs::types::Vnode;
+use crate::fs::{self, Vnode};
 use crate::errors::KernelError;
 
 
@@ -21,7 +20,7 @@ pub fn syscall_open(path: &str, flags: OpenFlags, access: FileAccess) -> Result<
         (cwd, current_uid, file_num)
     };
 
-    let file = vfs::open(cwd, path, flags, access, current_uid)?;
+    let file = fs::open(cwd, path, flags, access, current_uid)?;
     proc.try_lock()?.files.try_lock()?.set_slot(file_num, file)?;
     Ok(file_num)
 }
@@ -36,19 +35,19 @@ pub fn syscall_close(file: FileDesc) -> Result<(), KernelError> {
 #[syscall_handler]
 pub fn syscall_read(file: FileDesc, buffer: &mut [u8]) -> Result<usize, KernelError> {
     let file = scheduler::get_current().try_lock()?.files.try_lock()?.get_file(file)?;
-    vfs::read(file, buffer)
+    fs::read(file, buffer)
 }
 
 #[syscall_handler]
 pub fn syscall_write(file: FileDesc, buffer: &[u8]) -> Result<usize, KernelError> {
     let file = scheduler::get_current().try_lock()?.files.try_lock()?.get_file(file)?;
-    vfs::write(file, buffer)
+    fs::write(file, buffer)
 }
 
 #[syscall_handler]
 pub fn syscall_readdir(file: FileDesc, dirent: &mut DirEntry) -> Result<bool, KernelError> {
     let file = scheduler::get_current().try_lock()?.files.try_lock()?.get_file(file)?;
-    match vfs::readdir(file)? {
+    match fs::readdir(file)? {
         Some(result) => {
             *dirent = result;
             Ok(true)
@@ -73,21 +72,21 @@ pub fn syscall_dup2(old_fd: FileDesc, new_fd: FileDesc) -> Result<(), KernelErro
 #[syscall_handler]
 pub fn syscall_unlink(path: &str) -> Result<(), KernelError> {
     let (cwd, current_uid) = get_current_cwd_and_uid()?;
-    vfs::unlink(cwd, path, current_uid)?;
+    fs::unlink(cwd, path, current_uid)?;
     Ok(())
 }
 
 #[syscall_handler]
 pub fn syscall_rename(old_path: &str, new_path: &str) -> Result<(), KernelError> {
     let (cwd, current_uid) = get_current_cwd_and_uid()?;
-    vfs::rename(cwd, old_path, new_path, current_uid)?;
+    fs::rename(cwd, old_path, new_path, current_uid)?;
     Ok(())
 }
 
 #[syscall_handler]
 pub fn syscall_mkdir(path: &str, access: FileAccess) -> Result<(), KernelError> {
     let (cwd, current_uid) = get_current_cwd_and_uid()?;
-    vfs::make_directory(cwd, path, access, current_uid)?;
+    fs::make_directory(cwd, path, access, current_uid)?;
     Ok(())
 }
 
@@ -108,6 +107,6 @@ fn get_current_cwd_and_uid() -> Result<(Option<Vnode>, UserID), KernelError> {
 
 #[syscall_handler]
 pub fn syscall_sync() -> Result<(), KernelError> {
-    vfs::sync_all()
+    fs::sync_all()
 }
 

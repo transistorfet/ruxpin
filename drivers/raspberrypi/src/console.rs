@@ -9,7 +9,7 @@ use ruxpin_kernel::notice;
 use ruxpin_kernel::errors::KernelError;
 use ruxpin_kernel::tty::{self, CharOperations};
 use ruxpin_kernel::printk::set_console_device;
-use ruxpin_kernel::arch::types::KernelVirtualAddress;
+use ruxpin_kernel::arch::KernelVirtualAddress;
 use ruxpin_kernel::misc::deviceio::DeviceRegisters;
 
 

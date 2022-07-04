@@ -2,7 +2,7 @@
 use core::ptr;
 
 use core::marker::PhantomData;
-use crate::arch::types::KernelVirtualAddress;
+use crate::arch::KernelVirtualAddress;
 
 
 pub struct DeviceRegisters<T> {
