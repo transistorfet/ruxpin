@@ -35,7 +35,7 @@ pub struct Page {
 static mut PAGES: PagePool = PagePool::new();
 
 
-pub fn init_pages_area(start: PhysicalAddress, end: PhysicalAddress) {
+pub fn init_pages_pool(start: PhysicalAddress, end: PhysicalAddress) {
     let pages = PageRegion::new(start, end);
 
     unsafe {
@@ -43,7 +43,7 @@ pub fn init_pages_area(start: PhysicalAddress, end: PhysicalAddress) {
     }
 }
 
-pub fn get_page_area<'a>() -> &'a mut PagePool {
+pub fn get_page_pool<'a>() -> &'a mut PagePool {
     unsafe {
         &mut PAGES
     }

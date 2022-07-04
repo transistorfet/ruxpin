@@ -1,8 +1,18 @@
 
+* need to use copy on write for new file backed segments that are read write (since the pages in the page cache should be read-only)
+* need to add a way to remove from memory cached files that are no longer used
+
+* should you rename unmap_range, map_paged_range, reset_page_copy_on_write, etc to range_unmap, range_map_paged, page_reset_copy_on_write
+
+* modify a user fatal error so that it just terminates the process instead of kernel panic
+
 
 * unify bufcache and page cache
 * implement page cache and fix segments
 * for multi-core support, you first need per-cpu memory allocation (and maybe go into rust before kernel_start)
+
+
+* re-export symbols from the top level directory when there's a public interface... I'm thinking the fs module, arch (at least types?)
 
 
 HIGH PRIORITY ISSUES:

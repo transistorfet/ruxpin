@@ -1,5 +1,6 @@
  
 pub mod pages;
+pub mod pagecache;
 pub mod segments;
 pub mod kmalloc;
 pub mod vmalloc;

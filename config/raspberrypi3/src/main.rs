@@ -38,7 +38,7 @@ pub fn register_devices() -> Result<(), KernelError> {
     notice!("starting kernel...");
 
     kmalloc::initialize(PhysicalAddress::from(0x20_0000), PhysicalAddress::from(0x100_0000));
-    vmalloc::initialize(PhysicalAddress::from(0x100_0000), PhysicalAddress::from(0x1000_0000));
+    vmalloc::initialize(PhysicalAddress::from(0x100_0000), PhysicalAddress::from(0x1000_0000))?;
     irqs::register_interrupt_controller(Box::new(GenericInterruptController::new()));
 
     tasklets::initialize()?;

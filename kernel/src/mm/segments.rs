@@ -2,16 +2,14 @@
 use alloc::sync::Arc;
 use alloc::boxed::Box;
 
-use ruxpin_types::Seek;
-
-use crate::fs::vfs;
-use crate::arch::mmu;
-use crate::misc::align_up;
-use crate::sync::Spinlock;
-use crate::fs::types::File;
-use crate::mm::MemoryPermissions;
+use crate::arch::mmu::{self, TranslationTable};
+use crate::arch::types::{PhysicalAddress, VirtualAddress};
 use crate::errors::KernelError;
-use crate::arch::types::VirtualAddress;
+use crate::misc::align_up;
+use crate::mm::MemoryPermissions;
+use crate::mm::pagecache::PageCacheEntry;
+use crate::mm::pages;
+use crate::sync::Spinlock;
 
 
 #[derive(Copy, Clone, PartialEq)]
@@ -22,8 +20,7 @@ pub enum SegmentType {
 }
 
 pub trait SegmentOperations: Sync + Send {
-    // This assumes the page would be allocated automatically by the page fault handler, and this would just populate the data
-    fn load_page_at(&self, segment: &Segment, vaddr: VirtualAddress, page: &mut [u8]) -> Result<(), KernelError>;
+    fn load_page_at(&self, segment: &Segment, table: &mut TranslationTable, vaddr: VirtualAddress) -> Result<PhysicalAddress, KernelError>;
 }
 
 pub struct Segment {
@@ -45,14 +42,14 @@ impl Segment {
         }
     }
 
-    pub fn new_memory(permissions: MemoryPermissions, start: VirtualAddress, end: VirtualAddress) -> Self {
-        let ops = Box::new(MemorySegment::new());
-        Self::new(permissions, start, end, ops)
+    pub fn new_memory(permissions: MemoryPermissions, start: VirtualAddress, end: VirtualAddress) -> Result<Self, KernelError> {
+        let ops = Box::new(MemorySegment::new()?);
+        Ok(Self::new(permissions, start, end, ops))
     }
 
-    pub fn new_file_backed(file: File, file_offset: usize, file_size: usize, permissions: MemoryPermissions, mem_offset: usize, start: VirtualAddress, end: VirtualAddress) -> Self {
-        let ops = Box::new(FileBackedSegment::new(file, file_offset, file_size, mem_offset));
-        Self::new(permissions, start, end, ops)
+    pub fn new_file_backed(cache: Arc<PageCacheEntry>, file_offset: usize, file_size: usize, permissions: MemoryPermissions, mem_offset: usize, start: VirtualAddress, end: VirtualAddress) -> Result<Self, KernelError> {
+        let ops = Box::new(FileBackedSegment::new(cache, file_offset, file_size, mem_offset)?);
+        Ok(Self::new(permissions, start, end, ops))
     }
 
     pub fn page_aligned_len(&self) -> usize {
@@ -63,8 +60,8 @@ impl Segment {
         addr >= self.start && addr <= self.end
     }
 
-    pub fn load_page_at(&self, segment: &Segment, vaddr: VirtualAddress, page: &mut [u8]) -> Result<(), KernelError> {
-        self.ops.load_page_at(segment, vaddr, page)
+    pub fn load_page_at(&self, table: &mut TranslationTable, vaddr: VirtualAddress) -> Result<PhysicalAddress, KernelError> {
+        self.ops.load_page_at(&self, table, vaddr)
     }
 }
 
@@ -74,51 +71,51 @@ impl Segment {
 pub struct MemorySegment {}
 
 impl MemorySegment {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new() -> Result<Self, KernelError> {
+        Ok(Self {})
     }
 }
 
 impl SegmentOperations for MemorySegment {
-    fn load_page_at(&self, _segment: &Segment, _vaddr: VirtualAddress, _page: &mut [u8]) -> Result<(), KernelError> {
-        Ok(())
+    fn load_page_at(&self, _segment: &Segment, table: &mut TranslationTable, vaddr: VirtualAddress) -> Result<PhysicalAddress, KernelError> {
+        let pages = pages::get_page_pool();
+        let page = pages.alloc_page_zeroed();
+        table.update_page_addr(vaddr, page).unwrap();
+        Ok(page)
     }
 }
 
 
 #[derive(Clone)]
 pub struct FileBackedSegment {
-    file: File,
+    cache: Arc<PageCacheEntry>,
     file_offset: usize,
     file_size: usize,
     mem_offset: usize,
 }
 
 impl FileBackedSegment {
-    pub fn new(file: File, file_offset: usize, file_size: usize, mem_offset: usize) -> Self {
-        Self {
-            file,
+    pub fn new(cache: Arc<PageCacheEntry>, file_offset: usize, file_size: usize, mem_offset: usize) -> Result<Self, KernelError> {
+        Ok(Self {
+            cache,
             file_offset,
             file_size,
             mem_offset,
-        }
+        })
     }
 }
 
 impl SegmentOperations for FileBackedSegment {
-    fn load_page_at(&self, segment: &Segment, vaddr: VirtualAddress, page: &mut [u8]) -> Result<(), KernelError> {
-        //crate::debug!("swapping {:?} for segment from {:?}", vaddr, segment.start);
+    fn load_page_at(&self, segment: &Segment, table: &mut TranslationTable, vaddr: VirtualAddress) -> Result<PhysicalAddress, KernelError> {
+        let offset = usize::from(vaddr) - usize::from(segment.start) - (self.mem_offset - self.file_offset);
+        // TODO if the request is beyond the end of the file, then you could allocate a normal page instead of using a cached one, and save the copy on write
 
-        let segment_offset = usize::from(vaddr) - usize::from(segment.start);
-        let file_offset = self.file_offset + segment_offset.saturating_sub(self.mem_offset);
-        vfs::seek(self.file.clone(), file_offset, Seek::FromStart)?;
-
-        let buffer_start = if segment_offset < page.len() { self.mem_offset } else { 0 };
-        let buffer_len = if file_offset + self.file_size < page.len() - buffer_start { file_offset + self.file_size } else { page.len() - buffer_start };
-        vfs::read(self.file.clone(), &mut page[buffer_start..(buffer_start + buffer_len)])?;
-
-        //crate::debug!("file offset: {:x}  segment offset: {:x}  buffer_start: {:x}  buffer_len: {:x}", file_offset, segment_offset, buffer_start, buffer_len);
-        Ok(())
+        let page = self.cache.lookup(offset)?;
+        table.update_page_addr(vaddr, page).unwrap();
+        if segment.permissions == MemoryPermissions::ReadWrite {
+            table.set_page_copy_on_write(vaddr).unwrap();
+        }
+        Ok(page)
     }
 }
 

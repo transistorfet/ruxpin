@@ -1,14 +1,14 @@
 
 use core::mem;
+use core::slice;
 use alloc::string::ToString;
 
-use ruxpin_types::{OpenFlags, FileAccess, Seek};
+use ruxpin_types::{OpenFlags, FileAccess};
 
 use crate::debug;
 use crate::fs::vfs;
 use crate::arch::mmu;
 use crate::misc::memory;
-use crate::fs::types::File;
 use crate::errors::KernelError;
 use crate::misc::strarray::StandardArrayOfStrings;
 use crate::proc::scheduler::Task;
@@ -16,6 +16,7 @@ use crate::proc::tasks::TaskRecord;
 use crate::arch::types::VirtualAddress;
 use crate::mm::MemoryPermissions;
 use crate::mm::segments::SegmentType;
+use crate::mm::pagecache;
 
 use super::defs::*;
 
@@ -24,11 +25,13 @@ pub fn load_binary(proc: Task, path: &str, argv: &StandardArrayOfStrings, envp: 
     let mut locked_proc = proc.try_lock()?;
     locked_proc.cmd = path.to_string();
 
+    // Open the file (if executable) and initialize the cache entry
     vfs::access(locked_proc.files.try_lock()?.get_cwd(), path, FileAccess::Exec.plus(FileAccess::Regular), locked_proc.current_uid)?;
-
     let file = vfs::open(None, path, OpenFlags::ReadOnly, FileAccess::DefaultFile, locked_proc.current_uid)?;
+    let cache = pagecache::get_page_entry(file.clone())?;
 
-    let header: Elf64Header = read_file_data_into_struct(file.clone())?;
+    let header_page = cache.lookup_page_slice(0)?;
+    let header: &Elf64Header = unsafe { memory::cast_to_ref(header_page) };
 
     // Look for the ELF signature, 64-bit Little Endian ELF Version 1
     if &header.e_ident[0..7] != b"\x7F\x45\x4C\x46\x02\x01\x01" {
@@ -45,26 +48,22 @@ pub fn load_binary(proc: Task, path: &str, argv: &StandardArrayOfStrings, envp: 
         return Err(KernelError::OutOfMemory);
     }
 
-    let mut segments: [Option<Elf64ProgramSegment>; MAX_PROGRAM_SEGMENTS] = [None; MAX_PROGRAM_SEGMENTS];
-
     // Load the program headers from the ELF file
-    vfs::seek(file.clone(), header.e_phoff as usize, Seek::FromStart)?;
-    for i in 0..header.e_phnum as usize {
-        let segment: Elf64ProgramSegment = read_file_data_into_struct(file.clone())?;
+    let ps_page = cache.lookup_page_slice(header.e_phoff as usize)?;
+    let program_segments: &[Elf64ProgramSegment] = unsafe {
+        slice::from_raw_parts(ps_page.as_ptr().add(header.e_phoff as usize) as *const Elf64ProgramSegment, header.e_phnum as usize)
+    };
 
+    for (i, segment) in program_segments.iter().enumerate() {
         debug!("program segment {}: {:x} {:x} offset: {:x} v:{:x} p:{:x} size: {:x}", i, segment.p_type, segment.p_flags, segment.p_offset, segment.p_vaddr, segment.p_paddr, segment.p_filesz);
-        segments[i] = Some(segment);
-    }
 
-    for i in 0..header.e_phnum as usize {
-        let segment = segments[i].as_ref().unwrap();
         if segment.p_type == PT_LOAD {
             let vaddr = VirtualAddress::from(segment.p_vaddr).align_down(4096);
             let offset = VirtualAddress::from(segment.p_vaddr).offset_from_align(4096);
 
             let permissions = flags_to_permissions(segment.p_flags)?;
             let stype = if permissions == MemoryPermissions::ReadWrite { SegmentType::Data } else { SegmentType::Text };
-            locked_proc.space.try_lock()?.add_file_backed_segment(stype, permissions, file.clone(), segment.p_offset as usize, segment.p_filesz as usize, vaddr, offset, segment.p_memsz as usize)?;
+            locked_proc.space.try_lock()?.add_file_backed_segment(stype, permissions, cache.clone(), segment.p_offset as usize, segment.p_filesz as usize, vaddr, offset, segment.p_memsz as usize)?;
 
             // TODO this is a hack to forcefully load the page because the page fault in kernel space doesn't work
             //locked_proc.space.try_lock()?.alloc_page_at(vaddr)?;
@@ -78,22 +77,6 @@ pub fn load_binary(proc: Task, path: &str, argv: &StandardArrayOfStrings, envp: 
     set_up_stack(&mut *locked_proc, VirtualAddress::from(header.e_entry), argv, envp)?;
 
     Ok(())
-}
-
-fn read_file_data_into_struct<T>(file: File) -> Result<T, KernelError> {
-    let mut buffer = [0; 4096];
-
-    let length = mem::size_of::<T>();
-    let nbytes = vfs::read(file, &mut buffer[0..length])?;
-    if nbytes != length {
-        return Err(KernelError::IOError);
-    }
-
-    let result: T = unsafe {
-        memory::read_struct(&buffer)
-    };
-
-    Ok(result)
 }
 
 fn flags_to_permissions(flags: Elf64Word) -> Result<MemoryPermissions, KernelError> {

@@ -1,7 +1,7 @@
 
+use core::mem;
 use core::slice;
 
-use crate::debug;
 use crate::errors::KernelError;
 use crate::mm::pages::PagePool;
 use crate::mm::{MemoryType, MemoryPermissions};
@@ -56,7 +56,7 @@ pub const fn page_size() -> usize {
 
 #[inline(always)]
 pub const fn table_entries() -> usize {
-    page_size() / 8
+    page_size() / mem::size_of::<u64>()
 }
 
 pub fn get_page_slice(page: PhysicalAddress) -> &'static mut [u8] {
@@ -85,7 +85,6 @@ impl TranslationTable {
     }
 
 
-    #[allow(dead_code)]
     pub fn map_existing_range(&mut self, access: MemoryPermissions, mut vaddr: VirtualAddress, paddr: PhysicalAddress, mut len: usize, pages: &mut PagePool) -> Result<(), KernelError> {
         check_vaddr_and_usize(vaddr, len)?;
 
@@ -112,28 +111,10 @@ impl TranslationTable {
         })
     }
 
-    pub fn copy_refs_in_range(&mut self, parent_table: &Self, access: MemoryPermissions, mut vaddr: VirtualAddress, mut len: usize, pages: &mut PagePool) -> Result<(), KernelError> {
+    pub fn duplicate_paged_range(&mut self, parent_table: &Self, access: MemoryPermissions, mut vaddr: VirtualAddress, mut len: usize, pages: &mut PagePool) -> Result<(), KernelError> {
         check_vaddr_and_usize(vaddr, len)?;
 
         let flags = memory_type_flags(MemoryType::Unallocated) | memory_permissions_flags(access);
-
-        map_level(TL0_ADDR_BITS, self.as_slice_mut(), &mut len, &mut vaddr, pages, &mut |pages, page_addr, len| {
-            let (descriptor, _) = lookup_level(TL0_ADDR_BITS, parent_table.as_slice(), page_addr)?;
-            if len != page_size() {
-                Ok(None) // Don't map granuales larger than a page
-            } else if *descriptor & TT_BLOCK_MASK == 0 {
-                Ok(Some((PhysicalAddress::from(0), flags)))
-            } else {
-                Ok(Some((pages.ref_page(PhysicalAddress::from(*descriptor & TT_BLOCK_MASK)), TT_ACCESS_FLAG | flags)))
-            }
-        })
-    }
-
-
-    pub fn copy_pages_in_range(&mut self, parent_table: &Self, mut vaddr: VirtualAddress, mut len: usize, pages: &mut PagePool) -> Result<(), KernelError> {
-        check_vaddr_and_usize(vaddr, len)?;
-
-        let flags = memory_type_flags(MemoryType::Unallocated) | memory_permissions_flags(MemoryPermissions::ReadWrite);
 
         map_level(TL0_ADDR_BITS, self.as_slice_mut(), &mut len, &mut vaddr, pages, &mut |pages, page_addr, len| {
             let (descriptor, granuale_size) = lookup_level(TL0_ADDR_BITS, parent_table.as_slice(), page_addr)?;
@@ -145,25 +126,14 @@ impl TranslationTable {
             } else if *descriptor & TT_BLOCK_MASK == 0 {
                 Ok(Some((PhysicalAddress::from(0), flags)))
             } else {
-                let new_page = pages.alloc_page_zeroed();
-
-                // Copy data into new page
-                debug!("copying physical page {:?} to {:?}", PhysicalAddress::from(*descriptor & TT_BLOCK_MASK), new_page);
-                let page_buffer = get_page_slice(PhysicalAddress::from(*descriptor & TT_BLOCK_MASK));
-                let new_page_buffer = get_page_slice(new_page);
-                for i in 0..page_buffer.len() {
-                    new_page_buffer[i] = page_buffer[i];
-                }
-
-                Ok(Some((PhysicalAddress::from(new_page), TT_ACCESS_FLAG | flags)))
+                Ok(Some((pages.ref_page(PhysicalAddress::from(*descriptor & TT_BLOCK_MASK)), TT_ACCESS_FLAG | flags)))
             }
         })
     }
 
-    pub fn remap_copy_on_write(&mut self, parent: &mut Self, mut vaddr: VirtualAddress, mut len: usize, pages: &mut PagePool) -> Result<(), KernelError> {
+    pub fn remap_range_copy_on_write(&mut self, parent: &mut Self, mut vaddr: VirtualAddress, mut len: usize, pages: &mut PagePool) -> Result<(), KernelError> {
         check_vaddr_and_usize(vaddr, len)?;
 
-        let flags = memory_permissions_flags(MemoryPermissions::ReadWrite) | attribute_index(0);
         map_level(TL0_ADDR_BITS, self.as_slice_mut(), &mut len, &mut vaddr, pages, &mut |pages, page_addr, len| {
             let (descriptor, granuale_size) = lookup_level_mut(TL0_ADDR_BITS, parent.as_slice_mut(), page_addr)?;
             let page = *descriptor & TT_BLOCK_MASK;
@@ -172,11 +142,11 @@ impl TranslationTable {
                 Err(KernelError::UnexpectedGranualeSize)
             } else if len != page_size() {
                 Ok(None)
-            } else if page != 0 {
-                *descriptor = (*descriptor & !TT_PERMISSIONS_MASK) | TT_READ_ONLY_FLAG | TT_COPY_ON_WRITE_FLAG | attribute_index(0);
-                Ok(Some((pages.ref_page(PhysicalAddress::from(page)), TT_COPY_ON_WRITE_FLAG | TT_ACCESS_FLAG | TT_READ_ONLY_FLAG | attribute_index(0))))
+            } else if page == 0 {
+                Ok(Some((PhysicalAddress::from(0), TT_COPY_ON_WRITE_FLAG | TT_READ_ONLY_FLAG | attribute_index(0))))
             } else {
-                Ok(Some((PhysicalAddress::from(0), flags)))
+                *descriptor = (*descriptor & !TT_PERMISSIONS_MASK) | TT_COPY_ON_WRITE_FLAG | TT_READ_ONLY_FLAG | attribute_index(0);
+                Ok(Some((pages.ref_page(PhysicalAddress::from(page)), TT_ACCESS_FLAG | TT_COPY_ON_WRITE_FLAG | TT_READ_ONLY_FLAG | attribute_index(0))))
             }
         })
     }
@@ -193,12 +163,24 @@ impl TranslationTable {
         visitor.visit_level(TL0_ADDR_BITS, self.as_slice_mut(), &mut len, &mut vaddr)
     }
 
-    pub fn update_permissions(&mut self, perms: MemoryPermissions, mut vaddr: VirtualAddress, mut len: usize) -> Result<(), KernelError> {
-        let mut visitor = ChangeBits::new(TT_PERMISSIONS_MASK | TT_COPY_ON_WRITE_FLAG, memory_permissions_flags(perms) | TT_COPY_ON_WRITE_FLAG);
-        visitor.visit_level(TL0_ADDR_BITS, self.as_slice_mut(), &mut len, &mut vaddr)
+    //pub fn set_range_copy_on_write(&mut self, mut vaddr: VirtualAddress, mut len: usize) -> Result<(), KernelError> {
+    //    let mut visitor = ChangeBits::new(TT_PERMISSIONS_MASK | TT_COPY_ON_WRITE_FLAG, memory_permissions_flags(MemoryPermissions::ReadOnly) | TT_COPY_ON_WRITE_FLAG);
+    //    visitor.visit_level(TL0_ADDR_BITS, self.as_slice_mut(), &mut len, &mut vaddr)
+    //}
+
+    pub fn set_page_copy_on_write(&mut self, vaddr: VirtualAddress) -> Result<(), KernelError> {
+        check_vaddr_and_usize(vaddr, page_size())?;
+
+        let (descriptor, granuale_size) = lookup_level_mut(TL0_ADDR_BITS, self.as_slice_mut(), vaddr)?;
+        if granuale_size == page_size() {
+            *descriptor = (*descriptor & !TT_PERMISSIONS_MASK) | TT_COPY_ON_WRITE_FLAG | TT_READ_ONLY_FLAG;
+            Ok(())
+        } else {
+            Err(KernelError::UnexpectedGranualeSize)
+        }
     }
 
-    pub fn reset_copy_on_write(&mut self, vaddr: VirtualAddress) -> Result<(PhysicalAddress, bool), KernelError> {
+    pub fn reset_page_copy_on_write(&mut self, vaddr: VirtualAddress) -> Result<(PhysicalAddress, bool), KernelError> {
         check_vaddr_and_usize(vaddr, page_size())?;
 
         let (descriptor, granuale_size) = lookup_level_mut(TL0_ADDR_BITS, self.as_slice_mut(), vaddr)?;
@@ -211,11 +193,11 @@ impl TranslationTable {
         }
     }
 
-    pub fn update_addr(&mut self, vaddr: VirtualAddress, paddr: PhysicalAddress, expected_size: usize) -> Result<(), KernelError> {
-        check_vaddr_and_usize(vaddr, expected_size)?;
+    pub fn update_page_addr(&mut self, vaddr: VirtualAddress, paddr: PhysicalAddress) -> Result<(), KernelError> {
+        check_vaddr_and_usize(vaddr, page_size())?;
 
         let (descriptor, granuale_size) = lookup_level_mut(TL0_ADDR_BITS, self.as_slice_mut(), vaddr)?;
-        if granuale_size == expected_size {
+        if granuale_size == page_size() {
             *descriptor &= !TT_BLOCK_MASK;
             *descriptor |= (u64::from(paddr) & TT_BLOCK_MASK) | TT_ACCESS_FLAG;
             Ok(())
@@ -407,7 +389,7 @@ where
 
 
 /// Unmap all pages in the given address range
-pub struct UnmapRange<'a, F> {
+struct UnmapRange<'a, F> {
     pages: &'a mut PagePool,
     unmap_block: F,
 }
@@ -445,8 +427,9 @@ where
 }
 
 
+/*
 /// Modify the descriptor bits in a given address range
-pub struct ChangeBits {
+struct ChangeBits {
     mask: u64,
     bits: u64,
 }
@@ -467,7 +450,7 @@ impl TableVisitor for ChangeBits {
         Ok(())
     }
 }
-
+*/
 
 
 fn lookup_level(addr_bits: usize, table: &[u64], vaddr: VirtualAddress) -> Result<(&u64, usize), KernelError> {
@@ -496,11 +479,11 @@ fn lookup_level_mut(addr_bits: usize, table: &mut [u64], vaddr: VirtualAddress) 
     }
 }
 
+
+
 fn allocate_table(pages: &mut PagePool) -> PhysicalAddress {
     pages.alloc_page_zeroed()
 }
-
-
 
 fn table_index_from_vaddr(bits: usize, vaddr: VirtualAddress) -> usize {
     ((usize::from(vaddr) >> bits) & 0x1ff) as usize
