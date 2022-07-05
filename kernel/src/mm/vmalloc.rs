@@ -4,13 +4,12 @@ use alloc::sync::Arc;
 
 use crate::trace;
 use crate::mm::pages;
-use crate::misc::align_up;
 use crate::sync::Spinlock;
 use crate::errors::KernelError;
 use crate::arch::mmu::{self, TranslationTable};
 use crate::arch::{VirtualAddress, PhysicalAddress};
 
-use super::{MemoryType, MemoryPermissions};
+use super::MemoryPermissions;
 use super::pagecache::{self, PageCacheEntry};
 use super::segments::{Segment, ArcSegment, SegmentType};
 
@@ -71,36 +70,32 @@ impl VirtualAddressSpace {
     }
 
     pub fn add_memory_segment(&mut self, stype: SegmentType, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) -> Result<(), KernelError> {
-        let segment = Arc::new(Spinlock::new(Segment::new_memory(permissions, vaddr, vaddr.add(len))?));
+        let segment = Arc::new(Spinlock::new(Segment::new_memory(&mut self.table, permissions, vaddr, vaddr.add(len))?));
+
+        // TODO this is a hack that I'd like to get rid of
         if stype != SegmentType::Stack && (self.data.is_none() || vaddr > self.data.as_mut().unwrap().lock().start) {
             self.data = Some(segment.clone());
         }
-        self.segments.push(segment);
 
-        let pages = pages::get_page_pool();
-        self.table.map_paged_range(MemoryType::Unallocated, permissions, vaddr, align_up(len, mmu::page_size()), pages)?;
+        self.segments.push(segment);
         Ok(())
     }
 
     pub fn add_file_backed_segment(&mut self, stype: SegmentType, permissions: MemoryPermissions, cache: Arc<PageCacheEntry>, file_offset: usize, file_size: usize, vaddr: VirtualAddress, mem_offset: usize, mem_size: usize) -> Result<(), KernelError> {
-        let segment = Arc::new(Spinlock::new(Segment::new_file_backed(cache, file_offset, file_size, permissions, mem_offset, vaddr, vaddr.add(mem_size).add(mem_offset).align_up(mmu::page_size()))?));
+        let segment = Arc::new(Spinlock::new(Segment::new_file_backed(&mut self.table, cache, file_offset, file_size, permissions, mem_offset, vaddr, vaddr.add(mem_size).add(mem_offset).align_up(mmu::page_size()))?));
+
+        // TODO this is a hack that I'd like to get rid of
         if stype != SegmentType::Stack && (self.data.is_none() || vaddr > self.data.as_mut().unwrap().lock().start) {
             self.data = Some(segment.clone());
         }
-        self.segments.push(segment);
 
-        let pages = pages::get_page_pool();
-        self.table.map_paged_range(MemoryType::Unallocated, permissions, vaddr, align_up(mem_size + mem_offset, mmu::page_size()), pages)?;
+        self.segments.push(segment);
         Ok(())
     }
 
     pub fn clear_segments(&mut self) -> Result<(), KernelError> {
-        let pages = pages::get_page_pool();
-
         for i in 0..self.segments.len() {
-            let start = self.segments[i].lock().start;
-            let len = self.segments[i].lock().page_aligned_len();
-            self.table.unmap_range(start, len, pages)?
+            self.segments[i].try_lock()?.unmap(&mut self.table)?;
         }
         self.segments.clear();
         Ok(())
@@ -109,32 +104,22 @@ impl VirtualAddressSpace {
     pub fn copy_segments(&mut self, parent: &mut Self) -> Result<(), KernelError> {
         for segment in parent.segments.iter() {
             //crate::debug!("cloning segment {:x} to {:x}", usize::from(segment.start), usize::from(segment.end));
+            segment.try_lock()?.copy_mapping(&mut self.table, &mut parent.table)?;
             self.segments.push(segment.clone());
-
-            let segment = &*segment.lock();
-            let pages = pages::get_page_pool();
-
-            if segment.permissions == MemoryPermissions::ReadWrite {
-                self.table.remap_range_copy_on_write(&mut parent.table, segment.start, segment.page_aligned_len(), pages)?;
-            } else  {
-                self.table.duplicate_paged_range(&mut parent.table, segment.permissions, segment.start, segment.page_aligned_len(), pages)?;
-            }
         }
         Ok(())
     }
 
-    // TODO technically increment should be isize, and can be negative to shrink the size
-    pub fn adjust_stack_break(&mut self, increment: usize) -> Result<VirtualAddress, KernelError> {
+    pub fn adjust_stack_break(&mut self, increment: isize) -> Result<VirtualAddress, KernelError> {
         trace!("vmalloc: adjusting sbrk size by {}", increment);
-        let inc_aligned = align_up(increment, mmu::page_size());
-        let segment = self.data.clone().unwrap();
-        let mut locked_seg = segment.try_lock()?;
-        let previous_end = locked_seg.end;
-        locked_seg.end = locked_seg.end.add(inc_aligned);
-
-        let pages = pages::get_page_pool();
-        self.table.map_paged_range(MemoryType::Unallocated, locked_seg.permissions, previous_end, inc_aligned, pages)?;
-        Ok(previous_end)
+        if let Some(data_segment) = &mut self.data {
+            let mut locked_data = data_segment.try_lock()?;
+            let previous_end = locked_data.end;
+            locked_data.resize(&mut self.table, increment)?;
+            Ok(previous_end)
+        } else {
+            Err(KernelError::NoSegmentFound)
+        }
     }
 
     pub(crate) fn get_ttbr(&self) -> u64 {

@@ -9,7 +9,7 @@ use crate::misc::align_up;
 use crate::sync::Spinlock;
 
 use super::pages;
-use super::MemoryPermissions;
+use super::{MemoryType, MemoryPermissions};
 use super::pagecache::PageCacheEntry;
 
 
@@ -43,14 +43,20 @@ impl Segment {
         }
     }
 
-    pub fn new_memory(permissions: MemoryPermissions, start: VirtualAddress, end: VirtualAddress) -> Result<Self, KernelError> {
+    pub fn new_memory(table: &mut TranslationTable, permissions: MemoryPermissions, start: VirtualAddress, end: VirtualAddress) -> Result<Self, KernelError> {
         let ops = Box::new(MemorySegment::new()?);
-        Ok(Self::new(permissions, start, end, ops))
+        let segment = Self::new(permissions, start, end, ops);
+        let pages = pages::get_page_pool();
+        table.map_paged_range(MemoryType::Unallocated, permissions, segment.start, segment.page_aligned_len(), pages)?;
+        Ok(segment)
     }
 
-    pub fn new_file_backed(cache: Arc<PageCacheEntry>, file_offset: usize, file_size: usize, permissions: MemoryPermissions, mem_offset: usize, start: VirtualAddress, end: VirtualAddress) -> Result<Self, KernelError> {
+    pub fn new_file_backed(table: &mut TranslationTable, cache: Arc<PageCacheEntry>, file_offset: usize, file_size: usize, permissions: MemoryPermissions, mem_offset: usize, start: VirtualAddress, end: VirtualAddress) -> Result<Self, KernelError> {
         let ops = Box::new(FileBackedSegment::new(cache, file_offset, file_size, mem_offset)?);
-        Ok(Self::new(permissions, start, end, ops))
+        let segment = Self::new(permissions, start, end, ops);
+        let pages = pages::get_page_pool();
+        table.map_paged_range(MemoryType::Unallocated, permissions, segment.start, segment.page_aligned_len(), pages)?;
+        Ok(segment)
     }
 
     pub fn page_aligned_len(&self) -> usize {
@@ -61,8 +67,39 @@ impl Segment {
         addr >= self.start && addr <= self.end
     }
 
+    pub fn unmap(&mut self, table: &mut TranslationTable) -> Result<(), KernelError> {
+        let pages = pages::get_page_pool();
+        table.unmap_range(self.start, self.page_aligned_len(), pages)
+    }
+
     pub fn load_page_at(&self, table: &mut TranslationTable, vaddr: VirtualAddress) -> Result<PhysicalAddress, KernelError> {
         self.ops.load_page_at(&self, table, vaddr)
+    }
+
+    pub fn copy_mapping(&self, table: &mut TranslationTable, parent_table: &mut TranslationTable) -> Result<(), KernelError> {
+        let pages = pages::get_page_pool();
+
+        if self.permissions == MemoryPermissions::ReadWrite {
+            table.remap_range_copy_on_write(parent_table, self.start, self.page_aligned_len(), pages)?;
+        } else  {
+            table.duplicate_paged_range(parent_table, self.permissions, self.start, self.page_aligned_len(), pages)?;
+        }
+        Ok(())
+    }
+
+    pub fn resize(&mut self, table: &mut TranslationTable, diff: isize) -> Result<(), KernelError> {
+        let pages = pages::get_page_pool();
+
+        if diff >= 0 {
+            let aligned_diff = align_up(diff as usize, mmu::page_size());
+            table.map_paged_range(MemoryType::Unallocated, self.permissions, self.end, aligned_diff, pages)?;
+            self.end = self.end.add(aligned_diff);
+        } else {
+            let aligned_diff = align_up((-1 * diff) as usize, mmu::page_size());
+            table.unmap_range(self.end.sub(aligned_diff), aligned_diff, pages)?;
+            self.end = self.end.sub(aligned_diff);
+        }
+        Ok(())
     }
 }
 

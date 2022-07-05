@@ -79,7 +79,7 @@ pub fn syscall_waitpid(pid: Pid, status: &mut isize, _options: usize) -> Result<
 }
 
 #[syscall_handler]
-pub fn syscall_sbrk(increment: usize) -> Result<*const u8, KernelError> {
+pub fn syscall_sbrk(increment: isize) -> Result<*const u8, KernelError> {
     let proc = scheduler::get_current();
     let old_break = proc.try_lock()?.space.try_lock()?.adjust_stack_break(increment)?;
 

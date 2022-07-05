@@ -96,6 +96,10 @@ impl VirtualAddress {
         Self(self.0 + offset as u64)
     }
 
+    pub fn sub(self, offset: usize) -> Self {
+        Self(self.0 - offset as u64)
+    }
+
     pub fn align_down(self, align: usize) -> Self  {
         Self(align_down(self.0 as usize, align) as u64)
     }
