@@ -6,7 +6,6 @@ use crate::arch::mmu::{self, TranslationTable};
 use crate::arch::{PhysicalAddress, VirtualAddress};
 use crate::errors::KernelError;
 use crate::misc::align_up;
-use crate::sync::Spinlock;
 
 use super::pages;
 use super::{MemoryType, MemoryPermissions};
@@ -21,6 +20,7 @@ pub enum SegmentType {
 }
 
 pub trait SegmentOperations: Sync + Send {
+    fn copy(&self) -> Box<dyn SegmentOperations>;
     fn load_page_at(&self, segment: &Segment, table: &mut TranslationTable, vaddr: VirtualAddress) -> Result<PhysicalAddress, KernelError>;
 }
 
@@ -30,8 +30,6 @@ pub struct Segment {
     pub(super) end: VirtualAddress,
     ops: Box<dyn SegmentOperations>,
 }
-
-pub type ArcSegment = Arc<Spinlock<Segment>>;
 
 impl Segment {
     pub fn new(permissions: MemoryPermissions, start: VirtualAddress, end: VirtualAddress, ops: Box<dyn SegmentOperations>) -> Self {
@@ -76,7 +74,7 @@ impl Segment {
         self.ops.load_page_at(&self, table, vaddr)
     }
 
-    pub fn copy_mapping(&self, table: &mut TranslationTable, parent_table: &mut TranslationTable) -> Result<(), KernelError> {
+    pub fn copy(&self, table: &mut TranslationTable, parent_table: &mut TranslationTable) -> Result<Self, KernelError> {
         let pages = pages::get_page_pool();
 
         if self.permissions == MemoryPermissions::ReadWrite {
@@ -84,7 +82,7 @@ impl Segment {
         } else  {
             table.duplicate_paged_range(parent_table, self.permissions, self.start, self.page_aligned_len(), pages)?;
         }
-        Ok(())
+        Ok(Self::new(self.permissions, self.start, self.end, self.ops.copy()))
     }
 
     pub fn resize(&mut self, table: &mut TranslationTable, diff: isize) -> Result<(), KernelError> {
@@ -115,6 +113,10 @@ impl MemorySegment {
 }
 
 impl SegmentOperations for MemorySegment {
+    fn copy(&self) -> Box<dyn SegmentOperations> {
+        Box::new(self.clone())
+    }
+
     fn load_page_at(&self, _segment: &Segment, table: &mut TranslationTable, vaddr: VirtualAddress) -> Result<PhysicalAddress, KernelError> {
         let pages = pages::get_page_pool();
         let page = pages.alloc_page_zeroed();
@@ -144,6 +146,10 @@ impl FileBackedSegment {
 }
 
 impl SegmentOperations for FileBackedSegment {
+    fn copy(&self) -> Box<dyn SegmentOperations> {
+        Box::new(self.clone())
+    }
+
     fn load_page_at(&self, segment: &Segment, table: &mut TranslationTable, vaddr: VirtualAddress) -> Result<PhysicalAddress, KernelError> {
         let offset = usize::from(vaddr) - usize::from(segment.start) - (self.mem_offset - self.file_offset);
         // TODO if the request is beyond the end of the file, then you could allocate a normal page instead of using a cached one, and save the copy on write

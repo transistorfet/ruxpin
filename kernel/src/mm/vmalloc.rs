@@ -11,7 +11,7 @@ use crate::arch::{VirtualAddress, PhysicalAddress};
 
 use super::MemoryPermissions;
 use super::pagecache::{self, PageCacheEntry};
-use super::segments::{Segment, ArcSegment, SegmentType};
+use super::segments::{Segment, SegmentType};
 
 
 const MAX_SEGMENTS: usize = 6;
@@ -26,7 +26,7 @@ pub fn initialize(start: PhysicalAddress, end: PhysicalAddress) -> Result<(), Ke
     let space = VirtualAddressSpace {
         table: TranslationTable::initial_kernel_table(),
         segments: Vec::new(),
-        data: None,
+        data_index: None,
     };
 
     unsafe {
@@ -39,8 +39,8 @@ pub type SharableVirtualAddressSpace = Arc<Spinlock<VirtualAddressSpace>>;
 
 pub struct VirtualAddressSpace {
     table: TranslationTable,
-    segments: Vec<ArcSegment>,
-    data: Option<ArcSegment>,
+    segments: Vec<Segment>,
+    data_index: Option<usize>,
 }
 
 impl VirtualAddressSpace {
@@ -57,7 +57,7 @@ impl VirtualAddressSpace {
         Self {
             table,
             segments: Vec::with_capacity(MAX_SEGMENTS),
-            data: None,
+            data_index: None,
         }
     }
 
@@ -70,11 +70,11 @@ impl VirtualAddressSpace {
     }
 
     pub fn add_memory_segment(&mut self, stype: SegmentType, permissions: MemoryPermissions, vaddr: VirtualAddress, len: usize) -> Result<(), KernelError> {
-        let segment = Arc::new(Spinlock::new(Segment::new_memory(&mut self.table, permissions, vaddr, vaddr.add(len))?));
+        let segment = Segment::new_memory(&mut self.table, permissions, vaddr, vaddr.add(len))?;
 
         // TODO this is a hack that I'd like to get rid of
-        if stype != SegmentType::Stack && (self.data.is_none() || vaddr > self.data.as_mut().unwrap().lock().start) {
-            self.data = Some(segment.clone());
+        if stype != SegmentType::Stack && (self.data_index.is_none() || vaddr > self.segments[self.data_index.clone().unwrap()].start) {
+            self.data_index = Some(self.segments.len());
         }
 
         self.segments.push(segment);
@@ -82,11 +82,11 @@ impl VirtualAddressSpace {
     }
 
     pub fn add_file_backed_segment(&mut self, stype: SegmentType, permissions: MemoryPermissions, cache: Arc<PageCacheEntry>, file_offset: usize, file_size: usize, vaddr: VirtualAddress, mem_offset: usize, mem_size: usize) -> Result<(), KernelError> {
-        let segment = Arc::new(Spinlock::new(Segment::new_file_backed(&mut self.table, cache, file_offset, file_size, permissions, mem_offset, vaddr, vaddr.add(mem_size).add(mem_offset).align_up(mmu::page_size()))?));
+        let segment = Segment::new_file_backed(&mut self.table, cache, file_offset, file_size, permissions, mem_offset, vaddr, vaddr.add(mem_size).add(mem_offset).align_up(mmu::page_size()))?;
 
         // TODO this is a hack that I'd like to get rid of
-        if stype != SegmentType::Stack && (self.data.is_none() || vaddr > self.data.as_mut().unwrap().lock().start) {
-            self.data = Some(segment.clone());
+        if stype != SegmentType::Stack && (self.data_index.is_none() || vaddr > self.segments[self.data_index.clone().unwrap()].start) {
+            self.data_index = Some(self.segments.len());
         }
 
         self.segments.push(segment);
@@ -95,7 +95,7 @@ impl VirtualAddressSpace {
 
     pub fn clear_segments(&mut self) -> Result<(), KernelError> {
         for i in 0..self.segments.len() {
-            self.segments[i].try_lock()?.unmap(&mut self.table)?;
+            self.segments[i].unmap(&mut self.table)?;
         }
         self.segments.clear();
         Ok(())
@@ -104,18 +104,17 @@ impl VirtualAddressSpace {
     pub fn copy_segments(&mut self, parent: &mut Self) -> Result<(), KernelError> {
         for segment in parent.segments.iter() {
             //crate::debug!("cloning segment {:x} to {:x}", usize::from(segment.start), usize::from(segment.end));
-            segment.try_lock()?.copy_mapping(&mut self.table, &mut parent.table)?;
-            self.segments.push(segment.clone());
+            let new_segment = segment.copy(&mut self.table, &mut parent.table)?;
+            self.segments.push(new_segment);
         }
         Ok(())
     }
 
     pub fn adjust_stack_break(&mut self, increment: isize) -> Result<VirtualAddress, KernelError> {
         trace!("vmalloc: adjusting sbrk size by {}", increment);
-        if let Some(data_segment) = &mut self.data {
-            let mut locked_data = data_segment.try_lock()?;
-            let previous_end = locked_data.end;
-            locked_data.resize(&mut self.table, increment)?;
+        if let Some(data_index) = self.data_index {
+            let previous_end = self.segments[data_index].end;
+            self.segments[data_index].resize(&mut self.table, increment)?;
             Ok(previous_end)
         } else {
             Err(KernelError::NoSegmentFound)
@@ -128,10 +127,9 @@ impl VirtualAddressSpace {
 
     pub(crate) fn alloc_page_at(&mut self, far: VirtualAddress) -> Result<(), KernelError> {
         for segment in &self.segments {
-            let locked_seg = segment.try_lock()?;
-            if locked_seg.match_range(far) {
+            if segment.match_range(far) {
                 let page_vaddr = far.align_down(mmu::page_size());
-                locked_seg.load_page_at(&mut self.table, page_vaddr).unwrap();
+                segment.load_page_at(&mut self.table, page_vaddr).unwrap();
                 return Ok(());
             }
         }
