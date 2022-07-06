@@ -47,12 +47,12 @@ pub fn disable_all_irq() {
 
 
 #[no_mangle]
-pub extern "C" fn fatal_error(context: &Context, elr: u64, esr: u64, far: u64) -> ! {
+pub extern "C" fn fatal_user_error(context: &Context, elr: u64, esr: u64, far: u64) {
     let sp = context.get_stack();
     let table = context.get_translation_table();
     let far_addr = table.translate_addr(VirtualAddress::from(far));
     let elr_addr = table.translate_addr(VirtualAddress::from(elr));
-    let pid = crate::proc::scheduler::get_current().lock().process_id;
+    let pid = scheduler::get_current().lock().process_id;
 
     error!("\nFatal Error in PID {}: ESR: {:#010x}, FAR: {:#x}, ELR: {:#x}\n", pid, esr, far, elr);
     if let Ok(addr) = elr_addr {
@@ -73,7 +73,8 @@ pub extern "C" fn fatal_error(context: &Context, elr: u64, esr: u64, far: u64) -
         unsafe { printk_dump(u64::from(sp), 128); }
     }
 
-    context::loop_forever();
+    //context::loop_forever();
+    scheduler::exit_current(-1);
 }
 
 #[no_mangle]
@@ -101,12 +102,12 @@ extern "C" fn handle_user_exception(context: &Context, elr: u64, esr: u64, far: 
                 trace!("Instruction or Data Abort caused by Permissions Flag at address {:x} (either copy-on-write or fault)", far);
                 page_access_handler(far);
             } else {
-                fatal_error(context, elr, esr, far);
+                fatal_user_error(context, elr, esr, far);
             }
         },
 
         _ => {
-            fatal_error(context, elr, esr, far);
+            fatal_user_error(context, elr, esr, far);
         }
     }
 

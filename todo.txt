@@ -1,21 +1,18 @@
 
-* make the adjust stack break function also adjust the stack and not just the data
-* make a better way of finding the stack and data segments to be modified...
-* are segments always stored in sorted (non-overlapping) order in the Vec<Segment>?? If it were, you'd only need to know the index
-  of the data segment, and the stack would be whichever segment is just after it
+* make the elf loader use the maximum possible stack size, so that it butts up against the data segment.
+* make the elf loader create a data segment if one is not already created as part of the executable (or should we assume the elf will
+  always create a data segment even if not used at all).  So that there's always a data segment to grow when more heap is requested
+* add stack page guard, which would have to be created when the loader creates the stack, and also when sbrk/adjust is called
+* when a page is requested beyond the end of the file (BSS) then just allocate a page without a copy-on-write page, and also
+  add a check to page cache to not allocate pages beyond the end of the file
+
+* modify a user fatal error so that it just terminates the process instead of kernel panic
 
 * is there a way to get automatic ref counting for pages?  The actual page is being stored in as a PhysicalAddress in the
   page table, but what if you always took/gave a refcounted value, and have the translation table destroy the ref without
   decrementing the count, and then create a new uncounted ref from the physical address
 
 * there could be a memory leak with pages.  When the shell exits, you can print all the allocated pages that aren't freed
-
-
-* need to fix the data segment/heap/sbrk stuff because it doesn't change the stack size, and there is no checking or
-  support for stack resizing or allocating new stacks in the address space, which is needed for multithread stacks
-* when a page is requested beyond the end of the file (BSS) then just allocate a page without a copy-on-write page, and also
-  add a check to page cache to not allocate pages beyond the end of the file
-* modify a user fatal error so that it just terminates the process instead of kernel panic
 
 
 * for multi-core support, you first need per-cpu memory allocation (and maybe go into rust before kernel_start)

@@ -1,6 +1,7 @@
 
 
-.extern fatal_error
+.extern fatal_user_error
+.extern fatal_kernel_error
 .extern handle_irq
 .extern handle_user_exception
 .extern handle_kernel_exception
@@ -181,7 +182,7 @@ _restore_context:
 	eret
 
 
-_exception_fatal:
+_user_exception_fatal:
 	// Restore the kernel translation table so we can directly access lower memory
 	mrs	x0, TTBR1_EL1
 	msr	TTBR0_EL1, x0
@@ -195,7 +196,25 @@ _exception_fatal:
 	mrs	x0, ELR_EL1
 	mrs	x1, ESR_EL1
 	mrs	x2, FAR_EL1
-	b	fatal_error
+	b	fatal_user_error
+
+	eret
+
+_kernel_exception_fatal:
+	// Restore the kernel translation table so we can directly access lower memory
+	mrs	x0, TTBR1_EL1
+	msr	TTBR0_EL1, x0
+
+	// Print a ! character (for debugging when printing from rust causes exceptions)
+	ldr	x1, =0xFFFF00003F201000
+	mov	w0, #0x21
+	strb	w0, [x1]
+
+	// Jump to the fatal error code
+	mrs	x0, ELR_EL1
+	mrs	x1, ESR_EL1
+	mrs	x2, FAR_EL1
+	b	fatal_kernel_error
 _loop:
 	wfe
 	b	_loop
@@ -218,7 +237,7 @@ _loop:
 	mrs	x0, CurrentEL
 	mov	x30, #4
 	cmp	x0, x30
-	b.ne	_exception_fatal
+	b.ne	_kernel_exception_fatal
 
 	// Save the user process's context (and subtract the values stored at the start from the stack)
 	ldr	x0, CURRENT_CONTEXT
@@ -363,30 +382,29 @@ _default_exceptions_table:
 
 // Exceptions where SP_EL0 is the stack
 .balign 0x80	// Synchronous
-	b	_exception_fatal
+	b	_kernel_exception_fatal
 
 .balign 0x80	// IRQ
-	b	_exception_fatal
+	b	_kernel_exception_fatal
 
 .balign 0x80	// Fast IRQ
-	b	_exception_fatal
+	b	_kernel_exception_fatal
 
 .balign 0x80	// SError
-	b	_exception_fatal
+	b	_kernel_exception_fatal
 
 // Exceptions where SP_ELx is the stack
 .balign 0x80	// Synchronous
-	// TODO if this is enabled and a page fault occurs, locks up
 	HANDLE_KERNEL_EXCEPTION handle_kernel_exception
 
 .balign 0x80	// IRQ
 	HANDLE_KERNEL_EXCEPTION handle_kernel_irq
 
 .balign 0x80	// Fast IRQ
-	b	_exception_fatal
+	b	_kernel_exception_fatal
 
 .balign 0x80	// SError
-	b	_exception_fatal
+	b	_kernel_exception_fatal
 
 // Exceptions from lower EL in AArch64
 .balign 0x80	// Synchronous
@@ -396,22 +414,22 @@ _default_exceptions_table:
 	HANDLE_CONTEXT_SWITCH handle_user_irq
 
 .balign 0x80	// Fast IRQ
-	b	_exception_fatal
+	b	_user_exception_fatal
 
 .balign 0x80	// SError
-	b	_exception_fatal
+	b	_user_exception_fatal
 
 // Exceptions from lower EL in AArch32
 .balign 0x80	// Synchronous
-	b	_exception_fatal
+	b	_kernel_exception_fatal
 
 .balign 0x80	// IRQ
-	b	_exception_fatal
+	b	_kernel_exception_fatal
 
 .balign 0x80	// Fast IRQ
-	b	_exception_fatal
+	b	_kernel_exception_fatal
 
 .balign 0x80	// SError
-	b	_exception_fatal
+	b	_kernel_exception_fatal
 
 
