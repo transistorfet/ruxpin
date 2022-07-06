@@ -12,7 +12,7 @@ use super::{MemoryType, MemoryPermissions};
 use super::pagecache::PageCacheEntry;
 
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum SegmentType {
     Text,
     Data,
@@ -25,6 +25,7 @@ pub trait SegmentOperations: Sync + Send {
 }
 
 pub struct Segment {
+    pub(super) stype: SegmentType,
     pub(super) permissions: MemoryPermissions,
     pub(super) start: VirtualAddress,
     pub(super) end: VirtualAddress,
@@ -32,8 +33,9 @@ pub struct Segment {
 }
 
 impl Segment {
-    pub fn new(permissions: MemoryPermissions, start: VirtualAddress, end: VirtualAddress, ops: Box<dyn SegmentOperations>) -> Self {
+    pub fn new(stype: SegmentType, permissions: MemoryPermissions, start: VirtualAddress, end: VirtualAddress, ops: Box<dyn SegmentOperations>) -> Self {
         Self {
+            stype,
             permissions,
             start,
             end,
@@ -41,17 +43,17 @@ impl Segment {
         }
     }
 
-    pub fn new_memory(table: &mut TranslationTable, permissions: MemoryPermissions, start: VirtualAddress, end: VirtualAddress) -> Result<Self, KernelError> {
+    pub fn new_memory(table: &mut TranslationTable, stype: SegmentType, permissions: MemoryPermissions, start: VirtualAddress, end: VirtualAddress) -> Result<Self, KernelError> {
         let ops = Box::new(MemorySegment::new()?);
-        let segment = Self::new(permissions, start, end, ops);
+        let segment = Self::new(stype, permissions, start, end, ops);
         let pages = pages::get_page_pool();
         table.map_paged_range(MemoryType::Unallocated, permissions, segment.start, segment.page_aligned_len(), pages)?;
         Ok(segment)
     }
 
-    pub fn new_file_backed(table: &mut TranslationTable, cache: Arc<PageCacheEntry>, file_offset: usize, file_size: usize, permissions: MemoryPermissions, mem_offset: usize, start: VirtualAddress, end: VirtualAddress) -> Result<Self, KernelError> {
+    pub fn new_file_backed(table: &mut TranslationTable, stype: SegmentType, permissions: MemoryPermissions, mem_offset: usize, start: VirtualAddress, end: VirtualAddress, cache: Arc<PageCacheEntry>, file_offset: usize, file_size: usize) -> Result<Self, KernelError> {
         let ops = Box::new(FileBackedSegment::new(cache, file_offset, file_size, mem_offset)?);
-        let segment = Self::new(permissions, start, end, ops);
+        let segment = Self::new(stype, permissions, start, end, ops);
         let pages = pages::get_page_pool();
         table.map_paged_range(MemoryType::Unallocated, permissions, segment.start, segment.page_aligned_len(), pages)?;
         Ok(segment)
@@ -82,7 +84,7 @@ impl Segment {
         } else  {
             table.duplicate_paged_range(parent_table, self.permissions, self.start, self.page_aligned_len(), pages)?;
         }
-        Ok(Self::new(self.permissions, self.start, self.end, self.ops.copy()))
+        Ok(Self::new(self.stype, self.permissions, self.start, self.end, self.ops.copy()))
     }
 
     pub fn resize(&mut self, table: &mut TranslationTable, diff: isize) -> Result<(), KernelError> {
@@ -96,6 +98,21 @@ impl Segment {
             let aligned_diff = align_up((-1 * diff) as usize, mmu::page_size());
             table.unmap_range(self.end.sub(aligned_diff), aligned_diff, pages)?;
             self.end = self.end.sub(aligned_diff);
+        }
+        Ok(())
+    }
+
+    pub fn resize_stack(&mut self, table: &mut TranslationTable, diff: isize) -> Result<(), KernelError> {
+        let pages = pages::get_page_pool();
+
+        if diff >= 0 {
+            let aligned_diff = align_up(diff as usize, mmu::page_size());
+            table.map_paged_range(MemoryType::Unallocated, self.permissions, self.start.sub(aligned_diff), aligned_diff, pages)?;
+            self.start = self.start.sub(aligned_diff);
+        } else {
+            let aligned_diff = align_up((-1 * diff) as usize, mmu::page_size());
+            table.unmap_range(self.start, aligned_diff, pages)?;
+            self.start = self.start.add(aligned_diff);
         }
         Ok(())
     }
