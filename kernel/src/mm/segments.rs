@@ -147,7 +147,7 @@ impl SegmentOperations for MemorySegment {
 pub struct FileBackedSegment {
     cache: Arc<PageCacheEntry>,
     file_offset: usize,
-    file_size: usize,
+    file_limit: usize,
     mem_offset: usize,
 }
 
@@ -156,7 +156,7 @@ impl FileBackedSegment {
         Ok(Self {
             cache,
             file_offset,
-            file_size,
+            file_limit: align_up(file_offset + file_size, mmu::page_size()),
             mem_offset,
         })
     }
@@ -169,14 +169,20 @@ impl SegmentOperations for FileBackedSegment {
 
     fn load_page_at(&self, segment: &Segment, table: &mut TranslationTable, vaddr: VirtualAddress) -> Result<PhysicalAddress, KernelError> {
         let offset = usize::from(vaddr) - usize::from(segment.start) - (self.mem_offset - self.file_offset);
-        // TODO if the request is beyond the end of the file, then you could allocate a normal page instead of using a cached one, and save the copy on write
 
-        let page = self.cache.lookup(offset)?;
-        table.update_page_addr(vaddr, page).unwrap();
-        if segment.permissions == MemoryPermissions::ReadWrite {
-            table.set_page_copy_on_write(vaddr).unwrap();
+        if offset <= self.file_limit {
+            let page = self.cache.lookup(offset)?;
+            table.update_page_addr(vaddr, page).unwrap();
+            if segment.permissions == MemoryPermissions::ReadWrite {
+                table.set_page_copy_on_write(vaddr).unwrap();
+            }
+            Ok(page)
+        } else {
+            let pages = pages::get_page_pool();
+            let page = pages.alloc_page_zeroed();
+            table.update_page_addr(vaddr, page).unwrap();
+            Ok(page)
         }
-        Ok(page)
     }
 }
 

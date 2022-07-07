@@ -1,12 +1,11 @@
 
+* when a page is requested beyond the end of the file (BSS) then just allocate a page without a copy-on-write page, and also
+  add a check to page cache to not allocate pages beyond the end of the file
 * make the elf loader use the maximum possible stack size, so that it butts up against the data segment.
 * make the elf loader create a data segment if one is not already created as part of the executable (or should we assume the elf will
   always create a data segment even if not used at all).  So that there's always a data segment to grow when more heap is requested
 * add stack page guard, which would have to be created when the loader creates the stack, and also when sbrk/adjust is called
-* when a page is requested beyond the end of the file (BSS) then just allocate a page without a copy-on-write page, and also
-  add a check to page cache to not allocate pages beyond the end of the file
 
-* modify a user fatal error so that it just terminates the process instead of kernel panic
 
 * is there a way to get automatic ref counting for pages?  The actual page is being stored in as a PhysicalAddress in the
   page table, but what if you always took/gave a refcounted value, and have the translation table destroy the ref without
@@ -38,6 +37,8 @@ HIGH PRIORITY ISSUES:
 
 
 TODO:
+
+* (verify) modify a user fatal error so that it just terminates the process instead of kernel panic
 
 * implement api getcwd()
 * add networking
