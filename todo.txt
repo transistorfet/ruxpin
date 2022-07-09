@@ -1,17 +1,16 @@
 
-* when a page is requested beyond the end of the file (BSS) then just allocate a page without a copy-on-write page, and also
-  add a check to page cache to not allocate pages beyond the end of the file
+* in order to map large areas of memory feasibly, it needs to be possible populate the map tables on demand, because otherwise it's allocating
+  a huge number of pages just to populate the tables down to 4KB, which uses a lot of memory if only the first page of the stack segment is used
 * make the elf loader use the maximum possible stack size, so that it butts up against the data segment.
-* make the elf loader create a data segment if one is not already created as part of the executable (or should we assume the elf will
-  always create a data segment even if not used at all).  So that there's always a data segment to grow when more heap is requested
 * add stack page guard, which would have to be created when the loader creates the stack, and also when sbrk/adjust is called
 
 
+* there could be a memory leak with pages.  When the shell exits, you can print all the allocated pages that aren't freed
 * is there a way to get automatic ref counting for pages?  The actual page is being stored in as a PhysicalAddress in the
   page table, but what if you always took/gave a refcounted value, and have the translation table destroy the ref without
-  decrementing the count, and then create a new uncounted ref from the physical address
-
-* there could be a memory leak with pages.  When the shell exits, you can print all the allocated pages that aren't freed
+  decrementing the count, and then create a new uncounted ref from the physical address, once only.
+  The issue here is that you need a way, from the page descriptor alone (although you have a fixed address for it) to determine the
+  page, and thus PhysicalAddress, so that you can switch back and forth (between an Arc<Page> and a PhysicalAddress)
 
 
 * for multi-core support, you first need per-cpu memory allocation (and maybe go into rust before kernel_start)
@@ -47,6 +46,8 @@ TODO:
 
 * add a stack guard page to each stack segment, with permissions/mapping in the translation table such that it will cause a fault
   instead of crashing into the adjacent segment.  Linux has this adjustable in size I think
+* make the elf loader create a data segment if one is not already created as part of the executable (or should we assume the elf will
+  always create a data segment even if not used at all).  So that there's always a data segment to grow when more heap is requested
 
 * add mounts to procfs (and make mount command)
 

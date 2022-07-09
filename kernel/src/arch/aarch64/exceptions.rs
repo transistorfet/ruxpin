@@ -12,6 +12,11 @@ use super::types::VirtualAddress;
 use super::context::{self, Context};
 
 
+const DFSC_TRANSLATION_FAULT: u64       = 0b000100;
+const DFSC_ACCESS_FAULT: u64            = 0b001000;
+const DFSC_PERMISSIONS_FAULT: u64       = 0b001100;
+
+
 pub type IrqFlags = u64;
 
 pub unsafe fn enable_irq(flags: IrqFlags) {
@@ -85,7 +90,7 @@ pub extern "C" fn fatal_kernel_error(_sp: u64, elr: u64, esr: u64, far: u64) -> 
 
 #[no_mangle]
 extern "C" fn handle_user_exception(context: &Context, elr: u64, esr: u64, far: u64, _sp: u64) {
-    trace!("Handle an exception of ESR: {:x} from ELR: {:x}", esr, elr);
+    trace!("Handle a user exception of ESR: {:x} from ELR: {:x}", esr, elr);
 
     match esr >> 26 {
         // SVC from Aarch64
@@ -95,14 +100,18 @@ extern "C" fn handle_user_exception(context: &Context, elr: u64, esr: u64, far: 
 
         // Instruction or Data Abort from lower EL
         0b100000 | 0b100100 => {
-            if esr & 0b111100 == 0b001000 {
-                trace!("Instruction or Data Abort caused by Access Flag at address {:x} (allocating new page)", far);
-                page_fault_handler(far);
-            } else if esr & 0b111100 == 0b001100 {
-                trace!("Instruction or Data Abort caused by Permissions Flag at address {:x} (either copy-on-write or fault)", far);
-                page_access_handler(far);
-            } else {
-                fatal_user_error(context, elr, esr, far);
+            match esr & 0b111100 {
+                DFSC_ACCESS_FAULT | DFSC_TRANSLATION_FAULT => {
+                    trace!("Instruction or Data Abort caused by Access Flag at address {:x} (allocating new page)", far);
+                    page_fault_handler(far);
+                },
+                DFSC_PERMISSIONS_FAULT => {
+                    trace!("Instruction or Data Abort caused by Permissions Flag at address {:x} (either copy-on-write or fault)", far);
+                    page_access_handler(far);
+                },
+                _ => {
+                    fatal_user_error(context, elr, esr, far);
+                },
             }
         },
 
@@ -132,11 +141,18 @@ extern "C" fn handle_kernel_exception(sp: u64, elr: u64, esr: u64, far: u64) {
     match esr >> 26 {
         // Instruction or Data Abort from lower EL
         0b100000 | 0b100100 | 0b100101 => {
-            if esr & 0b111100 == 0b001000 {
-                trace!("Instruction or Data Abort caused by Access Flag at address {:x} (allocating new page)", far);
-                page_fault_handler(far);
-            } else {
-                fatal_kernel_error(sp, elr, esr, far);
+            match esr & 0b111100 {
+                DFSC_ACCESS_FAULT | DFSC_TRANSLATION_FAULT => {
+                    trace!("Instruction or Data Abort caused by Access Flag at address {:x} (allocating new page)", far);
+                    page_fault_handler(far);
+                },
+                DFSC_PERMISSIONS_FAULT => {
+                    trace!("Instruction or Data Abort caused by Permissions Flag at address {:x} (either copy-on-write or fault)", far);
+                    page_access_handler(far);
+                },
+                _ => {
+                    fatal_kernel_error(sp, elr, esr, far);
+                },
             }
         },
 
