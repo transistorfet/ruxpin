@@ -156,9 +156,7 @@ impl TranslationTable {
         check_vaddr_and_usize(vaddr, len)?;
 
         let free_pages_fn = |pages: &mut PagePool, _, paddr| {
-            if usize::from(paddr) != 0 {
-                pages.free_page(paddr)
-            }
+            pages.free_page(paddr)
         };
         let mut visitor = UnmapRange::new(pages, free_pages_fn);
         visitor.visit_level(TL0_ADDR_BITS, self.as_slice_mut(), &mut len, &mut vaddr)
@@ -329,10 +327,6 @@ trait TableVisitor {
     fn visit_level(&mut self, addr_bits: usize, table: &mut [u64], len: &mut usize, vaddr: &mut VirtualAddress) -> Result<(), KernelError> {
         walk_level(self, addr_bits, table, len, vaddr)
     }
-
-    fn visit_all_granuales(&mut self, addr_bits: usize, table: &mut [u64], index: &mut usize, len: &mut usize, vaddr: &mut VirtualAddress) -> Result<(), KernelError> {
-        walk_all_granuales(self, addr_bits, table, index, len, vaddr)
-    }
 }
 
 fn walk_level<V>(visitor: &mut V, addr_bits: usize, table: &mut [u64], len: &mut usize, vaddr: &mut VirtualAddress) -> Result<(), KernelError>
@@ -344,10 +338,12 @@ where
     let mut index = table_index_from_vaddr(addr_bits, *vaddr);
     while *len > 0 && index < table_entries() {
         if is_block(addr_bits, table, index) {
-            visitor.visit_all_granuales(addr_bits, table, &mut index, len, vaddr)?;
-        }
+            visitor.visit_granuale(addr_bits, table, index, *vaddr)?;
 
-        if addr_bits != 12 && descriptor_type(table, index) == TT2_DESCRIPTOR_TABLE {
+            index += 1;
+            *vaddr = vaddr.add(granuale_size);
+            *len = len.saturating_sub(granuale_size);
+        } else if is_table(addr_bits, table, index) {
             visitor.visit_table_before(addr_bits, table, index, *vaddr)?;
 
             let subtable = table_ref_mut(table, index)?;
@@ -355,30 +351,6 @@ where
 
             visitor.visit_table_after(addr_bits, table, index, *vaddr)?;
         } else {
-            break;
-        }
-    }
-
-    Ok(())
-}
-
-fn walk_all_granuales<V>(visitor: &mut V, addr_bits: usize, table: &mut [u64], index: &mut usize, len: &mut usize, vaddr: &mut VirtualAddress) -> Result<(), KernelError>
-where
-    V: TableVisitor + ?Sized
-{
-    let granuale_size = 1 << addr_bits;
-
-    while *len >= granuale_size {
-        if descriptor_type(table, *index) != TT_DESCRIPTOR_EMPTY {
-            visitor.visit_granuale(addr_bits, table, *index, *vaddr)?;
-        }
-
-        *index += 1;
-        *vaddr = vaddr.add(granuale_size);
-        *len = len.saturating_sub(granuale_size);
-
-        if *index >= table_entries() {
-            // If we've reached the end of this table, then return to allow a higher level to increment its index
             break;
         }
     }
@@ -410,7 +382,10 @@ where
     F: Fn(&mut PagePool, VirtualAddress, PhysicalAddress)
 {
     fn visit_granuale(&mut self, _addr_bits: usize, table: &mut [u64], index: usize, vaddr: VirtualAddress) -> Result<(), KernelError> {
-        (self.unmap_block)(self.pages, vaddr, block_ptr(table, index));
+        let paddr = block_ptr(table, index);
+        if usize::from(paddr) != 0 {
+            (self.unmap_block)(self.pages, vaddr, paddr);
+        }
         table[index] = 0;
         Ok(())
     }
@@ -536,6 +511,10 @@ fn is_block(addr_bits: usize, table: &[u64], index: usize) -> bool {
     } else {
         dtype == TT2_DESCRIPTOR_BLOCK
     }
+}
+
+fn is_table(addr_bits: usize, table: &[u64], index: usize) -> bool {
+    addr_bits != 12 && descriptor_type(table, index) == TT2_DESCRIPTOR_TABLE
 }
 
 fn table_is_empty(table: &mut [u64]) -> bool {
