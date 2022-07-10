@@ -281,7 +281,7 @@ where
 
         *index += 1;
         *vaddr = vaddr.add(granuale_size);
-        *len -= granuale_size;
+        *len = len.saturating_sub(granuale_size);
 
         if *index >= table_entries() {
             // If we've reached the end of this table, then return to allow a higher level to increment its index
@@ -355,9 +355,7 @@ where
 
             visitor.visit_table_after(addr_bits, table, index, *vaddr)?;
         } else {
-            *vaddr = vaddr.add(granuale_size);
-            *len -= granuale_size;
-            index += 1;
+            break;
         }
     }
 
@@ -377,7 +375,7 @@ where
 
         *index += 1;
         *vaddr = vaddr.add(granuale_size);
-        *len -= granuale_size;
+        *len = len.saturating_sub(granuale_size);
 
         if *index >= table_entries() {
             // If we've reached the end of this table, then return to allow a higher level to increment its index

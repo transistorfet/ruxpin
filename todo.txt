@@ -1,4 +1,8 @@
 
+* you have code in the stash for allocating page tables on demand
+
+
+
 * in order to map large areas of memory feasibly, it needs to be possible populate the map tables on demand, because otherwise it's allocating
   a huge number of pages just to populate the tables down to 4KB, which uses a lot of memory if only the first page of the stack segment is used
 * make the elf loader use the maximum possible stack size, so that it butts up against the data segment.
