@@ -137,7 +137,7 @@ impl SegmentOperations for MemorySegment {
     fn load_page_at(&self, _segment: &Segment, table: &mut TranslationTable, vaddr: VirtualAddress) -> Result<PhysicalAddress, KernelError> {
         let pages = pages::get_page_pool();
         let page = pages.alloc_page_zeroed();
-        table.update_page_addr(vaddr, page).unwrap();
+        table.update_page_addr(vaddr, page, pages).unwrap();
         Ok(page)
     }
 }
@@ -168,11 +168,12 @@ impl SegmentOperations for FileBackedSegment {
     }
 
     fn load_page_at(&self, segment: &Segment, table: &mut TranslationTable, vaddr: VirtualAddress) -> Result<PhysicalAddress, KernelError> {
+        let pages = pages::get_page_pool();
         let offset = usize::from(vaddr) - usize::from(segment.start) - (self.mem_offset - self.file_offset);
 
         if offset <= self.file_limit {
             let page = self.cache.lookup(offset)?;
-            table.update_page_addr(vaddr, page).unwrap();
+            table.update_page_addr(vaddr, page, pages).unwrap();
             if segment.permissions == MemoryPermissions::ReadWrite {
                 table.set_page_copy_on_write(vaddr).unwrap();
             }
@@ -180,7 +181,7 @@ impl SegmentOperations for FileBackedSegment {
         } else {
             let pages = pages::get_page_pool();
             let page = pages.alloc_page_zeroed();
-            table.update_page_addr(vaddr, page).unwrap();
+            table.update_page_addr(vaddr, page, pages).unwrap();
             Ok(page)
         }
     }

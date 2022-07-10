@@ -79,7 +79,7 @@ pub extern "C" fn fatal_user_error(context: &Context, elr: u64, esr: u64, far: u
     }
 
     //context::loop_forever();
-    scheduler::exit_current(-1);
+    scheduler::abort(scheduler::get_current());
 }
 
 #[no_mangle]
@@ -102,11 +102,11 @@ extern "C" fn handle_user_exception(context: &Context, elr: u64, esr: u64, far: 
         0b100000 | 0b100100 => {
             match esr & 0b111100 {
                 DFSC_ACCESS_FAULT | DFSC_TRANSLATION_FAULT => {
-                    trace!("Instruction or Data Abort caused by Access Flag at address {:x} (allocating new page)", far);
+                    trace!("Instruction or Data Abort {:x} caused by Access Flag at address {:x} (allocating new page)", esr, far);
                     page_fault_handler(far);
                 },
                 DFSC_PERMISSIONS_FAULT => {
-                    trace!("Instruction or Data Abort caused by Permissions Flag at address {:x} (either copy-on-write or fault)", far);
+                    trace!("Instruction or Data Abort {:x} caused by Permissions Flag at address {:x} (either copy-on-write or fault)", esr, far);
                     page_access_handler(far);
                 },
                 _ => {
@@ -143,11 +143,11 @@ extern "C" fn handle_kernel_exception(sp: u64, elr: u64, esr: u64, far: u64) {
         0b100000 | 0b100100 | 0b100101 => {
             match esr & 0b111100 {
                 DFSC_ACCESS_FAULT | DFSC_TRANSLATION_FAULT => {
-                    trace!("Instruction or Data Abort caused by Access Flag at address {:x} (allocating new page)", far);
+                    trace!("Instruction or Data Abort {:x} caused by Access Flag at address {:x} (allocating new page)", esr, far);
                     page_fault_handler(far);
                 },
                 DFSC_PERMISSIONS_FAULT => {
-                    trace!("Instruction or Data Abort caused by Permissions Flag at address {:x} (either copy-on-write or fault)", far);
+                    trace!("Instruction or Data Abort {:x} caused by Permissions Flag at address {:x} (either copy-on-write or fault)", esr, far);
                     page_access_handler(far);
                 },
                 _ => {
@@ -179,11 +179,19 @@ fn run_tasklets_with_interrupts() {
 
 fn page_fault_handler(far: u64) {
     let current = scheduler::get_current();
-    current.try_lock().unwrap().space.try_lock().unwrap().alloc_page_at(VirtualAddress::from(far)).unwrap_or_else(|_| scheduler::abort(scheduler::get_current()));
+    let result = current.try_lock().unwrap().space.try_lock().unwrap().alloc_page_at(VirtualAddress::from(far));
+    match result {
+        Ok(()) => { },
+        Err(_) => scheduler::abort(scheduler::get_current()),
+    }
 }
 
 fn page_access_handler(far: u64) {
     let current = scheduler::get_current();
-    current.try_lock().unwrap().space.try_lock().unwrap().copy_on_write_at(VirtualAddress::from(far)).unwrap_or_else(|_| scheduler::abort(scheduler::get_current()));
+    let result = current.try_lock().unwrap().space.try_lock().unwrap().copy_on_write_at(VirtualAddress::from(far));
+    match result {
+        Ok(()) => { },
+        Err(_) => scheduler::abort(scheduler::get_current()),
+    }
 }
 

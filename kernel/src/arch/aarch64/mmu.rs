@@ -134,6 +134,7 @@ impl TranslationTable {
     pub fn remap_range_copy_on_write(&mut self, parent: &mut Self, mut vaddr: VirtualAddress, mut len: usize, pages: &mut PagePool) -> Result<(), KernelError> {
         check_vaddr_and_usize(vaddr, len)?;
 
+        let flags = TT_COPY_ON_WRITE_FLAG | TT_READ_ONLY_FLAG | attribute_index(0);
         map_level(TL0_ADDR_BITS, self.as_slice_mut(), &mut len, &mut vaddr, pages, &mut |pages, page_addr, len| {
             let (descriptor, granuale_size) = lookup_level_mut(TL0_ADDR_BITS, parent.as_slice_mut(), page_addr)?;
             let page = *descriptor & TT_BLOCK_MASK;
@@ -143,10 +144,10 @@ impl TranslationTable {
             } else if len != page_size() {
                 Ok(None)
             } else if page == 0 {
-                Ok(Some((PhysicalAddress::from(0), TT_COPY_ON_WRITE_FLAG | TT_READ_ONLY_FLAG | attribute_index(0))))
+                Ok(Some((PhysicalAddress::from(0), flags)))
             } else {
-                *descriptor = (*descriptor & !TT_PERMISSIONS_MASK) | TT_COPY_ON_WRITE_FLAG | TT_READ_ONLY_FLAG | attribute_index(0);
-                Ok(Some((pages.ref_page(PhysicalAddress::from(page)), TT_ACCESS_FLAG | TT_COPY_ON_WRITE_FLAG | TT_READ_ONLY_FLAG | attribute_index(0))))
+                *descriptor = (*descriptor & !TT_PERMISSIONS_MASK) | flags;
+                Ok(Some((pages.ref_page(PhysicalAddress::from(page)), TT_ACCESS_FLAG | flags)))
             }
         })
     }
@@ -193,7 +194,7 @@ impl TranslationTable {
         }
     }
 
-    pub fn update_page_addr(&mut self, vaddr: VirtualAddress, paddr: PhysicalAddress) -> Result<(), KernelError> {
+    pub fn update_page_addr(&mut self, vaddr: VirtualAddress, paddr: PhysicalAddress, pages: &mut PagePool) -> Result<(), KernelError> {
         check_vaddr_and_usize(vaddr, page_size())?;
 
         let (descriptor, granuale_size) = lookup_level_mut(TL0_ADDR_BITS, self.as_slice_mut(), vaddr)?;
@@ -216,11 +217,11 @@ impl TranslationTable {
     }
 
     fn as_slice(&self) -> &[u64] {
-        table_as_slice(PhysicalAddress::from(self.0))
+        table_as_slice(PhysicalAddress::from(self.0)).unwrap()
     }
 
     fn as_slice_mut(&mut self) -> &mut [u64] {
-        table_as_slice_mut(PhysicalAddress::from(self.0))
+        table_as_slice_mut(PhysicalAddress::from(self.0)).unwrap()
     }
 }
 
@@ -253,7 +254,7 @@ where
         if addr_bits != 12 {
             ensure_table_entry(table, index, pages)?;
 
-            map_level(addr_bits - 9, table_ref_mut(table, index), len, vaddr, pages, map_block)?;
+            map_level(addr_bits - 9, table_ref_mut(table, index)?, len, vaddr, pages, map_block)?;
         }
     }
 
@@ -349,7 +350,7 @@ where
         if addr_bits != 12 && descriptor_type(table, index) == TT2_DESCRIPTOR_TABLE {
             visitor.visit_table_before(addr_bits, table, index, *vaddr)?;
 
-            let subtable = table_ref_mut(table, index);
+            let subtable = table_ref_mut(table, index)?;
             visitor.visit_level(addr_bits - 9, subtable, len, vaddr)?;
 
             visitor.visit_table_after(addr_bits, table, index, *vaddr)?;
@@ -417,10 +418,11 @@ where
     }
 
     fn visit_table_after(&mut self, _addr_bits: usize, table: &mut [u64], index: usize, _vaddr: VirtualAddress) -> Result<(), KernelError> {
-        let subtable = table_ref_mut(table, index);
-        if table_is_empty(subtable) {
-            self.pages.free_page(table_ptr(table, index));
-            table[index] = 0;
+        if let Ok(subtable) = table_ref_mut(table, index) {
+            if table_is_empty(subtable) {
+                self.pages.free_page(table_ptr(table, index));
+                table[index] = 0;
+            }
         }
         Ok(())
     }
@@ -462,7 +464,7 @@ fn lookup_level(addr_bits: usize, table: &[u64], vaddr: VirtualAddress) -> Resul
     } else if addr_bits == 12 {
         Err(KernelError::AddressUnmapped)
     } else {
-        lookup_level(addr_bits - 9, table_ref(table, index), vaddr)
+        lookup_level(addr_bits - 9, table_ref(table, index)?, vaddr)
     }
 }
 
@@ -475,7 +477,7 @@ fn lookup_level_mut(addr_bits: usize, table: &mut [u64], vaddr: VirtualAddress) 
     } else if addr_bits == 12 {
         Err(KernelError::AddressUnmapped)
     } else {
-        lookup_level_mut(addr_bits - 9, table_ref_mut(table, index), vaddr)
+        lookup_level_mut(addr_bits - 9, table_ref_mut(table, index)?, vaddr)
     }
 }
 
@@ -489,23 +491,31 @@ fn table_index_from_vaddr(bits: usize, vaddr: VirtualAddress) -> usize {
     ((usize::from(vaddr) >> bits) & 0x1ff) as usize
 }
 
-fn table_ref(table: &[u64], index: usize) -> &[u64] {
+fn table_ref(table: &[u64], index: usize) -> Result<&[u64], KernelError> {
     table_as_slice(table_ptr(table, index))
 }
 
-fn table_ref_mut(table: &mut [u64], index: usize) -> &mut [u64] {
+fn table_ref_mut(table: &mut [u64], index: usize) -> Result<&mut [u64], KernelError> {
     table_as_slice_mut(table_ptr(table, index))
 }
 
-fn table_as_slice(paddr: PhysicalAddress) -> &'static [u64] {
-    unsafe {
-        slice::from_raw_parts(paddr.to_kernel_addr().as_ptr(), table_entries())
+fn table_as_slice(paddr: PhysicalAddress) -> Result<&'static [u64], KernelError> {
+    if u64::from(paddr) == 0 {
+        Err(KernelError::CorruptTranslationTable)
+    } else {
+        unsafe {
+            Ok(slice::from_raw_parts(paddr.to_kernel_addr().as_ptr(), table_entries()))
+        }
     }
 }
 
-fn table_as_slice_mut(paddr: PhysicalAddress) -> &'static mut [u64] {
-    unsafe {
-        slice::from_raw_parts_mut(paddr.to_kernel_addr().as_mut() as *mut u64, table_entries())
+fn table_as_slice_mut(paddr: PhysicalAddress) -> Result<&'static mut [u64], KernelError> {
+    if u64::from(paddr) == 0 {
+        Err(KernelError::CorruptTranslationTable)
+    } else {
+        unsafe {
+            Ok(slice::from_raw_parts_mut(paddr.to_kernel_addr().as_mut() as *mut u64, table_entries()))
+        }
     }
 }
 

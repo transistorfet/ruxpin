@@ -131,11 +131,12 @@ impl VirtualAddressSpace {
         self.table.get_ttbr()
     }
 
-    pub(crate) fn alloc_page_at(&mut self, far: VirtualAddress) -> Result<(), KernelError> {
+    pub(crate) fn alloc_page_at(&mut self, fault_addr: VirtualAddress) -> Result<(), KernelError> {
+        let page_vaddr = fault_addr.align_down(mmu::page_size());
+
         for segment in &self.segments {
-            if segment.match_range(far) {
-                let page_vaddr = far.align_down(mmu::page_size());
-                segment.load_page_at(&mut self.table, page_vaddr).unwrap();
+            if segment.match_range(fault_addr) {
+                segment.load_page_at(&mut self.table, page_vaddr)?;
                 return Ok(());
             }
         }
@@ -143,16 +144,16 @@ impl VirtualAddressSpace {
         Err(KernelError::NoSegmentFound)
     }
 
-    pub(crate) fn copy_on_write_at(&mut self, far: VirtualAddress) -> Result<(), KernelError> {
-        let page_vaddr = far.align_down(mmu::page_size());
-        let (page, previous_cow) = self.table.reset_page_copy_on_write(page_vaddr).unwrap();
+    pub(crate) fn copy_on_write_at(&mut self, fault_addr: VirtualAddress) -> Result<(), KernelError> {
+        let page_vaddr = fault_addr.align_down(mmu::page_size());
+        let (page, previous_cow) = self.table.reset_page_copy_on_write(page_vaddr)?;
         if previous_cow {
             trace!("copying page on write {:?}", page);
             let pages = pages::get_page_pool();
 
             // Allocate new page and map it in the current address space
             let new_page = pages.alloc_page_zeroed();
-            self.table.update_page_addr(page_vaddr, new_page).unwrap();
+            self.table.update_page_addr(page_vaddr, new_page, pages)?;
 
             // Copy data into new page
             let page_buffer = mmu::get_page_slice(page);
