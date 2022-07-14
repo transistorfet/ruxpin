@@ -1,6 +1,8 @@
 
 * you have code in the stash for allocating page tables on demand
 
+* should you change the memory map functions to take an end address instead of a length?
+
 
 
 * in order to map large areas of memory feasibly, it needs to be possible populate the map tables on demand, because otherwise it's allocating

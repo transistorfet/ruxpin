@@ -51,7 +51,7 @@ pub extern "C" fn non_boot_core_start() -> ! {
     }
 
     //notice!("cpu {}: booting secondary core", arch::cpu_id());
-    //let file = crate::fs::vfs::open(None, "/", ruxpin_types::OpenFlags::ReadOnly, ruxpin_types::FileAccess::DefaultDir, 0);
+    //let file = crate::fs::open(None, "/", ruxpin_types::OpenFlags::ReadOnly, ruxpin_types::FileAccess::DefaultDir, 0);
     //notice!("done");
 
     // TODO this does nothing for the moment
