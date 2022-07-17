@@ -88,12 +88,11 @@ impl TranslationTable {
     pub fn map_existing_range(&mut self, access: MemoryPermissions, start: VirtualAddress, paddr: PhysicalAddress, len: usize, pages: &mut PagePool) -> Result<(), KernelError> {
         check_vaddr_and_usize(start, len)?;
 
-        let start_vaddr = start;
-        let end = start_vaddr.add(len);
+        let end = start.add(len);
         let flags = memory_type_flags(MemoryType::Existing) | memory_permissions_flags(access);
 
-        let mut mapper = MappingVisitor::new(pages, |_, current_vaddr, _| {
-            let voffset = usize::from(current_vaddr) - usize::from(start_vaddr);
+        let mut mapper = MapRange::new(pages, |_, current_vaddr, _| {
+            let voffset = usize::from(current_vaddr) - usize::from(start);
             Ok(Some((paddr.add(voffset), flags)))
         });
         mapper.visit_table(TL0_ADDR_BITS, self.as_slice_mut(), start, end)
@@ -105,8 +104,8 @@ impl TranslationTable {
         let end = start.add(len);
         let flags = memory_type_flags(mtype) | memory_permissions_flags(access);
 
-        let mut mapper = MappingVisitor::new(pages, |pages, _, len| {
-            if len != page_size() {
+        let mut mapper = MapRange::new(pages, |pages, _, granuale_size| {
+            if granuale_size != page_size() {
                 Ok(None) // Don't map granuales larger than a page
             } else if mtype == MemoryType::Allocated {
                 Ok(Some((pages.alloc_page_zeroed(), flags)))
@@ -117,13 +116,13 @@ impl TranslationTable {
         mapper.visit_table(TL0_ADDR_BITS, self.as_slice_mut(), start, end)
     }
 
-    pub fn duplicate_paged_range(&mut self, parent_table: &Self, access: MemoryPermissions, start: VirtualAddress, len: usize, pages: &mut PagePool) -> Result<(), KernelError> {
+    pub fn duplicate_paged_range(&mut self, parent_table: &mut Self, access: MemoryPermissions, start: VirtualAddress, len: usize, pages: &mut PagePool) -> Result<(), KernelError> {
         check_vaddr_and_usize(start, len)?;
 
         let end = start.add(len);
         let flags = memory_type_flags(MemoryType::Unallocated) | memory_permissions_flags(access);
 
-        let mut mapper = MappingVisitor::new(pages, |pages, page_addr, len| {
+        let mut mapper = MapRange::new(pages, |pages, page_addr, len| {
             let (descriptor, granuale_size) = lookup_level(TL0_ADDR_BITS, parent_table.as_slice(), page_addr)?;
 
             if granuale_size != page_size() {
@@ -145,7 +144,7 @@ impl TranslationTable {
         let end = start.add(len);
         let flags = TT_COPY_ON_WRITE_FLAG | TT_READ_ONLY_FLAG | attribute_index(0);
 
-        let mut mapper = MappingVisitor::new(pages, |pages, page_addr, len| {
+        let mut mapper = MapRange::new(pages, |pages, page_addr, len| {
             let (descriptor, granuale_size) = lookup_level_mut(TL0_ADDR_BITS, parent.as_slice_mut(), page_addr)?;
             let page = *descriptor & TT_BLOCK_MASK;
 
@@ -245,73 +244,23 @@ fn check_vaddr_and_usize(vaddr: VirtualAddress, len: usize) -> Result<(), Kernel
     }
 }
 
+fn initialize_table(granuale_size: usize, table: &mut [u64], parent_descriptor: u64) -> Result<(), KernelError> {
+    let dtype = if granuale_size == page_size() {
+        TT3_DESCRIPTOR_BLOCK
+    } else {
+        TT2_DESCRIPTOR_TABLE
+    };
+    let flags = parent_descriptor & !(TT_TABLE_MASK | TT_TYPE_MASK | TT_ACCESS_FLAG) | dtype;
 
-/// Map 4K pages in a given range using a callback to allocate them
-struct MappingVisitor<'a, F> {
-    pages: &'a mut PagePool,
-    map_block: F,
-}
-
-impl<'a, F> MappingVisitor<'a, F>
-where
-    F: FnMut(&mut PagePool, VirtualAddress, usize) -> Result<Option<(PhysicalAddress, u64)>, KernelError>
-{
-    pub fn new(pages: &'a mut PagePool, map_block: F) -> Self {
-        Self {
-            pages,
-            map_block,
-        }
-    }
-}
-
-impl<'a, F> TableVisitor for MappingVisitor<'a, F>
-where
-    F: FnMut(&mut PagePool, VirtualAddress, usize) -> Result<Option<(PhysicalAddress, u64)>, KernelError>
-{
-    fn visit_granuale(&mut self, _addr_bits: usize, _table: &mut [u64], _index: usize, _vaddr: VirtualAddress) -> Result<(), KernelError> {
-        Err(KernelError::AddressAlreadyMapped)
+    for index in 0..table_entries() {
+        table[index] = flags;
     }
 
-    fn visit_empty(&mut self, addr_bits: usize, table: &mut [u64], index: usize, vaddr: VirtualAddress, end: VirtualAddress) -> Result<(), KernelError> {
-        if addr_bits != 12 {
-            ensure_table_entry(table, index, self.pages)?;
-
-            let subtable = table_ref_mut(table, index)?;
-            walk_table(self, addr_bits - 9, subtable, vaddr, end)?;
-        } else {
-            let granuale_size = 1 << addr_bits;
-            if let Some((paddr, flags)) = (self.map_block)(self.pages, vaddr, granuale_size)? {
-                let block_flag = if addr_bits == 12 { TT3_DESCRIPTOR_BLOCK } else { TT2_DESCRIPTOR_BLOCK };
-                table[index] = (u64::from(paddr) & TT_BLOCK_MASK) | flags | block_flag;
-            }
-        }
-        Ok(())
-    }
+    Ok(())
 }
 
-fn ensure_table_entry(table: &mut [u64], index: usize, pages: &mut PagePool) -> Result<(), KernelError> {
-    let desc_type = descriptor_type(table, index);
 
-    match desc_type {
-        TT2_DESCRIPTOR_TABLE => {
-            // Do nothing. Sub-table is already present
-            Ok(())
-        },
-
-        TT_DESCRIPTOR_EMPTY => {
-            let next_table = allocate_table(pages);
-            table[index] = (u64::from(next_table) & TT_TABLE_MASK) | TT2_DESCRIPTOR_TABLE;
-            Ok(())
-        },
-        TT2_DESCRIPTOR_BLOCK => {
-            Err(KernelError::AddressAlreadyMapped)
-        },
-        _ => {
-            Err(KernelError::CorruptTranslationTable)
-        },
-    }
-}
-
+/// Generic Visitor for a TranslationTable, which traverses each entry in the tree of tables
 trait TableVisitor {
     fn visit_granuale(&mut self, addr_bits: usize, table: &mut [u64], index: usize, vaddr: VirtualAddress) -> Result<(), KernelError>;
 
@@ -356,6 +305,72 @@ where
         index += 1;
     }
     Ok(())
+}
+
+
+/// Map 4K pages in a given range using a callback to allocate them
+struct MapRange<'a, F> {
+    pages: &'a mut PagePool,
+    map_block: F,
+}
+
+impl<'a, F> MapRange<'a, F>
+where
+    F: FnMut(&mut PagePool, VirtualAddress, usize) -> Result<Option<(PhysicalAddress, u64)>, KernelError>,
+{
+    pub fn new(pages: &'a mut PagePool, map_block: F) -> Self {
+        Self {
+            pages,
+            map_block,
+        }
+    }
+}
+
+impl<'a, F> TableVisitor for MapRange<'a, F>
+where
+    F: FnMut(&mut PagePool, VirtualAddress, usize) -> Result<Option<(PhysicalAddress, u64)>, KernelError>,
+{
+    fn visit_granuale(&mut self, _addr_bits: usize, _table: &mut [u64], _index: usize, _vaddr: VirtualAddress) -> Result<(), KernelError> {
+        Err(KernelError::AddressAlreadyMapped)
+    }
+
+    fn visit_empty(&mut self, addr_bits: usize, table: &mut [u64], index: usize, vaddr: VirtualAddress, end: VirtualAddress) -> Result<(), KernelError> {
+        if addr_bits != 12 {
+            ensure_table_entry(table, index, self.pages)?;
+
+            let subtable = table_ref_mut(table, index)?;
+            walk_table(self, addr_bits - 9, subtable, vaddr, end)?;
+        } else {
+            let granuale_size = 1 << addr_bits;
+            if let Some((paddr, flags)) = (self.map_block)(self.pages, vaddr, granuale_size)? {
+                table[index] = (u64::from(paddr) & TT_BLOCK_MASK) | flags | block_type(granuale_size);
+            }
+        }
+        Ok(())
+    }
+}
+
+fn ensure_table_entry(table: &mut [u64], index: usize, pages: &mut PagePool) -> Result<(), KernelError> {
+    let desc_type = descriptor_type(table, index);
+
+    match desc_type {
+        TT2_DESCRIPTOR_TABLE => {
+            // Do nothing. Sub-table is already present
+            Ok(())
+        },
+
+        TT_DESCRIPTOR_EMPTY => {
+            let next_table = allocate_table(pages);
+            table[index] = (u64::from(next_table) & TT_TABLE_MASK) | TT2_DESCRIPTOR_TABLE;
+            Ok(())
+        },
+        TT2_DESCRIPTOR_BLOCK => {
+            Err(KernelError::AddressAlreadyMapped)
+        },
+        _ => {
+            Err(KernelError::CorruptTranslationTable)
+        },
+    }
 }
 
 
@@ -545,6 +560,14 @@ const fn memory_permissions_flags(permissions: MemoryPermissions) -> u64 {
         MemoryPermissions::ReadExecute => TT_READ_ONLY_FLAG,
         MemoryPermissions::ReadWrite => TT_READ_WRITE_FLAG | TT_NO_EXECUTE_FLAG,
         MemoryPermissions::ReadWriteExecute => TT_READ_WRITE_FLAG,
+    }
+}
+
+const fn block_type(granuale_size: usize) -> u64 {
+    if granuale_size == page_size() {
+        TT3_DESCRIPTOR_BLOCK
+    } else {
+        TT2_DESCRIPTOR_BLOCK
     }
 }
 
