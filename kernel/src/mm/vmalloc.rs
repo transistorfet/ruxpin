@@ -119,7 +119,7 @@ impl VirtualAddressSpace {
                 (increment >= 0 && segs[data].end.add(increment as usize) >= segs[stack].start) ||
                 (increment >= 0 && segs[data].end.sub((-1 * increment) as usize) >= segs[stack].start)
             {
-                segs[stack].resize_stack(&mut self.table, increment)?;
+                segs[stack].resize_stack(&mut self.table, -1 * increment)?;
             }
             segs[data].resize(&mut self.table, increment)?;
         }

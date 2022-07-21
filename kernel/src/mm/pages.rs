@@ -63,7 +63,7 @@ impl PagePool {
                 return addr;
             }
         }
-        panic!("Out of memory");
+        panic!("pages: out of pages");
     }
 
     pub fn alloc_page_zeroed(&mut self) -> PhysicalAddress {

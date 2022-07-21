@@ -24,7 +24,7 @@ static mut MAIN_HEAP: Heap = Heap {
 
 #[alloc_error_handler]
 fn out_of_memory(_: Layout) -> ! {
-    panic!("Out Of Memory");
+    panic!("user allocator: out of memory");
 }
 
 unsafe impl GlobalAlloc for Heap {

@@ -20,8 +20,8 @@ struct Heap {
 static mut MAIN_HEAP: Heap = Heap { free_blocks: ptr::null_mut() };
 
 #[alloc_error_handler]
-fn out_of_memory(_: Layout) -> ! {
-    panic!("Out Of Memory");
+fn out_of_memory(layout: Layout) -> ! {
+    panic!("kmalloc: out of memory while allocating {}", layout.size());
 }
 
 pub fn initialize(start: PhysicalAddress, end: PhysicalAddress) {

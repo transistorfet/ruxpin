@@ -9,6 +9,7 @@ use crate::fs;
 use crate::debug;
 use crate::arch::mmu;
 use crate::misc::memory;
+use crate::misc::align_down;
 use crate::errors::KernelError;
 use crate::arch::VirtualAddress;
 use crate::misc::strarray::StandardArrayOfStrings;
@@ -53,6 +54,7 @@ pub fn load_binary(proc: Task, path: &str, argv: &StandardArrayOfStrings, envp: 
         slice::from_raw_parts(ps_page.as_ptr().add(header.e_phoff as usize) as *const Elf64ProgramSegment, header.e_phnum as usize)
     };
 
+    let mut end_of_data = 0;
     for (i, segment) in program_segments.iter().enumerate() {
         debug!("program segment {}: {:x} {:x} offset: {:x} v:{:x} p:{:x} size: {:x}", i, segment.p_type, segment.p_flags, segment.p_offset, segment.p_vaddr, segment.p_paddr, segment.p_filesz);
 
@@ -63,17 +65,17 @@ pub fn load_binary(proc: Task, path: &str, argv: &StandardArrayOfStrings, envp: 
             let permissions = flags_to_permissions(segment.p_flags)?;
             let stype = if permissions == MemoryPermissions::ReadWrite { SegmentType::Data } else { SegmentType::Text };
             locked_proc.space.try_lock()?.add_file_backed_segment(stype, permissions, cache.clone(), segment.p_offset as usize, segment.p_filesz as usize, vaddr, offset, segment.p_memsz as usize)?;
-
-            // TODO this is a hack to forcefully load the page because the page fault in kernel space doesn't work
-            //locked_proc.space.try_lock()?.alloc_page_at(vaddr)?;
-
         } else if segment.p_type == PT_GNU_RELRO {
             //char **data = proc->map.segments[M_TEXT].base + prog_headers[i].p_vaddr;
             //for (int entries = prog_headers[i].p_memsz >> 2; entries; entries--, data++)
             //    *data = (char *) proc->map.segments[M_TEXT].base + (size_t) *data;
         }
+
+        if segment.p_vaddr + segment.p_memsz > end_of_data {
+            end_of_data = segment.p_vaddr + segment.p_memsz;
+        }
     }
-    set_up_stack(&mut *locked_proc, VirtualAddress::from(header.e_entry), argv, envp)?;
+    set_up_stack(&mut *locked_proc, end_of_data, VirtualAddress::from(header.e_entry), argv, envp)?;
 
     Ok(())
 }
@@ -91,12 +93,13 @@ fn flags_to_permissions(flags: Elf64Word) -> Result<MemoryPermissions, KernelErr
     }
 }
 
-fn set_up_stack(locked_proc: &mut TaskRecord, entrypoint: VirtualAddress, argv: &StandardArrayOfStrings, envp: &StandardArrayOfStrings) -> Result<(), KernelError> {
+fn set_up_stack(locked_proc: &mut TaskRecord, end_of_data: u64, entrypoint: VirtualAddress, argv: &StandardArrayOfStrings, envp: &StandardArrayOfStrings) -> Result<(), KernelError> {
     let page_size = mmu::page_size();
 
     // TODO the size here is wrong, it needs to use the brk as the stack size, it needs to start higher (0x0001_0000_0000_0000 or 0x0000_8000_0000_0000)
-    let stack_size = page_size * page_size;
     let stack_start = 0x1_0000_0000 as u64;
+    //let stack_size = page_size * page_size;
+    let stack_size = align_down((stack_start - end_of_data) as usize, page_size);
 
     locked_proc.space.try_lock()?.add_memory_segment(SegmentType::Stack, MemoryPermissions::ReadWrite, VirtualAddress::from(stack_start - stack_size as u64), stack_size)?;
 
