@@ -1,7 +1,14 @@
 
-* you have code in the stash for allocating page tables on demand
+* there needs to be a way to initialize a new table with block entries and the permissions flags set correctly,
+  but that will require storing some of those flags in the table descriptors, which can then be copied to the block
+  entries during the lookup that creates the table (the update_address method doesn't have access to the memory type).
+  But this also requires somehow getting the flags that should be used from the MapRange function, or adding a new
+  function or argument for the flags to use for tables...
 
+* empty the old git stashes
 * should you change the memory map functions to take an end address instead of a length?
+
+* write tests for mmu translation tables
 
 
 
