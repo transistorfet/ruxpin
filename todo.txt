@@ -1,21 +1,10 @@
 
-* there needs to be a way to initialize a new table with block entries and the permissions flags set correctly,
-  but that will require storing some of those flags in the table descriptors, which can then be copied to the block
-  entries during the lookup that creates the table (the update_address method doesn't have access to the memory type).
-  But this also requires somehow getting the flags that should be used from the MapRange function, or adding a new
-  function or argument for the flags to use for tables...
+* for multi-core support, you first need per-cpu memory allocation (and maybe go into rust before kernel_start)
+* make a USB driver (so you can access the ethernet module)
 
-* empty the old git stashes
 * should you change the memory map functions to take an end address instead of a length?
-
-* write tests for mmu translation tables
-
-
-
-* in order to map large areas of memory feasibly, it needs to be possible populate the map tables on demand, because otherwise it's allocating
-  a huge number of pages just to populate the tables down to 4KB, which uses a lot of memory if only the first page of the stack segment is used
-* make the elf loader use the maximum possible stack size, so that it butts up against the data segment.
 * add stack page guard, which would have to be created when the loader creates the stack, and also when sbrk/adjust is called
+* write tests for mmu translation tables
 
 
 * there could be a memory leak with pages.  When the shell exits, you can print all the allocated pages that aren't freed
@@ -26,12 +15,18 @@
   page, and thus PhysicalAddress, so that you can switch back and forth (between an Arc<Page> and a PhysicalAddress)
 
 
-* for multi-core support, you first need per-cpu memory allocation (and maybe go into rust before kernel_start)
 * switch/fix the console driver that tries to use buffered I/O (the interrupt doesn't get triggered in a way that makes it difficult to
   completely avoid directly writing to the hardware FIFO)
 
 
 HIGH PRIORITY ISSUES:
+
+* should you make a new `subsystems/` directory to contain block, tty, usb, maybe fs? (and have it compile flagged))
+* If you did this, would arch/, proc/, and mm/ still be in the kernel?  Would api/ move to its own thing, or to the subsystems
+  Should misc be moved to lib/ somewhere?
+* can you make things like the open files for a given process be stored outside the task struct in a way that's linked or easily findable?
+  then those dependencies can be removed from proc/ so that it can stand on its own (kernel code must not reference subsystem/ code, but it
+  could reference lib/ code)
 
 * need to add a way to remove from pagecached files that are no longer used
 

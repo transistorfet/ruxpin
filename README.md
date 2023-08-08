@@ -8,7 +8,7 @@ An attempt at making an Operating System in Rust for a Raspberry Pi 3.  Due to
 time constraints, I've prioritized getting something that works instead of
 trying new ideas, so for now it's a monolithic OS with a Unix-like API, but I
 might change that in the future.  I largely copied what I had done for
-[ComputieOS](https://jabberwocky.ca/projects/computie/) which is written in C.
+[Gloworm OS](https://jabberwocky.ca/projects/gloworm/) which is written in C.
 
 At the moment, it has support for virtual memory, with on-demand page
 allocation, but no support yet for swapping memory to disk.  It has a virtual
